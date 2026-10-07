@@ -1,3 +1,4 @@
+import type React from "react";
 import { Input } from "@/components/ui/input.tsx";
 import { Label } from "@/components/ui/label.tsx";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card.tsx";
@@ -26,6 +27,10 @@ interface AddressFormProps {
   isAuthenticated: boolean;
   onFieldChange: (field: keyof FormData, value: string) => void;
   onPhoneChange: (value: string) => void;
+  /** WhatsApp verification under the phone field (PhoneVerify), when it is switched on. */
+  phoneExtra?: React.ReactNode;
+  /** Verifying the number already gave consent, so the offers box is not asked again. */
+  hideMarketingOptIn?: boolean;
 }
 
 export function AddressForm({
@@ -37,6 +42,8 @@ export function AddressForm({
   isAuthenticated,
   onFieldChange,
   onPhoneChange,
+  phoneExtra,
+  hideMarketingOptIn = false,
 }: AddressFormProps) {
   return (
     <>
@@ -99,7 +106,7 @@ export function AddressForm({
               <p className="text-xs text-red-600 mt-1">
                 Please enter a valid 10-digit mobile number
               </p>
-            ) : (
+            ) : phoneExtra ?? (
               // The number is saved with the cart as soon as it is typed (cartSync.ts).
               <p className="text-xs text-muted-foreground mt-1">
                 For order updates. We keep it with your cart so you can pick up where you left off.
@@ -110,7 +117,7 @@ export function AddressForm({
                 ✓ Verified for COD orders
               </p>
             )}
-            {onMarketingOptInChange && (
+            {onMarketingOptInChange && !hideMarketingOptIn && (
               <WhatsAppOptIn checked={marketingOptIn} onCheckedChange={onMarketingOptInChange} className="mt-3" />
             )}
           </div>

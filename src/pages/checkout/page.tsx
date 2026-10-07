@@ -26,6 +26,8 @@ import { CheckoutUpsells } from "./_components/checkout-upsells.tsx";
 import { CartSmartSetup, useSmartRepricing } from "@/components/cart-smart-setup.tsx";
 import { trackBeginCheckout, trackAddPaymentInfo, trackCheckoutValidationError, trackPaymentIssue, trackCheckoutAbandoned, markCheckoutDone, checkoutEventContext } from "@/lib/analytics.ts";
 import { AddressForm, type FormData } from "./_components/AddressForm.tsx";
+import { PhoneVerify } from "./_components/PhoneVerify.tsx";
+import { loadFs } from "@/lib/fs";
 import { PaymentMethodSelector } from "./_components/PaymentMethodSelector.tsx";
 import { CodOtpSection } from "./_components/CodOtpSection.tsx";
 import { WalletSection } from "./_components/WalletSection.tsx";
@@ -355,6 +357,22 @@ function CheckoutPageInner() {
     if (value !== "cod") { setOtpSent(false); setOtpVerified(false); setOtpInput(""); setOtpExpiresAt(null); setCodOtpToken(null); }
   };
 
+  /*
+   * WhatsApp verification of the checkout phone (settings/cartSaveOtp):
+   * a verified number is proven for delivery and carries the shopper's
+   * consent; checkoutRequired makes it a must before Place Order.
+   */
+  const [phoneOtpCfg, setPhoneOtpCfg] = useState<{ enabled: boolean; required: boolean }>({ enabled: false, required: false });
+  const [phoneToken, setPhoneToken] = useState<{ phone: string; token: string } | null>(null);
+  useEffect(() => {
+    let live = true;
+    loadFs().then(({ doc, getDoc, db }) => getDoc(doc(db, "settings", "cartSaveOtp")))
+      .then((s) => { const d = s.data() || {}; if (live) setPhoneOtpCfg({ enabled: d.enabled === true, required: d.enabled === true && d.checkoutRequired === true }); })
+      .catch(() => undefined);
+    return () => { live = false; };
+  }, []);
+  const phoneVerified = !!phoneToken && phoneToken.phone === formData.phone;
+
   const handlePhoneChange = (value: string) => {
     const digitsOnly = value.replace(/\D/g, "").slice(0, 10);
     setFormData((prev) => ({ ...prev, phone: digitsOnly }));
@@ -497,6 +515,7 @@ function CheckoutPageInner() {
       invalid("email_format", "Please enter a valid email address"); return;
     }
     if (!isPhoneValid) { invalid("phone", "Please enter a valid 10-digit mobile number"); return; }
+    if (phoneOtpCfg.required && !phoneVerified) { invalid("phone_verify", "Please verify your WhatsApp number to continue"); return; }
     if (!formData.addressLine1.trim()) { invalid("addressLine1", "Please enter address line 1"); return; }
     if (!formData.city.trim()) { invalid("city", "Please enter your city"); return; }
     if (!formData.state.trim()) { invalid("state", "Please enter your state"); return; }
@@ -528,6 +547,7 @@ function CheckoutPageInner() {
         codOtpToken: formData.paymentMethod === "cod" ? codOtpToken || undefined : undefined,
         marketingOptIn: marketingOptIn || undefined,
         attribution: getAttribution(),
+        phoneOtpToken: phoneVerified ? phoneToken?.token : undefined,
         // For the Conversions API: _fbp/_fbc/fbclid/utm and this checkout's event_ids (functions/src/metaCapi.ts).
         tracking: { ...getAdTracking(), ...checkoutEventContext() },
         codFee: codFeeAmount, prepaidAmount, codAmount,
@@ -765,6 +785,17 @@ function CheckoutPageInner() {
                 isAuthenticated={isAuthenticated}
                 onFieldChange={handleFieldChange}
                 onPhoneChange={handlePhoneChange}
+                hideMarketingOptIn={phoneVerified}
+                phoneExtra={phoneOtpCfg.enabled ? (
+                  <PhoneVerify
+                    phone={formData.phone}
+                    isPhoneValid={isPhoneValid}
+                    verified={phoneVerified}
+                    required={phoneOtpCfg.required}
+                    items={(cartItems || []) as any[]}
+                    onVerified={(token) => { setPhoneToken({ phone: formData.phone, token }); setMarketingOptIn(true); }}
+                  />
+                ) : undefined}
               />
 
               {isAuthenticated && (

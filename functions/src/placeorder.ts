@@ -97,6 +97,14 @@ export const placeOrder = functions
 
     const { shippingAddress, customerEmail, guestEmail, paymentMethod, guestItems,
             sessionId: reqSessionId, customerPhone, couponId, walletAmount, referralCode, ownReferralCode } = data;
+
+    // Checked first, before any coupon use is claimed. A phone proven by the WhatsApp code at checkout (phoneOtp.ts).
+    const { verifyPhoneToken, checkoutPhoneRequired } = await import("./phoneOtp");
+    const phone10 = String(shippingAddress?.phone || "").replace(/\D/g, "").slice(-10);
+    const phoneVerified = verifyPhoneToken(data?.phoneOtpToken, phone10);
+    if (!phoneVerified && (await checkoutPhoneRequired())) {
+      throw new HttpsError("failed-precondition", "Please verify your WhatsApp number to place the order");
+    }
     // Note: couponDiscount / prepaidAmount / amount also arrive from the client.
     // They are deliberately ignored — every figure below is re-derived here.
 
@@ -561,6 +569,7 @@ export const placeOrder = functions
       // For the Conversions API (metaCapi.ts): _fbp, _fbc, fbclid, utm, this
       // checkout's event_ids, and the buyer's IP and browser as this call saw them.
       ...(tracking ? { tracking } : {}),
+      ...(phoneVerified ? { phoneVerified: true, phoneVerifiedAt: Date.now() } : {}),
       createdAt: Date.now(),
       updatedAt: Date.now(),
     });

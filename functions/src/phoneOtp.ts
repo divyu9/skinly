@@ -15,8 +15,13 @@ import { cleanItems } from "./cartSync";
  * to updates and promotional messages about the order and products. The
  * abandoned-cart reminder then reaches them like any checkout left half-way.
  *
+ * The same code verifies the phone at checkout (purpose "checkout"): the
+ * reply carries a short-lived token that placeOrder checks and records as
+ * order.phoneVerified, so delivery has a proven number.
+ *
  * Switch and template: settings/cartSaveOtp
- *   { enabled: true, templateName: "<approved authentication template>", language: "en" }
+ *   { enabled: true, templateName: "<approved authentication template>", language: "en",
+ *     checkoutRequired: false }   // true = no order without a verified number
  * The cart page shows the box only while `enabled` is true. Needs
  * FAST2SMS_API_KEY and OTP_PEPPER in functions/.env and the business number's
  * phone_number_id in whatsappSettings/provider.
@@ -27,6 +32,7 @@ const RESEND_COOLDOWN_MS = 60_000;
 const MAX_ATTEMPTS = 5;
 export const CART_SAVE_CONSENT =
   "By verifying this number you agree to receive updates and promotional messages about your order and our products on WhatsApp. Reply STOP anytime.";
+// Both boxes show the same sentence (save-cart-whatsapp.tsx, PhoneVerify.tsx).
 
 const sha = (s: string) => crypto.createHash("sha256").update(s).digest("hex");
 const hashOtp = (otp: string, phone: string) => {
@@ -94,6 +100,27 @@ export const sendCartSaveOtp = onCall(async (data: any, context: any) => {
   return { sent: true };
 });
 
+const TOKEN_TTL_MS = 3 * 3600_000;
+const sign = (s: string) => {
+  const pepper = process.env.OTP_PEPPER || "";
+  if (pepper.length < 16) throw new HttpsError("failed-precondition", "OTP is not set up yet");
+  return crypto.createHmac("sha256", pepper).update(`phone-token:${s}`).digest("hex").slice(0, 32);
+};
+/** placeOrder: is this the token verifyCartSaveOtp gave for this phone, and still fresh? */
+export function verifyPhoneToken(token: unknown, phone10: string): boolean {
+  try {
+    const [p, exp, mac] = String(token || "").split(".");
+    if (!p || p !== phone10 || !(Number(exp) > Date.now())) return false;
+    const want = sign(`${p}.${exp}`);
+    return mac?.length === want.length && crypto.timingSafeEqual(Buffer.from(mac), Buffer.from(want));
+  } catch { return false; }
+}
+/** Whether checkout refuses an unverified number (settings/cartSaveOtp.checkoutRequired). */
+export async function checkoutPhoneRequired(): Promise<boolean> {
+  const s = (await admin.firestore().doc("settings/cartSaveOtp").get()).data() as any;
+  return s?.enabled === true && s?.checkoutRequired === true;
+}
+
 export const verifyCartSaveOtp = onCall(async (data: any) => {
   const phone = tenDigits(data?.phone);
   const otp = String(data?.otp || "").replace(/\D/g, "");
@@ -115,10 +142,11 @@ export const verifyCartSaveOtp = onCall(async (data: any) => {
   const now = Date.now();
   // Consent, as the box worded it at the moment of verifying.
   await db.collection("contacts").doc(phone).set({
-    optIn: true, optInAt: now, optInSource: "cart_save_otp", optOut: false,
+    optIn: true, optInAt: now, optInSource: data?.purpose === "checkout" ? "checkout_otp" : "cart_save_otp", optOut: false,
     phoneVerifiedAt: now, consentText: CART_SAVE_CONSENT,
   }, { merge: true });
 
+  const purpose = data?.purpose === "checkout" ? "checkout" : "cart";
   const items = cleanItems(data?.items);
   const snap = db.collection("cartSnapshots").doc(cartId);
   const prev = await snap.get();
@@ -127,10 +155,11 @@ export const verifyCartSaveOtp = onCall(async (data: any) => {
     items,
     itemCount: items.reduce((n, i) => n + i.quantity, 0),
     total: Math.round(items.reduce((s, i) => s + i.price * i.quantity, 0)),
-    stage: prevStage === "checkout" || prevStage === "ordered" ? prevStage : "saved",
+    stage: purpose === "checkout" ? "checkout" : prevStage === "checkout" || prevStage === "ordered" ? prevStage : "saved",
     phone, optIn: true, phoneVerified: true,
     checkoutAt: now, updatedAt: now,
     ...(prev.exists ? {} : { createdAt: now }),
   }, { merge: true });
-  return { ok: true };
+  const exp = now + TOKEN_TTL_MS;
+  return { ok: true, token: `${phone}.${exp}.${sign(`${phone}.${exp}`)}` };
 });
