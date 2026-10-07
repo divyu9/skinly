@@ -130,7 +130,10 @@ function AdminCouponsPageInner() {
       effectType: coupon.effectType || "discount",
       discountType: coupon.discountType,
       discountValue: String(coupon.discountValue),
-      minPurchase: coupon.minPurchase ? String(coupon.minPurchase) : "",
+      // "Min Cart Value" was a second field for the same rule (checkout and
+      // placeOrder take the larger of the two); it is folded in here.
+      minPurchase: Math.max(Number(coupon.minPurchase) || 0, Number(coupon.minCartValue) || 0)
+        ? String(Math.max(Number(coupon.minPurchase) || 0, Number(coupon.minCartValue) || 0)) : "",
       maxDiscount: coupon.maxDiscount ? String(coupon.maxDiscount) : "",
       startDate: toLocalInput(coupon.startDate),
       endDate: toLocalInput(coupon.endDate),
@@ -139,7 +142,7 @@ function AdminCouponsPageInner() {
       applicableVariantIds: coupon.applicableVariantIds || [],
       applicableCollectionIds: coupon.applicableCollectionIds || [],
       applicableProductKeywords: coupon.applicableProductKeywords?.join(", ") || "",
-      minCartValue: coupon.minCartValue ? String(coupon.minCartValue) : "",
+      minCartValue: "",
       minProductValue: coupon.minProductValue ? String(coupon.minProductValue) : "",
       allowedCustomerEmails: coupon.allowedCustomerEmails?.join(", ") || "",
     });
@@ -226,7 +229,7 @@ function AdminCouponsPageInner() {
         applicableProductKeywords: formData.applicableProductKeywords
           ? formData.applicableProductKeywords.split(",").map((k) => k.trim()).filter(Boolean)
           : undefined,
-        minCartValue: formData.minCartValue ? parseFloat(formData.minCartValue) : undefined,
+        minCartValue: undefined,
         minProductValue: formData.minProductValue ? parseFloat(formData.minProductValue) : undefined,
         allowedCustomerEmails: formData.allowedCustomerEmails
           ? formData.allowedCustomerEmails.split(",").map((e) => e.trim()).filter(Boolean)
@@ -533,11 +536,8 @@ function AdminCouponsPageInner() {
                     <div className="mt-4 pt-4 border-t space-y-2">
                       <div className="text-sm font-medium">Conditions:</div>
                       <div className="flex flex-wrap gap-2">
-                        {coupon.minPurchase && (
-                          <Badge variant="outline">Min purchase: ₹{coupon.minPurchase}</Badge>
-                        )}
-                        {coupon.minCartValue && (
-                          <Badge variant="outline">Min cart: ₹{coupon.minCartValue}</Badge>
+                        {Math.max(Number(coupon.minPurchase) || 0, Number(coupon.minCartValue) || 0) > 0 && (
+                          <Badge variant="outline">Min cart: ₹{Math.max(Number(coupon.minPurchase) || 0, Number(coupon.minCartValue) || 0)}</Badge>
                         )}
                         {coupon.minProductValue && (
                           <Badge variant="outline">Min product: ₹{coupon.minProductValue}</Badge>
@@ -688,7 +688,7 @@ function AdminCouponsPageInner() {
                       </div>
                     )}
                     <div>
-                      <Label htmlFor="minPurchase">Min Purchase (₹)</Label>
+                      <Label htmlFor="minPurchase">Min Cart Value (₹)</Label>
                       <Input
                         id="minPurchase"
                         type="number"
@@ -698,6 +698,7 @@ function AdminCouponsPageInner() {
                           setFormData({ ...formData, minPurchase: e.target.value })
                         }
                       />
+                      <p className="mt-1 text-xs text-muted-foreground">Whole cart's items, before shipping.</p>
                     </div>
                   </div>
                 </div>
@@ -863,18 +864,6 @@ function AdminCouponsPageInner() {
 
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <Label htmlFor="minCartValue">Min Cart Value (₹)</Label>
-                      <Input
-                        id="minCartValue"
-                        type="number"
-                        step="0.01"
-                        value={formData.minCartValue}
-                        onChange={(e) =>
-                          setFormData({ ...formData, minCartValue: e.target.value })
-                        }
-                      />
-                    </div>
-                    <div>
                       <Label htmlFor="minProductValue">Min Product Value (₹)</Label>
                       <Input
                         id="minProductValue"
@@ -885,7 +874,7 @@ function AdminCouponsPageInner() {
                           setFormData({ ...formData, minProductValue: e.target.value })
                         }
                       />
-                      <p className="mt-1 text-xs text-muted-foreground">The products this coupon is for must add up to at least this.</p>
+                      <p className="mt-1 text-xs text-muted-foreground">Only the products this coupon is for (chosen above) must add up to at least this. The minimum cart value is set at the top.</p>
                     </div>
                   </div>
                 </div>
@@ -951,7 +940,20 @@ function AdminCouponsPageInner() {
                   <Skeleton key={i} className="h-20 w-full" />
                 ))}
               </div>
-            ) : eligibleProducts.length === 0 ? (
+            ) : (eligibleProducts as any).allProducts ? (
+              <Empty>
+                <EmptyHeader>
+                  <EmptyMedia variant="icon">
+                    <PackageIcon />
+                  </EmptyMedia>
+                  <EmptyTitle>Applies to every product</EmptyTitle>
+                  <EmptyDescription>
+                    This coupon has no product, collection or keyword condition, so it works on the whole site
+                    (minimum cart value and other limits still apply).
+                  </EmptyDescription>
+                </EmptyHeader>
+              </Empty>
+            ) : ((eligibleProducts as any).products || []).length === 0 ? (
               <Empty>
                 <EmptyHeader>
                   <EmptyMedia variant="icon">
@@ -965,11 +967,14 @@ function AdminCouponsPageInner() {
               </Empty>
             ) : (
               <div className="space-y-4">
-                {eligibleProducts.map((product) => (
+                <p className="text-sm text-muted-foreground">
+                  {(eligibleProducts as any).total >= 200 ? "Showing the first 200 matching products" : `${(eligibleProducts as any).total} matching product(s)`}
+                </p>
+                {((eligibleProducts as any).products as any[]).map((product: any) => (
                   <Card key={product._id}>
                     <CardContent className="p-4">
                       <div className="flex gap-4">
-                        {product.images[0] && (
+                        {product.images?.[0]?.url && (
                           <img
                             src={product.images[0].url}
                             alt={product.title}
@@ -982,7 +987,7 @@ function AdminCouponsPageInner() {
                             {product.variants.length} eligible variant(s)
                           </p>
                           <div className="flex flex-wrap gap-1 mt-2">
-                            {product.variants.slice(0, 3).map((v) => (
+                            {product.variants.slice(0, 3).map((v: any) => (
                               <Badge key={v._id} variant="outline" className="text-xs">
                                 {v.title} - ₹{v.price}
                               </Badge>

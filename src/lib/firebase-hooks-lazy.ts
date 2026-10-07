@@ -23,7 +23,7 @@ import { searchRows } from "./search-match";
 import { calculateGST } from "./gst";
 import { laptopBodyKeys, squash } from "./laptop-body";
 import { brandInScope } from "./device-fit";
-import { onSnapshot, getDocs, getDoc, resolveUserDocId, exportRows, userIdCandidates, stripUndefinedDeep } from './firebase-hooks-store';
+import { onSnapshot, getDocs, getDoc, resolveUserDocId, exportRows, userIdCandidates, stripUndefinedDeep, couponScope } from './firebase-hooks-store';
 
 export type QueryCtx = { path: string; args: any; setData: (v: any) => void; unsubscribe: () => void };
 
@@ -1149,13 +1149,43 @@ const h42 = async (c: QueryCtx) => {
           }
         }
 };
+/*
+ * Admin › Coupons › Eligible Products: what this coupon actually applies to,
+ * by the same rule checkout and placeOrder use (couponScope).
+ *
+ * It returned every active product, ignored the coupon, and sent no
+ * variants — so the dialog crashed on `product.variants.length`. A coupon
+ * with no product conditions applies to the whole site; that is said, rather
+ * than listing all 1,400 products.
+ */
 const h43 = async (c: QueryCtx) => {
-  const { path, args, setData } = c;
-  void path; void args; void setData;
-  {
-          c.unsubscribe = onSnapshot(query(collection(db, 'products'), where('status', '==', 'active')), (snap) =>
-            setData(snap.docs.map(d => ({ _id: d.id, ...d.data() }))));
-        }
+  const { args, setData } = c;
+  try {
+    const cs = await getDoc(doc(db, 'coupons', String(args?.couponId || '')));
+    if (!cs.exists()) { setData({ allProducts: false, products: [], total: 0 }); return; }
+    const test = await couponScope(cs.data());
+    if (!test) { setData({ allProducts: true, products: [], total: 0 }); return; }
+    const prods = (await getDocs(query(collection(db, 'products'), where('status', '==', 'active'))))
+      .docs.map(d => ({ _id: d.id, ...(d.data() as any) }));
+    // One read of all variants, grouped by product, rather than one query per product.
+    const byProduct = new Map<string, any[]>();
+    (await getDocs(collection(db, 'variants'))).docs.forEach(d => {
+      const v = { _id: d.id, ...(d.data() as any) };
+      const list = byProduct.get(String(v.productId)) || [];
+      list.push(v); byProduct.set(String(v.productId), list);
+    });
+    const matched: any[] = [];
+    for (const p of prods) {
+      const vs = byProduct.get(p._id) || [];
+      const ok = vs.filter(v => test({ productId: p._id, variant: v.title, variantId: v._id, title: p.title }));
+      if (ok.length) matched.push({ ...p, images: Array.isArray(p.images) ? p.images : [], variants: ok });
+      if (matched.length >= 200) break;
+    }
+    setData({ allProducts: false, products: matched, total: matched.length });
+  } catch (e) {
+    console.error('getEligibleProducts', e);
+    setData({ allProducts: false, products: [], total: 0, error: String((e as any)?.message || e) });
+  }
 };
 const h44 = async (c: QueryCtx) => {
   const { path, args, setData } = c;
