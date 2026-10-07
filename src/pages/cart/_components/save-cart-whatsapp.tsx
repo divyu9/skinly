@@ -13,6 +13,9 @@ import { cartId } from "@/lib/cart-sync";
  * above the verify button: verifying agrees to order and product updates and
  * promotions, which is what the abandoned-cart reminder needs.
  *
+ * The copy never mentions the reminder's discount: telling a shopper they
+ * will get a code for not ordering makes them wait for it.
+ *
  * Shown only while settings/cartSaveOtp.enabled is true (an approved
  * WhatsApp authentication template is needed to send the code).
  */
@@ -49,7 +52,9 @@ export function SaveCartWhatsApp({ items }: { items: any[] }) {
     return (
       <p className="flex items-start gap-2 rounded-xl border-2 border-ink/10 bg-brand/10 p-3 text-xs">
         <CheckIcon className="mt-0.5 size-4 shrink-0 text-brand" />
-        <span>Cart saved for <b>{saved}</b>. If you don't finish your order, we'll send it to you on WhatsApp with a discount code.</span>
+        {/* No mention of the reminder or its code: promising a discount for
+            not ordering teaches people to wait for it. */}
+        <span>Cart saved for <b>{saved}</b>. Pick up right where you left off, anytime.</span>
       </p>
     );
   }
@@ -88,7 +93,7 @@ export function SaveCartWhatsApp({ items }: { items: any[] }) {
     >
       <label htmlFor={step === "phone" ? "save-cart-phone" : "save-cart-code"} className="flex items-center gap-1.5 text-sm font-semibold">
         <MessageCircleIcon className="size-4 text-brand" />
-        {step === "phone" ? "Not ready yet? Save your cart on WhatsApp" : `Enter the code sent to ${phone} on WhatsApp`}
+        {step === "phone" ? "Save your cart to your WhatsApp number" : `Enter the code sent to ${phone} on WhatsApp`}
       </label>
       <div className="flex gap-2">
         {step === "phone" ? (
