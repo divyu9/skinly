@@ -567,6 +567,8 @@ export const sendAbandonedCartReminderNow = onCall(async (data: any, context: an
   }
 
   const coupon = await createRecoveryCoupon(cart, s);
+  // Saved like the automatic reminder's, so Admin › Abandoned Carts shows it.
+  if (coupon) await admin.firestore().collection("abandonedCarts").doc(cart._id).update({ lastCouponCode: coupon }).catch(() => undefined);
   const emailSent = await sendReminderEmail(cart, coupon, s);
   if (!emailSent) {
     await giveBack();

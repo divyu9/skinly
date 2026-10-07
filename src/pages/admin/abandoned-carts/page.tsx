@@ -495,9 +495,11 @@ function AbandonedCartsPageInner() {
                           </Badge>
                         </TableCell>
                         <TableCell>
-                          {cart.couponCode ? (
+                          {/* The reminder saves its code as lastCouponCode (functions/src/abandonedCarts.ts);
+                              this read couponCode, which nothing writes, so every row said "—". */}
+                          {(cart as any).lastCouponCode || cart.couponCode ? (
                             <code className="text-xs bg-muted px-2 py-1 rounded font-mono">
-                              {cart.couponCode}
+                              {(cart as any).lastCouponCode || cart.couponCode}
                             </code>
                           ) : (
                             <span className="text-muted-foreground text-sm">—</span>
