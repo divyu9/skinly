@@ -131,6 +131,9 @@ RewriteRule ^pages/(terms-of-service|terms)$ https://goskinly.com/policies/terms
 RewriteRule ^pages/(shop|store)$ https://goskinly.com/products [R=301,L]
 RewriteRule ^pages(/.*)?$ https://goskinly.com/ [R=301,L]
 RewriteRule ^account/(login|register|signup)$ https://goskinly.com/account [R=301,L]
+# Odd old URLs from the 8 Oct 2026 Search Console 404 export
+RewriteRule ^Skinly$ https://goskinly.com/ [R=301,L]
+RewriteRule ^buy-phone-skin$ https://goskinly.com/phone-skins [R=301,L]
 # Shopify's own machinery (web-pixel manager, asset CDN, storefront password,
 # checkout): never pages, nothing replaced them. 410 tells Google to forget them.
 RewriteRule ^(wpm|cdn|password|checkouts)(/.*)?$ - [G,L]
@@ -153,6 +156,8 @@ RewriteRule ^(lens-skins-skins|lens-skins-lens-skins)$ https://goskinly.com/lens
 RewriteRule ^charger-skins-skins$ https://goskinly.com/chargers-skins [R=301,L]
 RewriteRule ^(camera-skins-skins|camera-skins-camera-skins)$ https://goskinly.com/camera-skins [R=301,L]
 RewriteRule ^(laptop-skins-skins|laptop-skins-laptop-skins)$ https://goskinly.com/laptop-skins [R=301,L]
+# Any other doubled "-skins-skins" (after the specific ones above)
+RewriteRule ^(.+)-skins-skins$ https://goskinly.com/$1-skins [R=301,L]
 RewriteRule ^matte-phone-skins-phone-skins$ https://goskinly.com/matte-phone-skins [R=301,L]
 RewriteRule ^3d-embossed-phone-skins-phone-skins$ https://goskinly.com/3d-embossed-phone-skins [R=301,L]
 
