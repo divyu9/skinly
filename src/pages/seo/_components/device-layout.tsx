@@ -66,7 +66,7 @@ export default function DevicePageLayout({ page, data }: DevicePageLayoutProps) 
               {page.h1Heading}
             </h1>
             <p className="text-xl text-muted-foreground mb-8">
-              {data?.description || page.metaDescription}
+              {page.metaDescription || data?.description}
             </p>
             <div className="flex flex-wrap gap-4">
               <Button size="lg" asChild>

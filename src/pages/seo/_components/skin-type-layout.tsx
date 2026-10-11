@@ -68,7 +68,7 @@ export default function SkinTypePageLayout({ page, data }: SkinTypePageLayoutPro
             {page.h1Heading}
           </h1>
           <p className="text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
-            {data?.description || page.metaDescription}
+            {page.metaDescription || data?.description}
           </p>
           <div className="flex flex-wrap gap-4 justify-center">
             <Button size="lg" asChild>

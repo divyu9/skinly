@@ -67,8 +67,10 @@ export default function BrandPageLayout({ page, data }: BrandPageLayoutProps) {
           <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-6 text-balance">
             {page.h1Heading}
           </h1>
+          {/* The page's own description first: it is there on the first frame, and
+              swapping in the longer generated one later added a line (CLS). */}
           <p className="text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
-            {data?.description || page.metaDescription}
+            {page.metaDescription || data?.description}
           </p>
           <div className="flex flex-wrap gap-4 justify-center">
             <Button size="lg" asChild>
