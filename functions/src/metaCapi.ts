@@ -113,6 +113,13 @@ const eventTime = (ms?: number) => {
 export type CapiResult = { ok: boolean; status?: number; error?: string; fbtraceId?: string; eventsReceived?: number; testCode?: string };
 
 /** POSTs events to the dataset. Never throws. */
+/** The result without undefined fields: Firestore refuses them, and with the
+ * test code gone `testCode: undefined` made every save of a sent event throw,
+ * so orders showed Purchase "pending" and Checkout "not sent" (Oct 2026). */
+function defined<T extends Record<string, unknown>>(o: T): T {
+  return Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined)) as T;
+}
+
 export async function sendCapiEvents(events: any[], opts: { testEventCode?: string } = {}): Promise<CapiResult> {
   if (!capiEnabled()) return { ok: false, error: "disabled (no META_CAPI_TOKEN or META_CAPI_ENABLED=false)" };
   const testCode = opts.testEventCode || TEST_CODE();
@@ -173,7 +180,7 @@ export async function sendPurchaseForOrder(db: admin.firestore.Firestore, orderI
     if (!order) return;
     const event = buildPurchaseEvent(orderId, order);
     const r = await sendCapiEvents([event]);
-    await ref.update({ "metaCapi.purchase": { claimedAt: Date.now(), via, eventId: event.event_id, value: event.custom_data.value, ...r, sentAt: Date.now() } });
+    await ref.update({ "metaCapi.purchase": { claimedAt: Date.now(), via, eventId: event.event_id, value: event.custom_data.value, ...defined(r), sentAt: Date.now() } });
     if (!r.ok) console.error("[metaCapi] Purchase failed", { orderId, ...r });
   } catch (e: any) {
     console.error("[metaCapi] Purchase error", { orderId, error: e?.message || e });
@@ -203,7 +210,7 @@ export async function sendCheckoutEventsForOrder(db: admin.firestore.Firestore, 
     }
     if (!events.length) return;
     const r = await sendCapiEvents(events);
-    await db.collection("orders").doc(orderId).update({ "metaCapi.checkout": { sentAt: Date.now(), events: events.map((e) => e.event_name), ...r } });
+    await db.collection("orders").doc(orderId).update({ "metaCapi.checkout": { sentAt: Date.now(), events: events.map((e) => e.event_name), ...defined(r) } });
     if (!r.ok) console.error("[metaCapi] checkout events failed", { orderId, ...r });
   } catch (e: any) {
     console.error("[metaCapi] checkout events error", { orderId, error: e?.message || e });

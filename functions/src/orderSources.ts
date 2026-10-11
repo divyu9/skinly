@@ -45,7 +45,11 @@ export async function syncOrderSources(days: number) {
   const db = admin.firestore();
   let written = 0, missing = 0;
   const seen = new Set<string>();
-  for (const row of data?.rows || []) {
+  // One purchase can come back on two rows, one with the session's source
+  // "(not set)"; the row that names a source wins whichever comes first.
+  const known = (r: any) => !/^\(not set\)$|^$/.test(String(r.dimensionValues[1]?.value || ""));
+  const rows = [...(data?.rows || [])].sort((a: any, b: any) => Number(known(b)) - Number(known(a)));
+  for (const row of rows) {
     const [id, source, medium, campaign, group] = row.dimensionValues.map((d: any) => String(d.value || ""));
     if (!id || id === "(not set)" || seen.has(id) || id.includes("/")) continue;
     seen.add(id);
