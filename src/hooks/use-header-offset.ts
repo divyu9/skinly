@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useLayoutEffect, useState } from "react";
+import { announcementLikelyShown, isAnnouncementDismissed } from "@/lib/announcement-dismissed.ts";
 
 /**
  * How far down the page has to start to clear the fixed header.
@@ -15,10 +16,13 @@ import { useEffect, useState } from "react";
  * does not move as you scroll. Re-measured when the header resizes and when
  * the bar above it comes or goes.
  */
-export function useHeaderOffset(fallback = 92): number {
-  const [offset, setOffset] = useState(fallback);
+export function useHeaderOffset(fallback?: number): number {
+  // First frame: the same answer the header uses (64 + the bar, if it is up),
+  // not a fixed 92 — with the bar off that padded the page 28px too far and
+  // it jumped up once measured (field CLS). Measured before paint after that.
+  const [offset, setOffset] = useState(() => fallback ?? (announcementLikelyShown() && !isAnnouncementDismissed() ? 92 : 64));
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const measure = () => {
       const header = document.querySelector("header");
       if (!header) return;

@@ -296,7 +296,10 @@ export default function App() {
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="/mock-payment" element={<Suspense fallback={<PageSkeleton />}><MockPaymentPage /></Suspense>} />
             {/* SEO landing pages (catch-all for root-level slugs) - must be second to last */}
-            <Route path="/:slug" element={<Suspense fallback={<PageSkeleton />}><SEOPage /></Suspense>} />
+            {/* No skeleton while the chunk loads: it drew at the top of the page with no
+                room for the header, then the page arrived 96px lower (0.17 of CLS on
+                every landing page). Blank until the page is ready moves nothing. */}
+            <Route path="/:slug" element={<Suspense fallback={null}><SEOPage /></Suspense>} />
             {/* 404 - must be absolute last */}
             <Route path="*" element={<NotFound />} />
           </Routes>

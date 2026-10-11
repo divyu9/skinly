@@ -397,6 +397,20 @@ function seedFor(p) {
  * soon as it downloads. React replaces it on its first render with the same
  * picture in the same box, already decoded, so nothing moves.
  */
+/*
+ * Whether the notice bar is up, on every page. The header sits under the bar
+ * and the page pads for both, so a page that guessed wrong moved 28px once
+ * Firestore answered: Search Console's field CLS stayed over 0.1 on phone and
+ * desktop once the BBD sale bar ended (9 Oct 2026) while still switched on.
+ * The homepage already gets the whole settings doc in __homeSeed; the other
+ * pages get just this (announcementLikelyShown reads it, end time included).
+ */
+let announcementSeed = null;
+function announcementSeedFor(p) {
+  if (!announcementSeed || p.homeSeed) return "";
+  return `<script id="__annSeed" type="application/json">${JSON.stringify(announcementSeed).replace(/</g, "\\u003c")}</script>`;
+}
+
 function homeSeedFor(p) {
   if (!p.homeSeed) return "";
   return `<script id="__homeSeed" type="application/json">${JSON.stringify(p.homeSeed).replace(/</g, "\\u003c")}</script>`;
@@ -511,6 +525,12 @@ function productShell(s) {
         `</div><div></div></div>` +
       `</div></div>` +
     `</div>` +
+    // Padded for the notice bar (92 + 12); 28px less when the page's
+    // __annSeed says the bar is off or over, so the photo stays put when
+    // the app's own copy replaces it.
+    `<script>(function(){try{var a=JSON.parse(document.getElementById("__annSeed").textContent);` +
+    `if(!a.enabled||!a.text||(a.endsAt&&Date.now()>a.endsAt)||sessionStorage.getItem("skinly_announcement_dismissed")==="1")` +
+    `document.querySelector("#__photoShell > div").style.paddingTop="76px"}catch(e){}})();</script>` +
     `<script>(function(){var t0=Date.now(),p=location.pathname;function done(){var s=document.getElementById("__photoShell");if(s)s.remove();clearInterval(iv)}` +
     `var iv=setInterval(function(){if(location.pathname!==p||Date.now()-t0>15000)return done();` +
     `var m=document.querySelector("#root [data-main-photo]");if(m&&m.complete&&m.naturalWidth)(document.hidden?done():requestAnimationFrame(function(){requestAnimationFrame(done)}))},100)})();</script>`
@@ -572,7 +592,7 @@ function render(template, p) {
     ? `<link rel="preload" as="image" imagesrcset="${esc(ph.srcset)}" imagesizes="${esc(ph.sizes)}" fetchpriority="high" />\n    `
     : "";
   html = html.replace("<!--seo-head-->", photoPreload + headFor(p));
-  html = html.replace("<!--seo-body-->", noscriptFor(p) + seedFor(p) + homeSeedFor(p));
+  html = html.replace("<!--seo-body-->", noscriptFor(p) + seedFor(p) + homeSeedFor(p) + announcementSeedFor(p));
   if (p.rootHtml) {
     html = html.replace('<div id="root"></div>', `<div id="root">${p.rootHtml}</div>`);
     html = heroFirst(html);
@@ -2291,6 +2311,15 @@ async function main() {
     };
   } catch (err) {
     log(`Firestore unreachable (${err?.message || err}); writing static pages only`);
+  }
+
+  if (data?.homepageSettings !== undefined) {
+    const hs = data.homepageSettings || {};
+    announcementSeed = {
+      enabled: hs.announcementEnabled === true,
+      text: String(hs.announcementText || ""),
+      endsAt: Number(hs.announcementEndsAt) || 0,
+    };
   }
 
   if (!data) {

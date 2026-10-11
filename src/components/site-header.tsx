@@ -84,10 +84,17 @@ export function SiteHeader({
         </div>
       </nav>
 
-      {/* LATEST MODELS STRIP */}
-      <div className="w-full bg-primary/5 border-y border-primary/10 mt-24 overflow-hidden">
+      {/* LATEST MODELS STRIP — one fixed height in every state (desktop only),
+          so the page under it never moves when the models arrive. On a phone
+          the "Loading…" row used to stand 52px tall and then vanish, pulling
+          every landing page up (field CLS over 0.25). */}
+      {/* Room for the fixed nav as a spacer, not mt-24: a top margin on the
+          page's first block collapses through to <body>, so the body itself
+          moved 96px down when this mounted (0.17 of CLS). */}
+      <div className="h-24" aria-hidden="true" />
+      <div className="w-full bg-primary/5 border-y border-primary/10 overflow-hidden">
         {latestModels === undefined && (
-          <div className="py-4 flex items-center justify-center gap-2">
+          <div className="hidden md:flex h-14 items-center justify-center gap-2">
             <div className="size-4 rounded-full bg-primary/40 animate-pulse" />
             <span className="text-sm text-muted-foreground">
               Loading latest models...
@@ -96,13 +103,13 @@ export function SiteHeader({
         )}
 
         {latestModels && latestModels.length === 0 && (
-          <div className="py-4 text-center text-sm text-muted-foreground">
+          <div className="hidden md:flex h-14 items-center justify-center text-sm text-muted-foreground">
             No models available
           </div>
         )}
 
         {latestModels && latestModels.length > 0 && (
-          <div className="hidden md:flex items-center gap-4 py-3">
+          <div className="hidden md:flex h-14 items-center gap-4">
             <div className="flex items-center gap-2 text-sm font-bold px-4 py-1.5 bg-primary text-primary-foreground rounded-r-full">
               ✨ Now supporting:
             </div>

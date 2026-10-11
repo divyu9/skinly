@@ -56,6 +56,17 @@ export function dismissAnnouncement() {
 const SHOWN_KEY = "skinly_announcement_was_shown";
 
 export function announcementLikelyShown(): boolean {
+  // The build wrote the bar's settings into the page (prerender.mjs
+  // announcementSeedFor): that beats any guess, and it knows the end time.
+  try {
+    const el = document.getElementById("__annSeed");
+    if (el?.textContent) {
+      const s = JSON.parse(el.textContent);
+      return announcementLive({ announcementEnabled: s.enabled, announcementText: s.text, announcementEndsAt: s.endsAt });
+    }
+  } catch {
+    /* fall through to last visit's answer */
+  }
   try {
     const v = localStorage.getItem(SHOWN_KEY);
     return v === null ? true : v === "1";
