@@ -2276,3 +2276,23 @@
 /products/asus-phone-skins-all-models-travel-the-world-3d-embossed-finish-l-232
 /products/nothing-phone-skins-all-models-batman-arkham-city-3d-embossed-l-94
 /products/vivo-zvxtus-series-phone-skins-all-models-teddy-membrane-3d-embossed-finish-l-86
+
+# Search Console 404 export after the failed validation, 12 Oct 2026
+/products/tecno-phone-skins-all-models-spiderman-face-new-matte-finish-m-41
+/products/vivo-y-series-phone-skins-all-models-i-need-my-nasa-skin-3d-embossed-finish-l-149
+/products/infinix-phone-skins-all-models-colourful-silk-cloth-matte-finish-m-165
+/products/oppo-phone-skins-all-models-matte-finish-m-63
+/products/google-pixel-phone-skins-all-models-deadpool-3d-embossed-finish-l-56
+/products/apple-iphone-skins-all-models-matte-finish-m-46
+/products/samsung-mfnoteflip-and-c-phone-skins-all-models-black-green-dual-leather-stich-3d-embossed-finish-l-233
+/products/vivo-y-series-phone-skins-all-models-black-g-print-3d-embossed-finish-l-109
+/products/realme-phone-skins-all-models-royal-rich-panda-3d-embossed-finish-l-170
+/products/samsung-as-series-phone-skins-all-models-one-piece-rocket-punch-manga-3d-embossed-finish-l-25
+/products/poco-phone-skins-all-models-3d-embossed-finish-l-179
+/products/google-pixel-phone-skins-all-models-transformers-devastation-3d-embossed-finish-l-301
+/products/asus-phone-skins-all-models-battle-king-dude-face-3d-embossed-finish-l-178
+/products/oneplus-phone-skins-all-models-3d-embossed-l-199
+/products/stylish-blue-abstract-colour-lines-matte-finish-controller-skin
+/products/infinix-phone-skins-all-models-the-beast-3d-embossed-finish-l-157
+/products/tecno-phone-skins-all-models-angry-goku-matte-finish-m-12
+/products/oneplus-phone-skins-all-models-3d-embossed-finish-l-105
