@@ -1,4 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card.tsx";
+import { productThumb } from "@/lib/product-thumb";
 import { Separator } from "@/components/ui/separator.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
@@ -99,9 +100,12 @@ interface OrderSummaryPanelProps {
   cardClassName?: string;
 }
 
-function OrderItemImage({ src, alt, grayscale }: { src?: string; alt: string; grayscale: boolean }) {
+function OrderItemImage({ src, alt, grayscale, productId }: { src?: string; alt: string; grayscale: boolean; productId?: string }) {
   const [hasError, setHasError] = useState(false);
-  const normalizedSrc = src ? getCdnUrl(src) : "";
+  // A saved picture that does not load (an old guessed mockup) falls back to
+  // the listing's own picture before the empty box (lib/product-thumb.ts).
+  const [fallback, setFallback] = useState<string | null>(null);
+  const normalizedSrc = fallback || (src ? getCdnUrl(src) : "");
 
   if (!normalizedSrc || hasError) {
     return (
@@ -121,7 +125,10 @@ function OrderItemImage({ src, alt, grayscale }: { src?: string; alt: string; gr
         className={grayscale ? "w-full h-full object-cover grayscale" : "w-full h-full object-cover"}
         loading="lazy"
         decoding="async"
-        onError={() => setHasError(true)}
+        onError={() => {
+          if (fallback || !productId) { setHasError(true); return; }
+          void productThumb(productId).then((u) => (u && u !== normalizedSrc ? setFallback(getCdnUrl(u)) : setHasError(true)));
+        }}
       />
     </div>
   );
@@ -174,7 +181,7 @@ export function OrderSummaryPanel({
                   key={item._id ? String(item._id) : `${item.productId}-${item.variant}-${index}`}
                   className={`flex gap-3 ${isOutOfStock ? "opacity-50" : ""}`}
                 >
-                  <OrderItemImage src={item.productImage} alt={item.productTitle} grayscale={isOutOfStock} />
+                  <OrderItemImage src={item.productImage} alt={item.productTitle} grayscale={isOutOfStock} productId={String(item.productId || "")} />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between gap-2">
                       <p className="text-sm font-medium line-clamp-2">{item.productTitle}</p>

@@ -1,4 +1,5 @@
 import { useQuery, useMutation } from "@/lib/firebase-hooks";
+import { cartImageFallback } from "@/lib/product-thumb";
 import { shippingFor, shippingRule } from "@/lib/shipping-config.mjs";
 import { api } from "@/lib/firebase-api";
 import { Button } from "@/components/ui/button.tsx";
@@ -284,9 +285,7 @@ function AuthenticatedCartContent() {
                           src={item.productImage}
                           alt={item.productTitle}
                           className={`w-full h-full object-cover hover:scale-105 transition-transform ${isOutOfStock ? 'grayscale' : ''}`}
-                          onError={(e) => {
-                            e.currentTarget.src = "/logo.webp";
-                          }}
+                          onError={cartImageFallback(String(item.productId))}
                         />
                       </div>
                     </Link>
@@ -645,9 +644,7 @@ function GuestCartContent() {
                             src={item.productImage}
                             alt={item.productTitle}
                             className={`w-full h-full object-cover hover:scale-105 transition-transform ${isOutOfStock ? 'grayscale' : ''}`}
-                            onError={(e) => {
-                              e.currentTarget.src = "/logo.webp";
-                            }}
+                            onError={cartImageFallback(String(item.productId))}
                           />
                         </div>
                       </Link>

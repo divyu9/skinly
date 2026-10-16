@@ -1,4 +1,5 @@
 import { useQuery, useMutation } from "@/lib/firebase-hooks";
+import { cartImageFallback } from "@/lib/product-thumb";
 import { api } from "@/lib/firebase-api";
 import { Button } from "@/components/ui/button.tsx";
 import {
@@ -213,9 +214,7 @@ function CartContent({ onCheckoutClick }: { onCheckoutClick: () => void }) {
                       src={item.productImage}
                       alt={item.productTitle}
                       className={`w-full h-full object-cover ${isOutOfStock ? 'grayscale' : ''}`}
-                      onError={(e) => {
-                        e.currentTarget.src = "/logo.webp";
-                      }}
+                      onError={cartImageFallback(String(item.productId))}
                     />
                   </div>
                 )}

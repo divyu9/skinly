@@ -209,7 +209,12 @@ export default function ProductDetailPage() {
   } = useCartActions({
     product: productData,
     selectedVariant: productState.selectedVariant,
-    displayImage: displayImages[0]?.url || "",
+    // The cart keeps one picture of the line. A guessed mockup filename
+    // (useProductDetail, no mockup on record) is usually a 404: carts and
+    // checkout showed an empty box for camera and laptop skins. Only a
+    // picture that is on record goes in.
+    displayImage: (displayImages.find((i: any) => i?.url && !i.guessed) || displayImages[0])?.url
+      || (productData?.images?.[0] as any)?.url || "",
     phoneModel,
     phoneBrand,
     coverage: isPhoneSkin ? (isTranzy ? "only_back" : productState.selectedCoverage) : undefined,

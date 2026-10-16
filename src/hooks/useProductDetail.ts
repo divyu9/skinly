@@ -27,6 +27,8 @@ export interface MockupState {
   shownModel?: string | null;
   /** False when the picture is a stand-in for a model we have no shot of. */
   exact?: boolean;
+  /** A filename guessed from the model and SKU, not a mockup on record: it usually does not exist. */
+  guessed?: boolean;
 }
 
 /** Real photos woven into the gallery: the shopper's phone first, the rest after the mockup. */
@@ -215,7 +217,7 @@ export function useProductDetail() {
       // unreachable to the compiler while still running at runtime.
       const url = findMockupImageUrl(phoneModel, sku, null) as unknown as string | Promise<string>;
       if (url && typeof url === 'string') {
-        setMockupState({ url, loading: false });
+        setMockupState({ url, loading: false, guessed: true });
       } else if (url instanceof Promise) {
         url.then(resolvedUrl => setMockupState({ url: resolvedUrl, loading: false }))
            .catch(() => setMockupState({ url: null, loading: false }));
@@ -258,6 +260,7 @@ export function useProductDetail() {
         url: mockupState.url,
         alt: `${productData.title} - ${phoneModel} Preview`,
         phoneModel: phoneModel,
+        ...(mockupState.guessed ? { guessed: true } : {}),
       });
     }
 
@@ -287,7 +290,7 @@ export function useProductDetail() {
     }
 
     return images.length > 0 ? images : productData.images;
-  }, [productData, phoneModel, mockupState.url]);
+  }, [productData, phoneModel, mockupState.url, mockupState.guessed]);
 
   // Buyers' own photos from approved reviews of this design, after everything else.
   const reviews = useDesignReviews(
