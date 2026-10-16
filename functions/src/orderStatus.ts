@@ -317,6 +317,10 @@ export async function notifyOrderStatus(
     if (!snap.exists) return null;
     const data = snap.data() as any;
     if ((data.statusNotified || []).includes(status)) return null;
+    // A manual order sends status messages only when the admin switched
+    // automatic updates on (order page). Not marked as notified, so a status
+    // reached after switching on still sends.
+    if (data.source === "manual" && data.autoUpdates !== true) return null;
     tx.update(ref, { statusNotified: admin.firestore.FieldValue.arrayUnion(status) });
     return data;
   });

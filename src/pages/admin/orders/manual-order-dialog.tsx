@@ -86,8 +86,6 @@ export function ManualOrderDialog({ open, onOpenChange }: ManualOrderDialogProps
   const [couponInput, setCouponInput] = useState("");
   const [coupon, setCoupon] = useState<{ id: string; code: string; discount: number; walletCredit: number } | null>(null);
   const [couponBusy, setCouponBusy] = useState(false);
-  // "Order received" on WhatsApp and email, sent when the order is confirmed (orderConfirm.ts).
-  const [notifyCustomer, setNotifyCustomer] = useState(true);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -208,7 +206,7 @@ export function ManualOrderDialog({ open, onOpenChange }: ManualOrderDialogProps
     setItems([{ productId: "", productTitle: "", variant: "", sku: "", price: 0, quantity: 1 }]);
     setCoupon(null);
     setCouponInput("");
-    setNotifyCustomer(true);
+
     setPaymentMethod("COD");
     setShippingFee(0);
     setCodFee(0);
@@ -318,15 +316,14 @@ export function ManualOrderDialog({ open, onOpenChange }: ManualOrderDialogProps
         paymentStatus,
         status,
         statusChangedAt: Date.now(),
-        // Marked as already sent, so nothing goes out, when the admin unticked it.
-        ...(notifyCustomer ? {} : { orderNotifiedAt: Date.now(), orderNotifySkipped: true }),
+
         ...(awbNumber ? { awbNumber } : {}),
         ...(trackingUrl ? { trackingUrl } : {}),
         ...(courierName ? { courierName } : {}),
       };
       const orderId = await createManualOrder({ orderData });
       toast.success(paymentStatus === "success" || orderData.paymentMethod === "cod"
-        ? "Order created — its order number and invoice follow in a moment"
+        ? "Order created — number and invoice follow in a moment. Send the WhatsApp / email from the order page if you want to."
         : "Order created (payment pending: no order number until it is paid)");
       void orderId;
       resetForm();
@@ -698,13 +695,6 @@ export function ManualOrderDialog({ open, onOpenChange }: ManualOrderDialogProps
                 </div>
               )}
             </div>
-
-            <label className="flex items-start gap-2 text-sm">
-              <input type="checkbox" className="mt-1" checked={notifyCustomer} onChange={(e) => setNotifyCustomer(e.target.checked)} />
-              <span>
-                <b>Send order confirmation</b> — WhatsApp and email to the customer (and the admin alert), once the order is paid or COD.
-              </span>
-            </label>
 
             {/* Order Summary */}
             <div className="p-4 bg-muted rounded-lg space-y-2">

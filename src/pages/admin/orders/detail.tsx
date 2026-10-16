@@ -18,6 +18,7 @@ import { OrderItemsTable, type ItemFormEntry } from "./_components/OrderItemsTab
 import { PaymentRefundPanel, type RefundFormData } from "./_components/PaymentRefundPanel.tsx";
 import { ReferralPanel } from "./_components/ReferralPanel.tsx";
 import { SourceCard } from "./_components/SourceCard.tsx";
+import { ManualConfirmPanel } from "./_components/ManualConfirmPanel.tsx";
 import { PaymentTestPanel } from "./_components/PaymentTestPanel.tsx";
 import { ShippingTrackingPanel, type ShippingFormData, type ManualTrackingFormData } from "./_components/ShippingTrackingPanel.tsx";
 import { DelhiveryShipPanel } from "./_components/DelhiveryShipPanel.tsx";
@@ -709,6 +710,7 @@ function OrderDetailPageInner() {
             onSaveAddress={handleUpdateShippingAddress}
           />
 
+          <ManualConfirmPanel order={order} />
           <SourceCard attribution={(order as any).attribution} tracking={(order as any).tracking} metaCapi={(order as any).metaCapi} />
           <PaymentTestPanel order={order} />
 

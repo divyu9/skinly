@@ -57,6 +57,8 @@ export async function sendReviewRequests(
     const o = d.data() as any;
     // A replacement parcel (reshipOrder): the original order is the one asked about.
     if (o.isDeleted === true || o.isReplacement || o.reviewAskedAt || o.reviewedAt) continue;
+    // A manual order gets automatic messages only when the admin switched them on (order page).
+    if (o.source === "manual" && o.autoUpdates !== true) continue;
     // Orders from before the move to Firebase carry _creationTime, not createdAt.
     const at = Number(o.deliveredAt) || Number(o.updatedAt) || Number(o.createdAt) || Number(o._creationTime) || 0;
     if (!at || at > now - ASK_AFTER_DAYS * 86400000) continue;

@@ -1,4 +1,6 @@
 import { msg91Ref } from "./emailEvents";
+import { onCall, HttpsError } from "firebase-functions/v1/https";
+import { requireAdmin } from "./auth";
 import * as crypto from "crypto";
 import * as admin from "firebase-admin";
 import { describeItems } from "./ordersAdmin";
@@ -270,3 +272,45 @@ export async function notifyOrderPlaced(
   );
   console.log("notifyOrderPlaced", { orderId, orderNumber, customerWa, adminWa, mail, adminMail });
 }
+
+
+/**
+ * "Order received" on one channel, on the admin's say-so: the buttons on a
+ * manual order's page. A manual order sends nothing by itself (the shop may
+ * be entering an order taken on a call, a repeat, or a test), so the admin
+ * decides. Sending again is allowed — it is a button, pressed on purpose —
+ * and each send is in the order's message history like any other.
+ */
+export const sendOrderConfirmation = onCall(async (data: any, context: any) => {
+    await requireAdmin(context);
+    const orderId = String(data?.orderId || "");
+    const channel = data?.channel === "email" ? "email" : data?.channel === "whatsapp" ? "whatsapp" : "";
+    if (!orderId || !channel) throw new HttpsError("invalid-argument", "orderId and channel (whatsapp | email) are required");
+    const db = admin.firestore();
+    const ref = db.collection("orders").doc(orderId);
+    const order = (await ref.get()).data() as any;
+    if (!order) throw new HttpsError("not-found", "No such order");
+    if (!order.orderNumber) throw new HttpsError("failed-precondition", "The order has no number yet — it gets one once it is paid or COD");
+
+    let ok = false;
+    if (channel === "whatsapp") {
+      const phone = order.shippingAddress?.phone || order.phone || "";
+      if (!phone) throw new HttpsError("failed-precondition", "The order has no phone number");
+      const items = Array.isArray(order.items) ? order.items : [];
+      const { whatsappHeaderImage } = await import("./waImage");
+      const headerImage = await whatsappHeaderImage(`order-${orderId}`, items).catch(() => "https://goskinly.com/og-default.jpg");
+      ok = !!(await queueWhatsApp(db, "order_received", phone, {
+        customer_name: order.shippingAddress?.fullName || order.customerName || "Customer",
+        order_number: String(order.orderNumber),
+        order_total: (Number(order.total ?? order.amountPayable) || 0).toFixed(2),
+        product_name: items.map((i: any) => i?.productTitle).filter(Boolean).join(", "),
+        header_image: headerImage,
+      }, orderId));
+    } else {
+      if (!order.email) throw new HttpsError("failed-precondition", "The order has no email address");
+      ok = !!(await sendUsecaseEmail(db, order, orderId, "order_confirmed"));
+    }
+    if (!ok) throw new HttpsError("unavailable", `The ${channel === "email" ? "email" : "WhatsApp"} could not be sent — see the order's message history`);
+    await ref.update({ [`confirmationSent.${channel}`]: Date.now() });
+    return { ok: true };
+});
