@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useMutation, useQuery } from "@/lib/firebase-hooks";
+import { useMutation, useQuery, useConvex } from "@/lib/firebase-hooks";
 import { api } from "@/lib/firebase-api";
 import {
   Dialog,
@@ -80,6 +80,12 @@ const INDIAN_STATES = [
 export function ManualOrderDialog({ open, onOpenChange }: ManualOrderDialogProps) {
   const createManualOrder = useMutation(api.admin.orders.createManualOrder);
   const products = useQuery(api.products.getAllProducts);
+  const convex = useConvex();
+
+  // A coupon, checked the way checkout checks it (coupons.validateCoupon).
+  const [couponInput, setCouponInput] = useState("");
+  const [coupon, setCoupon] = useState<{ id: string; code: string; discount: number; walletCredit: number } | null>(null);
+  const [couponBusy, setCouponBusy] = useState(false);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -161,8 +167,31 @@ export function ManualOrderDialog({ open, onOpenChange }: ManualOrderDialogProps
     return items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
   };
 
+  const couponDiscount = coupon ? Math.min(coupon.discount, calculateSubtotal()) : 0;
   const calculateTotal = () => {
-    return calculateSubtotal() + shippingFee + codFee;
+    return Math.max(0, calculateSubtotal() - couponDiscount) + shippingFee + codFee;
+  };
+
+  const applyCoupon = async () => {
+    const code = couponInput.trim().toUpperCase();
+    if (!code) return;
+    if (!items.some((i) => i.productId && i.price > 0)) { toast.error("Add an item first"); return; }
+    setCouponBusy(true);
+    try {
+      const r: any = await convex.query(api.coupons.validateCoupon, {
+        code,
+        cartTotal: calculateSubtotal(),
+        userEmail: customerEmail || undefined,
+        cartItems: items.filter((i) => i.productId).map((i) => ({ productId: i.productId, productTitle: i.productTitle, variant: i.variant, price: i.price, quantity: i.quantity })),
+      });
+      if (!r) { toast.error("That coupon could not be found"); return; }
+      setCoupon({ id: String(r.coupon?._id || ""), code, discount: r.isWalletCredit ? 0 : Number(r.discountAmount) || 0, walletCredit: r.isWalletCredit ? Number(r.walletCreditAmount) || 0 : 0 });
+      toast.success(r.isWalletCredit ? `${code}: ₹${r.walletCreditAmount} wallet credit on delivery` : `${code}: ₹${Math.round(Number(r.discountAmount) || 0)} off`);
+    } catch (e: any) {
+      toast.error(e?.data?.message || e?.message || "Coupon could not be applied");
+    } finally {
+      setCouponBusy(false);
+    }
   };
 
   const resetForm = () => {
@@ -175,6 +204,8 @@ export function ManualOrderDialog({ open, onOpenChange }: ManualOrderDialogProps
     setState("");
     setPincode("");
     setItems([{ productId: "", productTitle: "", variant: "", sku: "", price: 0, quantity: 1 }]);
+    setCoupon(null);
+    setCouponInput("");
     setPaymentMethod("COD");
     setShippingFee(0);
     setCodFee(0);
@@ -231,37 +262,68 @@ export function ManualOrderDialog({ open, onOpenChange }: ManualOrderDialogProps
     setIsSubmitting(true);
 
     try {
-      const result = await createManualOrder({
-        customerName,
-        customerPhone,
-        customerEmail: customerEmail || undefined,
-        addressLine1,
-        addressLine2: addressLine2 || undefined,
-        city,
-        state,
-        pincode,
-        items: items.map(item => ({
-          productId: item.productId,
-          productTitle: item.productTitle,
-          variant: item.variant,
-          sku: item.sku || undefined,
-          price: item.price,
-          quantity: item.quantity,
-          phoneModel: item.phoneModel || undefined,
-          phoneBrand: item.phoneBrand || undefined,
-          lensModel: item.lensModel || undefined,
-        })),
-        paymentMethod,
+      /*
+       * The order as checkout writes it: customerName, phone, email and a
+       * shippingAddress object, items with their picture and variant id,
+       * itemsTotal / total / amountPayable. The dialog used to send flat
+       * fields that createManualOrder read from `args.orderData`, which it
+       * never sent — so it saved an empty order (three fields), showed
+       * "created", and the order list had nothing to show. Order number and
+       * invoice follow from orderConfirm.ts once it is paid or COD.
+       */
+      const phone10 = customerPhone.replace(/\D/g, "").slice(-10);
+      const phone = phone10 ? `+91${phone10}` : customerPhone.trim();
+      const itemsTotal = calculateSubtotal();
+      const total = calculateTotal();
+      const orderData: Record<string, any> = {
+        source: "manual",
+        customerName: customerName.trim(),
+        phone,
+        email: customerEmail.trim().toLowerCase(),
+        shippingAddress: {
+          fullName: customerName.trim(), phone,
+          addressLine1: addressLine1.trim(), addressLine2: addressLine2.trim(),
+          city: city.trim(), state, pincode: pincode.trim(),
+        },
+        items: items.map((item) => {
+          const product: any = products?.find((p) => p._id === item.productId);
+          const v = (product?.variants || []).find((x: any) => x.title === item.variant);
+          return {
+            productId: item.productId,
+            productTitle: item.productTitle,
+            productImage: String(product?.images?.find((i: any) => i?.url)?.url || ""),
+            variant: item.variant,
+            ...(v?._id ? { variantId: v._id } : {}),
+            ...(item.sku ? { sku: item.sku } : {}),
+            price: item.price,
+            quantity: item.quantity,
+            ...(item.phoneModel ? { phoneModel: item.phoneModel } : {}),
+            ...(item.phoneBrand ? { phoneBrand: item.phoneBrand } : {}),
+            ...(item.lensModel ? { lensModel: item.lensModel } : {}),
+          };
+        }),
+        itemsTotal,
         shippingFee,
-        codFee: codFee > 0 ? codFee : undefined,
-        status,
+        codFee,
+        couponCode: coupon?.code || "",
+        couponId: coupon?.id || null,
+        couponDiscount,
+        ...(coupon?.walletCredit ? { walletCreditCouponAmount: coupon.walletCredit } : {}),
+        total,
+        amountPayable: total,
+        paymentMethod: paymentMethod.toLowerCase() === "cod" ? "cod" : paymentMethod,
         paymentStatus,
-        awbNumber: awbNumber || undefined,
-        trackingUrl: trackingUrl || undefined,
-        courierName: courierName || undefined,
-      });
-
-      toast.success(`Order ${result.orderNumber} created successfully!`);
+        status,
+        statusChangedAt: Date.now(),
+        ...(awbNumber ? { awbNumber } : {}),
+        ...(trackingUrl ? { trackingUrl } : {}),
+        ...(courierName ? { courierName } : {}),
+      };
+      const orderId = await createManualOrder({ orderData });
+      toast.success(paymentStatus === "success" || orderData.paymentMethod === "cod"
+        ? "Order created — its order number and invoice follow in a moment"
+        : "Order created (payment pending: no order number until it is paid)");
+      void orderId;
       resetForm();
       onOpenChange(false);
     } catch (error) {
@@ -613,6 +675,25 @@ export function ManualOrderDialog({ open, onOpenChange }: ManualOrderDialogProps
               </div>
             </div>
 
+            {/* Coupon */}
+            <div className="space-y-2">
+              <Label>Coupon code</Label>
+              {coupon ? (
+                <div className="flex items-center justify-between rounded-lg border px-3 py-2 text-sm">
+                  <span><b>{coupon.code}</b> · {coupon.walletCredit ? `₹${coupon.walletCredit} wallet credit on delivery` : `₹${couponDiscount.toFixed(0)} off`}</span>
+                  <Button type="button" variant="ghost" size="sm" onClick={() => setCoupon(null)}>Remove</Button>
+                </div>
+              ) : (
+                <div className="flex gap-2">
+                  <Input value={couponInput} onChange={(e) => setCouponInput(e.target.value.toUpperCase())} placeholder="e.g. BBD50"
+                    onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); void applyCoupon(); } }} />
+                  <Button type="button" variant="outline" onClick={applyCoupon} disabled={couponBusy || !couponInput.trim()}>
+                    {couponBusy ? "Checking…" : "Apply"}
+                  </Button>
+                </div>
+              )}
+            </div>
+
             {/* Order Summary */}
             <div className="p-4 bg-muted rounded-lg space-y-2">
               <h3 className="font-semibold text-sm">Order Summary</h3>
@@ -621,6 +702,12 @@ export function ManualOrderDialog({ open, onOpenChange }: ManualOrderDialogProps
                   <span>Subtotal:</span>
                   <span>₹{calculateSubtotal().toFixed(2)}</span>
                 </div>
+                {couponDiscount > 0 && (
+                  <div className="flex justify-between text-green-700">
+                    <span>Coupon ({coupon?.code}):</span>
+                    <span>−₹{couponDiscount.toFixed(2)}</span>
+                  </div>
+                )}
                 <div className="flex justify-between">
                   <span>Shipping Fee:</span>
                   <span>₹{shippingFee.toFixed(2)}</span>

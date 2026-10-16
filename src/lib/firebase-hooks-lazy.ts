@@ -2914,8 +2914,14 @@ export async function runMutation(path: string, args?: any) {
         }
         
         if (actualActionName === 'createManualOrder') {
+          const orderData = args?.orderData || args || {};
+          // An order with no items or customer is not an order: it saved a
+          // three-field document and reported success once already.
+          if (!Array.isArray(orderData.items) || !orderData.items.length || !orderData.customerName) {
+            throw new Error("Order has no customer or items — nothing was saved");
+          }
           const docRef = await addDoc(collection(db, 'orders'), {
-            ...args.orderData,
+            ...orderData,
             // The order number and GST invoice come from the same sequence as
             // every other order, once it is confirmed (paid or COD) — see
             // functions/src/orderConfirm.ts. This random MAN-##### used to be
