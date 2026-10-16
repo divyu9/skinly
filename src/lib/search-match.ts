@@ -23,15 +23,68 @@
  *    70-200), then the rest, shortest first.
  */
 
-/** Lowercase letters and digits only, with "+" spelled out. */
+const ROMAN: Record<string, string> = { ii: "2", iii: "3", iv: "4", v: "5", vi: "6", vii: "7" };
+
+/**
+ * Generation numbers written one way. Cameras print the same model as
+ * "A7 III", "A7 Mark III", "A7M3" and "Alpha 7 III", and people type "a73",
+ * "a7iii", "a7m3" or "a7miii". So, in names and queries alike:
+ *  - a roman numeral right after a number, or after "mark"/"mk"/"m", is that
+ *    number: A7 III → A7 3, Z6 II → Z6 2, 5D Mark IV → 5D 4, Xperia 1 V → 1 5,
+ *    and after a model code's letter suffix: A7R V → A7R 5, A7S III → A7S 3;
+ *  - "mark", "mk" and an "m" written onto a number drop out: A7 Mark 3, A7M3 → A7 3
+ *    (but "iPad Pro 11 M4" keeps its M4);
+ *  - "alpha" before a number is "a": Alpha 7 IV → a 7 4.
+ * A lone "i" is left alone ("Xiaomi 11i" is not "111"), and a numeral after a
+ * word stays a word ("Vivo V29" keeps its V). Separators are kept, so the
+ * words a query was typed in stay its words.
+ */
+export function canonical(s: unknown): string {
+  const str = String(s ?? "").toLowerCase();
+  const toks: { t: string; at: number }[] = [];
+  const re = /[a-z]+|\d+/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(str))) toks.push({ t: m[0], at: m.index });
+  if (!toks.length) return str;
+  const isNum = (t?: string) => !!t && /^\d+$/.test(t);
+  const isMarkWord = (t?: string) => t === "mark" || t === "mk";
+  const out: string[] = [];
+  let last = 0;
+  for (let i = 0; i < toks.length; i++) {
+    const { t, at } = toks[i];
+    const prev = toks[i - 1]?.t;
+    const next = toks[i + 1]?.t;
+    let rep = t;
+    // "a7m3" (m written onto the number), not "iPad Pro 11 M4" (an M4 chip).
+    const joined = at > 0 && /\d/.test(str[at - 1]);
+    const nextIsGen = isNum(next) || (!!next && next in ROMAN);
+    if (isMarkWord(t) && nextIsGen) rep = "";
+    else if (t === "m" && joined && isNum(prev) && nextIsGen) rep = "";
+    // …or after a model code's letter suffix: A7R V, A7S III (the "R" is written onto the 7).
+    else if (t in ROMAN && !joined && !!prev && /^[a-z]{1,2}$/.test(prev) && isNum(toks[i - 2]?.t)
+      && toks[i - 1].at === toks[i - 2].at + toks[i - 2].t.length) rep = ROMAN[t];
+    else if (t in ROMAN && (isNum(prev) || isMarkWord(prev) || (prev === "m" && isNum(toks[i - 2]?.t)))) rep = ROMAN[t];
+    else if (/^m(ii|iii|iv|v|vi|vii)$/.test(t) && joined && isNum(prev)) rep = ROMAN[t.slice(1)];
+    // A suffix letter and the numeral typed as one: "a7siii", "a7rv" → a7s 3, a7r 5.
+    else if (joined && isNum(prev) && /^[a-z]{1,2}?(ii|iii|iv|v|vi|vii)$/.test(t) && /^([a-z]{1,2})(ii|iii|iv|v|vi|vii)$/.test(t)) {
+      const mm = /^([a-z]{1,2}?)(ii|iii|iv|v|vi|vii)$/.exec(t)!;
+      rep = `${mm[1]} ${ROMAN[mm[2]]}`;
+    }
+    else if (t === "alpha" && isNum(next)) rep = "a";
+    out.push(str.slice(last, at), rep);
+    last = at + t.length;
+  }
+  out.push(str.slice(last));
+  return out.join("");
+}
+
+/** Lowercase letters and digits only, with "+" spelled out and generations written one way. */
 export const compact = (s: unknown): string =>
-  String(s ?? "").toLowerCase().replace(/\+/g, "plus").replace(/[^a-z0-9]/g, "");
+  canonical(String(s ?? "").replace(/\+/g, " plus ")).replace(/[^a-z0-9]/g, "");
 
 /** The query as words, each compacted; "s24+" is ["s24", "plus"]. */
 export const searchWords = (q: unknown): string[] =>
-  String(q ?? "")
-    .toLowerCase()
-    .replace(/\+/g, " plus ")
+  canonical(String(q ?? "").toLowerCase().replace(/\+/g, " plus "))
     .split(/[\s,/|]+/)
     .map(compact)
     .filter(Boolean);
@@ -43,7 +96,7 @@ export const searchWords = (q: unknown): string[] =>
  * spells c-a-n-o-n-e-o-s once the spaces are gone.
  */
 function starts(haystack: string): string[] {
-  const s = String(haystack ?? "").toLowerCase().replace(/\+/g, " plus ");
+  const s = canonical(String(haystack ?? "").toLowerCase().replace(/\+/g, " plus "));
   const out: string[] = [];
   const re = /[a-z]+|\d+/g;
   const flat = compact(s);
@@ -91,9 +144,7 @@ function within(a: string, b: string, max: number): boolean {
 
 /** Words of a name, split where letters meet digits too: "s24fe" gives s, 24, fe. */
 const nameTokens = (s: string): string[] =>
-  String(s ?? "")
-    .toLowerCase()
-    .replace(/\+/g, " plus ")
+  canonical(String(s ?? "").toLowerCase().replace(/\+/g, " plus "))
     .split(/[^a-z0-9]+/)
     .flatMap((t) => [t, ...t.split(/(?<=[a-z])(?=\d)|(?<=\d)(?=[a-z])/)])
     .filter(Boolean);
