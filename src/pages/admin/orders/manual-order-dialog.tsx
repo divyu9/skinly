@@ -19,6 +19,8 @@ import { ORDER_STATUSES, type OrderStatus } from "@/lib/normalize-order.ts";
 import { ADMIN_STATUS_LABELS } from "@/lib/order-label.ts";
 import { PlusIcon, TrashIcon } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area.tsx";
+import { SearchPicker } from "./_components/SearchPicker.tsx";
+import { LensSelector, isWithLensVariant } from "@/components/product/LensSelector.tsx";
 
 type OrderItem = {
   productId: string;
@@ -29,7 +31,35 @@ type OrderItem = {
   quantity: number;
   phoneModel?: string;
   phoneBrand?: string;
+  lensModel?: string;
+  /** The listing's device kind (phone, camera, laptop…): which models the model search offers. */
+  gadget?: string;
 };
+
+/**
+ * The device a skin is cut for, searched like the product page's picker:
+ * the models of the listing's own kind (phones for a phone skin, cameras for
+ * a camera skin), brand filled in with the model.
+ */
+function ModelPicker({ gadget, brand, model, onPick }: {
+  gadget: string;
+  brand?: string;
+  model?: string;
+  onPick: (brand: string, model: string) => void;
+}) {
+  const models = useQuery(api.supportedModels.listAll, { category: gadget, isActive: true });
+  return (
+    <SearchPicker<any>
+      rows={models}
+      value={model ? [brand, model].filter(Boolean).join(" ") : ""}
+      onPick={(m) => onPick(String(m.brandName || ""), String(m.modelName || ""))}
+      label={(m) => `${m.brandName} ${m.modelName}`}
+      placeholder={`Search ${gadget} model`}
+      searchPlaceholder="e.g. iphone 15 pro, s24fe, a7iii"
+      emptyText="No model matches — type it in the boxes below."
+    />
+  );
+}
 
 interface ManualOrderDialogProps {
   open: boolean;
@@ -104,12 +134,26 @@ export function ManualOrderDialog({ open, onOpenChange }: ManualOrderDialogProps
     const product = products?.find(p => p._id === productId);
     if (!product) return;
 
+    // Its first priced variant, with SKU and price, so the line is ready to go.
+    const variants = ((product as any).variants || []).filter((v: any) => Number(v?.price) > 0);
+    const v = variants[0];
     const newItems = [...items];
     newItems[index] = {
       ...newItems[index],
       productId: product._id,
       productTitle: product.title,
+      gadget: String((product as any).gadgetCategory || "phone"),
+      ...(v ? { variant: String(v.title || ""), sku: String(v.sku || ""), price: Number(v.price) || 0 } : {}),
+      lensModel: "",
     };
+    setItems(newItems);
+  };
+
+  const handleVariantSelect = (index: number, title: string) => {
+    const product = products?.find(p => p._id === items[index].productId);
+    const v = ((product as any)?.variants || []).find((x: any) => x.title === title);
+    const newItems = [...items];
+    newItems[index] = { ...newItems[index], variant: title, ...(v ? { sku: String(v.sku || ""), price: Number(v.price) || 0 } : {}), lensModel: "" };
     setItems(newItems);
   };
 
@@ -205,6 +249,7 @@ export function ManualOrderDialog({ open, onOpenChange }: ManualOrderDialogProps
           quantity: item.quantity,
           phoneModel: item.phoneModel || undefined,
           phoneBrand: item.phoneBrand || undefined,
+          lensModel: item.lensModel || undefined,
         })),
         paymentMethod,
         shippingFee,
@@ -361,29 +406,38 @@ export function ManualOrderDialog({ open, onOpenChange }: ManualOrderDialogProps
                   <div className="grid grid-cols-2 gap-3">
                     <div className="col-span-2 space-y-2">
                       <Label>Product *</Label>
-                      <Select
-                        value={item.productId}
-                        onValueChange={(value) => handleProductSelect(index, value)}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select product" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {products?.map((p) => (
-                            <SelectItem key={p._id} value={p._id}>
-                              {p.title}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <SearchPicker<any>
+                        rows={products as any[] | undefined}
+                        value={item.productTitle}
+                        onPick={(p) => handleProductSelect(index, p._id)}
+                        label={(p) => String(p.title || "")}
+                        sub={(p) => [p.status !== "active" ? p.status : "", ...(p.variants || []).slice(0, 3).map((v: any) => `${v.title} ₹${v.price}`)].filter(Boolean).join(" · ")}
+                        full={(p) => `${p.title} ${(p.tags || []).join(" ")} ${(p.variantSkus || []).join(" ")}`}
+                        placeholder="Search product"
+                        searchPlaceholder="Design name, device or SKU, e.g. R-76 sony"
+                      />
                     </div>
                     <div className="space-y-2">
                       <Label>Variant *</Label>
-                      <Input
-                        value={item.variant}
-                        onChange={(e) => handleItemChange(index, "variant", e.target.value)}
-                        placeholder="e.g., Matte Black"
-                      />
+                      {(() => {
+                        const pv = (((products as any[] | undefined)?.find((p) => p._id === item.productId))?.variants || []).filter((v: any) => Number(v?.price) > 0);
+                        return pv.length ? (
+                          <Select value={item.variant} onValueChange={(v) => handleVariantSelect(index, v)}>
+                            <SelectTrigger><SelectValue placeholder="Select variant" /></SelectTrigger>
+                            <SelectContent>
+                              {pv.map((v: any) => (
+                                <SelectItem key={v._id || v.title} value={v.title}>{v.title} · ₹{v.price}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        ) : (
+                          <Input
+                            value={item.variant}
+                            onChange={(e) => handleItemChange(index, "variant", e.target.value)}
+                            placeholder="e.g., Matte Black"
+                          />
+                        );
+                      })()}
                     </div>
                     <div className="space-y-2">
                       <Label>SKU</Label>
@@ -414,6 +468,30 @@ export function ManualOrderDialog({ open, onOpenChange }: ManualOrderDialogProps
                         placeholder="1"
                       />
                     </div>
+                    {item.productId && (
+                      <div className="col-span-2 space-y-2">
+                        <Label>Device model</Label>
+                        <ModelPicker
+                          gadget={item.gadget || "phone"}
+                          brand={item.phoneBrand}
+                          model={item.phoneModel}
+                          onPick={(b, m) => {
+                            const n = [...items];
+                            n[index] = { ...n[index], phoneBrand: b, phoneModel: m, lensModel: "" };
+                            setItems(n);
+                          }}
+                        />
+                      </div>
+                    )}
+                    {item.gadget === "camera" && isWithLensVariant(item.variant) && (
+                      <div className="col-span-2">
+                        <LensSelector
+                          brand={item.phoneBrand || ""}
+                          value={item.lensModel || ""}
+                          onChange={(l) => handleItemChange(index, "lensModel", l)}
+                        />
+                      </div>
+                    )}
                     <div className="space-y-2">
                       <Label>Phone Brand</Label>
                       <Input
