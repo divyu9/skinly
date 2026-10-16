@@ -65,6 +65,10 @@ export function canonical(s: unknown): string {
       && toks[i - 1].at === toks[i - 2].at + toks[i - 2].t.length) rep = ROMAN[t];
     else if (t in ROMAN && (isNum(prev) || isMarkWord(prev) || (prev === "m" && isNum(toks[i - 2]?.t)))) rep = ROMAN[t];
     else if (/^m(ii|iii|iv|v|vi|vii)$/.test(t) && joined && isNum(prev)) rep = ROMAN[t.slice(1)];
+    // A suffix letter with "m" for Mark: "a7sm3", "a7rm4" → a7s 3, a7r 4.
+    else if (joined && isNum(prev) && /^[a-ln-z]m$/.test(t) && nextIsGen) rep = t[0]; // not "mm" (millimetres)
+    // …and the same with a numeral: "a7smiii" → a7s 3.
+    else if (joined && isNum(prev) && /^[a-ln-z]m(ii|iii|iv|v|vi|vii)$/.test(t)) rep = `${t[0]} ${ROMAN[t.slice(2)]}`;
     // A suffix letter and the numeral typed as one: "a7siii", "a7rv" → a7s 3, a7r 5.
     else if (joined && isNum(prev) && /^[a-z]{1,2}?(ii|iii|iv|v|vi|vii)$/.test(t) && /^([a-z]{1,2})(ii|iii|iv|v|vi|vii)$/.test(t)) {
       const mm = /^([a-z]{1,2}?)(ii|iii|iv|v|vi|vii)$/.exec(t)!;
