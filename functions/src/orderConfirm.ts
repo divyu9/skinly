@@ -129,6 +129,17 @@ export const onOrderConfirmed = functionsV1.firestore
       await confirmOrder(admin.firestore(), context.params.id);
     } catch (e) {
       console.error("onOrderConfirmed failed", context.params.id, e);
+      return null;
+    }
+    // A manual order never passes placeOrder or the PhonePe confirm, the two
+    // places that send "order received" (WhatsApp + email, customer and
+    // admin). Sent here once it has its number; notifyOrderPlaced is
+    // once-only (orderNotifiedAt), and the dialog sets that flag up front
+    // when the admin unticks "send confirmation".
+    if (after.source === "manual" && !after.orderNotifiedAt) {
+      const { notifyOrderPlaced } = await import("./orderNotifications");
+      await notifyOrderPlaced(admin.firestore(), context.params.id).catch((e) =>
+        console.error("manual order notify failed", context.params.id, e?.message || e));
     }
     return null;
   });
