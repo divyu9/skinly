@@ -33,7 +33,8 @@ export async function sendAdminOrderEmail(db: admin.firestore.Firestore, order: 
   const total = Number(order.total ?? order.amountPayable) || 0;
   const itemsText = items.map((i) => {
     const qty = Number(i?.quantity) || 1;
-    const device = i?.phoneModel ? ` (${[i.phoneBrand, i.phoneModel].filter(Boolean).join(" ")})` : "";
+    const device = (i?.phoneModel ? ` (${[i.phoneBrand, i.phoneModel].filter(Boolean).join(" ")})` : "")
+      + (i?.lensModel ? ` + lens ${String(i.lensModel)}` : "");
     return `${qty > 1 ? `${qty} × ` : ""}${String(i?.productTitle || "Item")}${device}`;
   }).join("  ·  ");
   const upsell = items.filter((i) => i?.upsellRuleId).reduce((s, i) => s + (Number(i?.price) || 0) * (Number(i?.quantity) || 1), 0);

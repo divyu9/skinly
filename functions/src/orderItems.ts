@@ -32,6 +32,7 @@ const lineOf = (i: any) => ({
   ...(i?.phoneBrand ? { phoneBrand: String(i.phoneBrand) } : {}),
   ...(i?.phoneModel ? { phoneModel: String(i.phoneModel) } : {}),
   ...(i?.coverage ? { coverage: String(i.coverage) } : {}),
+  ...(i?.lensModel ? { lensModel: String(i.lensModel).slice(0, 80) } : {}),
   ...(i?.upsellRuleId ? { upsellRuleId: String(i.upsellRuleId) } : {}),
   ...(i?.upsellSource ? { upsellSource: String(i.upsellSource) } : {}),
 });

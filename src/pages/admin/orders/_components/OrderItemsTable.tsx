@@ -26,6 +26,7 @@ export interface OrderItem {
   price: number;
   quantity: number;
   phoneModel?: string;
+  lensModel?: string;
   phoneBrand?: string;
   coverage?: "only_back" | "full_body_wrap";
   sku?: string;
@@ -40,6 +41,7 @@ export interface ItemFormEntry {
   price: number;
   quantity: number;
   phoneModel?: string;
+  lensModel?: string;
   phoneBrand?: string;
   coverage?: "only_back" | "full_body_wrap";
   sku?: string;
@@ -208,6 +210,7 @@ export function OrderItemsTable({
                     <p>Variant: {item.variant}</p>
                     {item.sku && <p>SKU: <span className="font-mono">{item.sku}</span></p>}
                     {item.phoneModel && <p>Model: {item.phoneModel}</p>}
+                    {item.lensModel && <p className="font-semibold text-foreground">Lens: {item.lensModel}</p>}
                     {item.phoneBrand && <p>Brand: {item.phoneBrand}</p>}
                     {item.coverage && (
                       <p>

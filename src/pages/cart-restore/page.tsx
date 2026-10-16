@@ -39,7 +39,7 @@ export default function CartRestorePage() {
           let cart: any[] = [];
           try { cart = JSON.parse(localStorage.getItem(key) || "[]"); } catch { cart = []; }
           const same = (a: any, b: any) => a.productId === b.productId && a.variant === b.variant &&
-            (a.phoneModel || "") === (b.phoneModel || "") && (a.coverage || "") === (b.coverage || "");
+            (a.phoneModel || "") === (b.phoneModel || "") && (a.coverage || "") === (b.coverage || "") && (a.lensModel || "") === (b.lensModel || "");
           for (const it of items) if (!cart.some((c) => same(c, it))) cart.push(it);
           localStorage.setItem(key, JSON.stringify(cart));
           window.dispatchEvent(new Event("guest_cart_updated"));

@@ -35,7 +35,7 @@ const PUBLIC_FIELDS = [
   "paymentFailureCode", "paymentFailureReason",
 ];
 const ITEM_FIELDS = ["productId", "productTitle", "productImage", "variant", "variantId", "sku", "quantity", "price",
-  "compareAtPrice", "phoneBrand", "phoneModel", "gadgetType", "finishType", "isUpsell", "coverage"];
+  "compareAtPrice", "phoneBrand", "phoneModel", "gadgetType", "finishType", "isUpsell", "coverage", "lensModel"];
 
 async function isAdminCaller(context: any): Promise<boolean> {
   try { await requireAdmin(context); return true; } catch { return false; }

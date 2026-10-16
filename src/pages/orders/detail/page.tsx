@@ -371,6 +371,11 @@ function OrderDetailPageInner() {
                             For: {item.phoneModel}
                           </p>
                         )}
+                        {(item as any).lensModel && (
+                          <p className="text-sm text-muted-foreground mb-1">
+                            Lens: <span className="font-medium text-foreground">{(item as any).lensModel}</span>
+                          </p>
+                        )}
                         {coverageLabel(item) && (
                           <p className="text-sm text-muted-foreground mb-1">
                             Coverage: <span className="font-medium text-foreground">{coverageLabel(item)}</span>

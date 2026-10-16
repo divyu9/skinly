@@ -314,6 +314,7 @@ function AuthenticatedCartContent() {
                     {(() => {
                       const meta = [
                         item.phoneModel,
+                        (item as any).lensModel ? `Lens: ${(item as any).lensModel}` : null,
                         item.coverage ? (item.coverage === "only_back" ? "Only Back" : "Full Body Wrap") : null,
                         item.variant !== "Default Title" && item.variant !== "Default" ? item.variant : null,
                       ].filter(Boolean);
@@ -672,6 +673,7 @@ function GuestCartContent() {
                       {(() => {
                         const meta = [
                           item.phoneModel,
+                          (item as any).lensModel ? `Lens: ${(item as any).lensModel}` : null,
                           item.coverage ? (item.coverage === "only_back" ? "Only Back" : "Full Body Wrap") : null,
                           item.variant !== "Default Title" && item.variant !== "Default" ? item.variant : null,
                         ].filter(Boolean);

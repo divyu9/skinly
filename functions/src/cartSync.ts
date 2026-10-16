@@ -42,6 +42,7 @@ export function cleanItems(raw: unknown) {
     ...(str(i?.phoneBrand, 60) ? { phoneBrand: str(i.phoneBrand, 60) } : {}),
     ...(str(i?.phoneModel, 80) ? { phoneModel: str(i.phoneModel, 80) } : {}),
     ...(i?.coverage === "only_back" || i?.coverage === "full_body_wrap" ? { coverage: i.coverage } : {}),
+    ...(str(i?.lensModel, 80) ? { lensModel: str(i.lensModel, 80) } : {}),
   })).filter((i) => i.productId);
 }
 

@@ -241,6 +241,7 @@ function CartContent({ onCheckoutClick }: { onCheckoutClick: () => void }) {
                     {(() => {
                       const meta = [
                         item.phoneModel,
+                        (item as any).lensModel ? `Lens: ${(item as any).lensModel}` : null,
                         item.coverage
                           ? item.coverage === "only_back"
                             ? "Only Back"

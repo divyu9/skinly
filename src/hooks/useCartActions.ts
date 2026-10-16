@@ -19,6 +19,8 @@ interface CartItemParams {
   phoneModel?: string;
   phoneBrand?: string;
   coverage?: "only_back" | "full_body_wrap";
+  /** The lens a camera skin's "With Lens" finish is cut for. */
+  lensModel?: string;
 }
 
 interface UseCartActionsParams {
@@ -39,6 +41,9 @@ interface UseCartActionsParams {
   phoneBrand?: string | null;
   coverage?: "only_back" | "full_body_wrap";
   requiresDeviceSelection: boolean;
+  /** Set on a camera listing's "With Lens" finish: the lens is needed to cut it. */
+  requiresLens?: boolean;
+  lensModel?: string | null;
   /** Add-ons ticked in Smart Setup, added after the item itself (each priced by placeOrder). */
   extras?: Array<CartItemParams & { upsellRuleId: string }>;
   /** Called once the item and its add-ons are in the cart. */
@@ -53,6 +58,8 @@ export function useCartActions({
   phoneBrand,
   coverage,
   requiresDeviceSelection,
+  requiresLens = false,
+  lensModel,
   extras = [],
   onAdded,
 }: UseCartActionsParams) {
@@ -83,9 +90,10 @@ export function useCartActions({
     
     if (phoneModel) item.phoneModel = phoneModel;
     if (phoneBrand) item.phoneBrand = phoneBrand;
+    if (requiresLens && lensModel?.trim()) item.lensModel = lensModel.trim();
     
     return item as CartItemParams;
-  }, [product, selectedVariant, displayImage, phoneModel, phoneBrand, coverage]);
+  }, [product, selectedVariant, displayImage, phoneModel, phoneBrand, coverage, requiresLens, lensModel]);
   
   const addToCart = useCallback(async (cartItem: CartItemParams) => {
     if (user) {
@@ -122,6 +130,11 @@ export function useCartActions({
     
     if (requiresDeviceSelection && !phoneModel) {
       toast.error("Please select your device model first");
+      return;
+    }
+    if (requiresLens && !lensModel?.trim()) {
+      toast.error("Please select your lens");
+      document.getElementById("lens-selector")?.scrollIntoView({ behavior: "smooth", block: "center" });
       return;
     }
     
@@ -162,13 +175,18 @@ export function useCartActions({
     } finally {
       setIsAdding(false);
     }
-  }, [product, requiresDeviceSelection, phoneModel, selectedVariant, createCartItem, addToCart, addToGuestCart, addExtras]);
+  }, [product, requiresDeviceSelection, phoneModel, requiresLens, lensModel, selectedVariant, createCartItem, addToCart, addToGuestCart, addExtras]);
   
   const handleBuyNow = useCallback(async () => {
     if (!product || !product.variants || product.variants.length === 0) return;
     
     if (requiresDeviceSelection && !phoneModel) {
       toast.error("Please select your device model first");
+      return;
+    }
+    if (requiresLens && !lensModel?.trim()) {
+      toast.error("Please select your lens");
+      document.getElementById("lens-selector")?.scrollIntoView({ behavior: "smooth", block: "center" });
       return;
     }
     
@@ -209,7 +227,7 @@ export function useCartActions({
     } finally {
       setIsBuyingNow(false);
     }
-  }, [product, requiresDeviceSelection, phoneModel, selectedVariant, createCartItem, addToCart, addToGuestCart, addExtras, navigate]);
+  }, [product, requiresDeviceSelection, phoneModel, requiresLens, lensModel, selectedVariant, createCartItem, addToCart, addToGuestCart, addExtras, navigate]);
   
   return {
     isAdding,

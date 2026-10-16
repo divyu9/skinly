@@ -16,7 +16,7 @@ import { designCodeOf } from "@/lib/real-photos";
 
 type Line = {
   productId?: string; productTitle?: string; variant?: string; sku?: string; quantity?: number; productImage?: string;
-  phoneBrand?: string; phoneModel?: string; coverage?: string;
+  phoneBrand?: string; phoneModel?: string; coverage?: string; lensModel?: string;
 };
 /** One cut to make: the device, and what it covers. */
 export type Cut = { device: string; coverage: string; qty: number; orders: string[] };
@@ -84,7 +84,8 @@ export async function buildPackList(orders: Array<{ orderNumber?: string; _id: s
     row.pieces += qty * (v?.multiplier || 1);
     row.orders.add(order);
     // What to cut from this design: each device and its coverage, alike ones counted together.
-    const device = [it.phoneBrand, it.phoneModel].filter(Boolean).join(" ").trim() || "Model not given";
+    const device = ([it.phoneBrand, it.phoneModel].filter(Boolean).join(" ").trim() || "Model not given")
+      + (it.lensModel ? ` + lens ${it.lensModel}` : "");
     const coverage = coverageOf(it);
     const cutKey = `${device}::${coverage}`;
     const cut = row.cuts.get(cutKey) || { device, coverage, qty: 0, orders: [] };

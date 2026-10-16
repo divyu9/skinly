@@ -25,6 +25,7 @@ export interface CartItemData {
   price: number;
   quantity: number;
   phoneModel?: string;
+  lensModel?: string;
   coverage?: "only_back" | "full_body_wrap";
   _id?: string;
 }
@@ -185,6 +186,9 @@ export function OrderSummaryPanel({
                     </div>
                     {item.phoneModel && (
                       <p className="text-xs text-muted-foreground">{item.phoneModel}</p>
+                    )}
+                    {item.lensModel && (
+                      <p className="text-xs text-muted-foreground">Lens: {item.lensModel}</p>
                     )}
                     {item.coverage && (
                       <p className="text-xs text-muted-foreground">

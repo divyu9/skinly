@@ -306,7 +306,7 @@ const contactKey = (email?: unknown, phone?: unknown) => {
 };
 /** Which phone and coverage a line was for, so /c/<code> can put back the same line. */
 const deviceOf = (i: any) => Object.fromEntries(
-  (["phoneBrand", "phoneModel", "coverage"] as const).filter((k) => i?.[k]).map((k) => [k, String(i[k])])
+  (["phoneBrand", "phoneModel", "coverage", "lensModel"] as const).filter((k) => i?.[k]).map((k) => [k, String(i[k])])
 );
 const rowId = (key: string) =>
   `c_${require("crypto").createHash("sha1").update(key).digest("hex").slice(0, 24)}`;

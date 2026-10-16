@@ -1,4 +1,4 @@
-import { Fragment, useState, useCallback, useMemo } from "react";
+import { Fragment, useState, useCallback, useMemo, useEffect } from "react";
 import { Link, Navigate } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
 import { Button } from "@/components/ui/button.tsx";
@@ -50,6 +50,7 @@ import { ProductUgcFloat } from "./_components/product-ugc-float.tsx";
 import { CashbackLine, cashbackAmount } from "./_components/cashback-line.tsx";
 import { ShippingLine } from "./_components/shipping-line.tsx";
 import { useHeaderOffset } from "@/hooks/use-header-offset.ts";
+import { LensSelector, isWithLensVariant } from "@/components/product/LensSelector.tsx";
 import { StickyBottomBar } from "./_components/sticky-bottom-bar.tsx";
 import { SmartSetup, type SetupCartItem } from "./_components/smart-setup.tsx";
 import { ReviewQuote } from "./_components/review-quote.tsx";
@@ -186,6 +187,15 @@ export default function ProductDetailPage() {
   // Tranzy (transparent) phone skins come for the back only: no Full Body Wrap.
   const isTranzy = /tranzy/i.test(String(productData?.title || "")) || String(productData?.finishType || "").toLowerCase() === "transparent";
 
+  // A camera skin's "With Lens" finish is cut for one lens: the shopper picks
+  // it (LensSelector), from the camera's brand. "Nikon Camera" → Nikon until
+  // a camera is picked.
+  const needsLens = deviceCategory === "camera"
+    && isWithLensVariant(productData?.variants?.[productState.selectedVariant]?.title);
+  const lensBrand = phoneBrand || String((productData as any)?.brandName || (productData as any)?.listingKind || "").replace(/\s*cameras?$/i, "").trim();
+  const [lensModel, setLensModel] = useState("");
+  useEffect(() => { setLensModel(""); }, [lensBrand, productData?._id]);
+
   // Add-ons ticked in "Complete your setup", added with the skin.
   const [setupExtras, setSetupExtras] = useState<SetupCartItem[]>([]);
   const [setupReset, setSetupReset] = useState(0);
@@ -204,6 +214,8 @@ export default function ProductDetailPage() {
     phoneBrand,
     coverage: isPhoneSkin ? (isTranzy ? "only_back" : productState.selectedCoverage) : undefined,
     requiresDeviceSelection: isSkinProduct && needsDeviceSelector,
+    requiresLens: needsLens,
+    lensModel,
     extras: setupExtras,
     onAdded: () => setSetupReset((n) => n + 1),
   });
@@ -590,6 +602,10 @@ export default function ProductDetailPage() {
                 />
               )}
               
+              {needsLens && (
+                <LensSelector brand={lensBrand} value={lensModel} onChange={setLensModel} />
+              )}
+
               {/* A dead grey primary button was the last thing a visitor saw
                   before leaving. When no model is picked the CTA is live and
                   says what to do; it only becomes Buy Now once we can sell. */}
