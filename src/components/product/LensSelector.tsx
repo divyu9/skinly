@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { SearchIcon, CheckIcon } from "lucide-react";
 import { useQuery } from "@/lib/firebase-hooks";
 import { api } from "@/lib/firebase-api";
+import { searchRows } from "@/lib/search-match";
 
 /** A camera listing's variant that includes the lens wrap ("With Lens", not "Without Lens"). */
 export const isWithLensVariant = (title?: string) => /\blens\b/i.test(String(title || "")) && !/\bwithout\b/i.test(String(title || ""));
@@ -59,20 +60,16 @@ export function LensSelector({ brand, value, onChange }: {
   }, [byBrand, cameraBrand]);
 
   const activeTab = byBrand.has(tab) ? tab : brands[0] || "";
-  // "24-70", "24 70" and "24–70" are the same lens: spaces and dashes don't count.
-  const norm = (t: string) => t.toLowerCase().replace(/[\s\-–_/]+/g, "");
-  const q = norm(search.trim());
+  const q = search.trim();
   const rows = useMemo(() => {
     const sortNames = (a: string, b: string) => a.localeCompare(b, undefined, { numeric: true });
     if (q) {
-      // A search looks through every brand: "sigma 24-70" or just "24-70".
-      const out: { brand: string; name: string }[] = [];
-      for (const b of brands) {
-        for (const n of byBrand.get(b)!) {
-          if (norm(`${b}${n}`).includes(q) || norm(n).includes(q)) out.push({ brand: b, name: n });
-        }
-      }
-      return out.slice(0, 200);
+      // The site's own search (lib/search-match): words in any order, spacing
+      // and dashes ignored, a typo forgiven, and "24 70 sigma" ranks Sigma's
+      // 24-70 first. It looks through every brand.
+      const all: { brand: string; name: string }[] = [];
+      for (const b of brands) for (const n of byBrand.get(b)!) all.push({ brand: b, name: n });
+      return searchRows(all, q, (r) => r.name, (r) => `${r.brand} ${r.name}`).slice(0, 200);
     }
     return [...(byBrand.get(activeTab) || [])].sort(sortNames).map((name) => ({ brand: activeTab, name }));
   }, [q, brands, byBrand, activeTab]);

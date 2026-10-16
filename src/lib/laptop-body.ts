@@ -1,3 +1,4 @@
+import { searchRows } from "./search-match";
 /**
  * Which laptops share a body.
  *
@@ -61,10 +62,16 @@ export function searchModels(brand: string, models: string[], query: string, cat
   if (!q) return { models, sameBody: new Set() };
   const terms = q.split(/\s+/).filter(Boolean);
   const sq = squash(q);
-  const direct = models.filter((m) => {
+  // The site search first (lib/search-match): words in any order, a typo
+  // forgiven, closest names on top ("24 70" above "24-105"). Then anything the
+  // old rule found that it did not — a code typed mid-name such as "15alc6".
+  const ranked = searchRows(models, query, (m) => m, (m) => `${brand} ${m}`);
+  const seen = new Set(ranked);
+  const direct = [...ranked, ...models.filter((m) => {
+    if (seen.has(m)) return false;
     const ml = m.toLowerCase();
     return terms.every((t) => ml.includes(t)) || (sq.length >= 3 && squash(m).includes(sq));
-  });
+  })];
   const sameBody = new Set<string>();
   if (category === "laptop") {
     const want = new Set(laptopBodyKeys(brand, query));

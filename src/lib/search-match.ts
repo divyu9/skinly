@@ -18,7 +18,9 @@
  *  - if nothing matches exactly, one wrong, missing or extra letter per word is
  *    forgiven (samsng, galxy), for words of four letters or more;
  *  - the closest names come first: the exact model, then models starting with
- *    the query, then the rest, shortest first.
+ *    the query, then names holding the query's words side by side in the
+ *    order typed ("24 70 sigma" puts Sigma's 24-70 above its 24-105 and
+ *    70-200), then the rest, shortest first.
  */
 
 /** Lowercase letters and digits only, with "+" spelled out. */
@@ -120,6 +122,19 @@ export function matchRank(name: string, fullName: string, query: string): number
 }
 
 /**
+ * How many neighbouring query words sit side by side in the name, in the
+ * order typed: "24 70" scores 1 against "24-70mm" and 0 against "24-105mm
+ * … 70" — every word matches both, but only one is the 24-70.
+ */
+export function adjacency(haystack: string, words: string[]): number {
+  if (words.length < 2) return 0;
+  const tails = starts(haystack);
+  let n = 0;
+  for (let i = 0; i + 1 < words.length; i++) if (hasFrom(tails, words[i] + words[i + 1])) n++;
+  return n;
+}
+
+/**
  * The rows that match, closest first. `name` is what the row is called
  * (model name, product title); `full` adds whatever else may be searched
  * (brand, tags).
@@ -137,7 +152,7 @@ export function searchRows<T>(
   if (!hits.length && core.length && core.length < words.length) hits = rows.filter((r) => matchesQuery(full(r), core));
   if (!hits.length) hits = rows.filter((r) => matchesQueryLoosely(full(r), core.length ? core : words));
   return hits
-    .map((r, i) => ({ r, i, rank: matchRank(name(r), full(r), query), len: compact(name(r)).length }))
-    .sort((a, b) => a.rank - b.rank || a.len - b.len || a.i - b.i)
+    .map((r, i) => ({ r, i, rank: matchRank(name(r), full(r), query), adj: adjacency(full(r), words), len: compact(name(r)).length }))
+    .sort((a, b) => a.rank - b.rank || b.adj - a.adj || a.len - b.len || a.i - b.i)
     .map((x) => x.r);
 }
