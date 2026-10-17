@@ -16,6 +16,7 @@ import { sizedImage } from "@/lib/image-cdn";
 import { designNameOf } from "@/lib/pack-list";
 import { adminStatusLabel, STATUS_BADGE } from "@/lib/order-label.ts";
 import { cn } from "@/lib/utils.ts";
+import { ActivityLog } from "./ActivityLog.tsx";
 
 /**
  * Admin home. One callable (adminDashboard) returns every figure on the
@@ -423,6 +424,9 @@ function DashboardInner() {
           icon={<CreditCardIcon className="size-4" />} tone="bg-card text-ink"
         />
       </div>
+
+      {/* ── What just happened, to act on ─────────────────────────────────── */}
+      <ActivityLog />
 
       {/* ── Trend + tasks ────────────────────────────────────────────────── */}
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
