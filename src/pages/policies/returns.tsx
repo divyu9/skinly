@@ -44,7 +44,7 @@ export default function ReturnsPolicy() {
 
         <div className="mb-8">
           <h1 className="text-4xl md:text-5xl font-black mb-4">Returns & Replacement Policy</h1>
-          <p className="text-muted-foreground">Last Updated: December 2024</p>
+          <p className="text-muted-foreground">Last Updated: October 2026</p>
         </div>
 
         <Card>
@@ -126,7 +126,24 @@ export default function ReturnsPolicy() {
             </section>
 
             <section className="mb-8">
-              <h2 className="text-2xl font-bold mb-4">7. Contact Us</h2>
+              <h2 className="text-2xl font-bold mb-4">7. Undelivered Parcels Returned by the Courier (RTO)</h2>
+              <p className="mb-4">If the courier cannot deliver your order after multiple attempts and returns it to us (Return to Origin), for any of the following reasons:</p>
+              <ul className="list-disc pl-6 mb-4 space-y-2">
+                <li>The customer was not reachable or not contactable on the phone number given at checkout</li>
+                <li>The address was wrong, incomplete or could not be located</li>
+                <li>The delivery was refused, or nobody was available to receive it</li>
+              </ul>
+              <p className="mb-4">then the following applies:</p>
+              <ul className="list-disc pl-6 mb-4 space-y-2">
+                <li><strong>Reshipping only after it reaches us:</strong> the order can be reshipped only once the returned parcel has been delivered back to us.</li>
+                <li><strong>Reshipping cost is paid by the customer:</strong> the shipping charge for sending it again is borne by the customer and must be paid before we reship.</li>
+                <li><strong>No refund:</strong> refunds are not possible for orders returned by the courier for these reasons, as every skin is printed and cut to order for your device.</li>
+              </ul>
+              <p className="mb-4">Please make sure your phone number and full address (with landmark and PIN code) are correct at checkout, and keep your phone reachable on the delivery day. To arrange a reshipment, contact us on WhatsApp with your order number.</p>
+            </section>
+
+            <section className="mb-8">
+              <h2 className="text-2xl font-bold mb-4">8. Contact Us</h2>
               <p className="mb-4">For any questions about our Returns and Replacement Policy, please contact us:</p>
               <div className="bg-muted p-4 rounded-lg">
                 <p className="font-semibold mb-2">Mad House Media</p>
