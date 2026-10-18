@@ -30,8 +30,10 @@ export const isBuyable = (c: any, now = Date.now()) =>
   (c?.status === "available" ||
     (c?.status === "reserved" && (c?.reservedUntil ? Number(c.reservedUntil) < now : Number(c?.reservedAt || 0) < now - RESERVE_MS)));
 
-/** A direct-UPI order waits for the customer to pay and the admin to check: its pieces are held a day. */
-export const UPI_HOLD_MS = 24 * 3600_000;
+/** A direct-UPI order has 10 minutes to pay and send the UTR; once the UTR is in, the
+ *  pieces stay held a day while the admin checks the bank. */
+export const UPI_HOLD_MS = 10 * 60_000;
+export const UPI_VERIFY_HOLD_MS = 24 * 3600_000;
 
 /** The admin puts an RTO order's pieces on the clearance page. */
 export const addRtoToClearance = onCall(async (data: any, context: any) => {
@@ -317,8 +319,23 @@ export const submitUpiPayment = onCall(async (data: any) => {
   const o = (await ref.get()).data() as any;
   if (!o || o.paymentMethod !== "upi_direct") throw new HttpsError("not-found", "No such UPI order");
   if (o.paymentStatus === "success") return { ok: true, already: true };
-  await ref.update({ upiUtr: utr, upiSubmittedAt: Date.now(), updatedAt: Date.now() });
-  return { ok: true };
+  if (o.status === "cancelled") throw new HttpsError("failed-precondition", "This order was cancelled");
+  // Keep this order's pieces while the admin checks; past the 10 minutes a piece
+  // someone else has since taken cannot be held — the admin sees that and refunds.
+  let lost = 0;
+  for (const it of o.items || []) {
+    if (!it?.clearanceItemId) continue;
+    const cref = db.collection("clearanceItems").doc(String(it.clearanceItemId));
+    await db.runTransaction(async (tx) => {
+      const c = (await tx.get(cref)).data() as any;
+      const mine = c?.status === "reserved" && c.reservedOrderId === orderId;
+      if (mine || (c && isBuyable(c))) {
+        tx.update(cref, { status: "reserved", reservedOrderId: orderId, reservedAt: Date.now(), reservedUntil: Date.now() + UPI_VERIFY_HOLD_MS });
+      } else lost++;
+    });
+  }
+  await ref.update({ upiUtr: utr, upiSubmittedAt: Date.now(), updatedAt: Date.now(), ...(lost ? { upiLostPieces: lost } : {}) });
+  return { ok: true, lost };
 });
 
 /** Admin: the UPI money arrived (confirm the order) or did not (cancel it, pieces back on sale). */

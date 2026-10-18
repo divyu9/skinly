@@ -44,6 +44,11 @@ export function UpiPaymentPanel({ order }: { order: any }) {
           {order.upiUtr ? <b className="font-mono">{order.upiUtr}</b> : <span className="text-muted-foreground">not submitted yet</span>}
           {order.upiSubmittedAt ? <span className="text-muted-foreground"> · {new Date(order.upiSubmittedAt).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })}</span> : null}
         </p>
+        {order.upiLostPieces ? (
+          <p className="rounded-md bg-red-50 px-2 py-1 text-xs font-semibold text-red-700">
+            The UTR came after the 10 minutes and {order.upiLostPieces} piece(s) had already gone to another order — refund the customer instead of confirming.
+          </p>
+        ) : null}
         <p className="text-xs text-muted-foreground">Personal sale: numbered in the CL- series, no GST invoice.</p>
         {paid ? (
           <p className="font-semibold text-green-700">Payment confirmed{order.orderNumber ? ` · ${order.orderNumber}` : ""}.</p>

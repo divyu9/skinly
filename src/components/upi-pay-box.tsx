@@ -11,7 +11,7 @@ import { CheckCircle2Icon, CopyIcon, SmartphoneIcon } from "lucide-react";
  */
 export function UpiPayBox({ orderId, upiPay, utr, submittedAt }: {
   orderId: string;
-  upiPay: { vpa: string; payeeName?: string; amount: number; note?: string };
+  upiPay: { vpa: string; payeeName?: string; amount: number; note?: string; holdUntil?: number };
   utr?: string;
   submittedAt?: number;
 }) {
@@ -39,6 +39,12 @@ export function UpiPayBox({ orderId, upiPay, utr, submittedAt }: {
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [sent, setSent] = useState(!!utr);
+  // 10 minutes to pay and send the UTR (placeOrder sets holdUntil); then the item is released.
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => { const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t); }, []);
+  const left = upiPay.holdUntil ? Math.max(0, upiPay.holdUntil - now) : null;
+  const expired = left === 0;
+  const mmss = left === null ? "" : `${String(Math.floor(left / 60000)).padStart(2, "0")}:${String(Math.floor((left % 60000) / 1000)).padStart(2, "0")}`;
 
   useEffect(() => {
     let live = true;
@@ -75,8 +81,14 @@ export function UpiPayBox({ orderId, upiPay, utr, submittedAt }: {
     <div className="space-y-3 rounded-2xl border-2 border-ink bg-card p-4 text-sm">
       <div>
         <p className="text-base font-extrabold">Pay ₹{amount} by UPI to complete your order</p>
-        <p className="text-muted-foreground">Clearance items are paid directly by UPI. Your item is held for you for 24 hours.</p>
+        <p className="text-muted-foreground">Clearance items are paid directly by UPI. Pay and enter the UTR to confirm your order.</p>
       </div>
+      {left !== null && (
+        <div className={`flex items-center justify-between rounded-xl border-2 px-3 py-2 font-bold ${expired ? "border-heart/40 bg-heart/10 text-heart" : left < 120000 ? "border-heart bg-heart/10 text-heart" : "border-ink bg-sunny text-ink"}`}>
+          <span>{expired ? "Time's up — this item may have been released" : "Item held for you — pay within"}</span>
+          {!expired && <span className="font-mono text-lg tabular-nums">{mmss}</span>}
+        </div>
+      )}
       <div className="flex flex-col items-center gap-3 sm:flex-row sm:items-start">
         <div className="grid size-[200px] shrink-0 place-items-center rounded-xl border bg-white p-2">
           {qr ? <img src={qr} alt={`UPI QR for ₹${amount}`} className="size-full" /> : <span className="text-xs text-muted-foreground">Loading QR…</span>}

@@ -869,7 +869,7 @@ function CheckoutPageInner() {
                 <div className="space-y-1 rounded-2xl border-2 border-ink bg-card p-4 text-sm">
                   <p className="font-bold">Payment: UPI (clearance items)</p>
                   <p className="text-muted-foreground">
-                    After you place the order you'll get a UPI QR and an app button for the exact amount. Pay, enter the UTR, and we confirm your order. Your item is held for 24 hours.
+                    After you place the order you'll get a UPI QR and an app button for the exact amount. You'll have 10 minutes to pay and enter the UTR; then we confirm your order.
                   </p>
                 </div>
               ) : (

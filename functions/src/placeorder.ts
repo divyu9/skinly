@@ -547,7 +547,7 @@ export const placeOrder = functions
       // Paid straight to the owner's UPI: a personal sale, CL- numbered, no invoice (clearance.ts).
       ...(upiDirect ? {
         personalSale: true,
-        upiPay: { vpa: upiDirect.vpa, payeeName: upiDirect.payeeName, amount: amountPayable, note: checkoutRef },
+        upiPay: { vpa: upiDirect.vpa, payeeName: upiDirect.payeeName, amount: amountPayable, note: checkoutRef, holdUntil: Date.now() + 10 * 60_000 },
       } : {}),
       itemsTotal,
       shippingFee,
