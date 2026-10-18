@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
 import { toast } from "sonner";
 import { ChevronLeftIcon, ChevronRightIcon, ImagesIcon, MessageCircleIcon, SearchIcon, ShoppingCartIcon, TagIcon, XIcon, ZapIcon } from "lucide-react";
@@ -38,6 +38,7 @@ export default function ClearancePage() {
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
   const [items, setItems] = useState<Piece[] | null>(null);
+  const [designs, setDesigns] = useState<{ title: string; slug: string; price: number; image: string }[]>([]);
   const [error, setError] = useState("");
   const [brand, setBrand] = useState("all");
   const [q, setQ] = useState("");
@@ -54,7 +55,7 @@ export default function ClearancePage() {
       try {
         const [{ functions }, { httpsCallable }] = await Promise.all([import("@/lib/firebase"), import("firebase/functions")]);
         const res: any = await httpsCallable(functions, "listClearance")({});
-        if (live) setItems(res.data?.items || []);
+        if (live) { setItems(res.data?.items || []); setDesigns(res.data?.designs || []); }
       } catch (e: any) {
         if (live) setError(e?.message || "Could not load the clearance sale");
       }
@@ -143,6 +144,28 @@ export default function ClearancePage() {
             Skins already printed and cut for one exact device. If yours is listed, it's ready to ship — at a clearance price.
           </p>
         </div>
+
+        {designs.length > 0 && (
+          <section className="mt-8">
+            <div className="flex items-baseline justify-between gap-2">
+              <h2 className="text-lg font-extrabold">Designs on sale — choose your model</h2>
+              <span className="text-xs text-muted-foreground">Cut for your exact device</span>
+            </div>
+            <div data-drag-scroll className="no-scrollbar -mx-4 mt-3 flex gap-3 overflow-x-auto px-4 pb-2">
+              {designs.map((d) => (
+                <Link key={d.slug} to={`/products/${d.slug}`} className="tile w-40 shrink-0 overflow-hidden rounded-2xl">
+                  <div className="aspect-square bg-muted">
+                    {d.image && <img src={sizedImage(d.image, 320)} alt={d.title} loading="lazy" className="size-full object-cover" />}
+                  </div>
+                  <div className="p-2">
+                    <p className="line-clamp-2 text-xs font-bold leading-snug">{d.title.replace(/\s*[-–(]?\s*\(?[LM]-\d+\)?\s*[-–]?/g, " ").replace(/\s+/g, " ").trim()}</p>
+                    <p className="mt-1 text-sm font-extrabold text-brand">₹{d.price}</p>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </section>
+        )}
 
         {items && items.length > 0 && (
           <>

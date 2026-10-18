@@ -219,7 +219,17 @@ export const listClearance = onCall(async (data: any, context: any) => {
         reservedOrderId: c.reservedOrderId || null, soldOrderId: c.soldOrderId || null, soldAt: c.soldAt || null,
       } : {}),
     }));
-  return { items };
+  // Designs on sale (product.designSale): slow precut designs, cut for any model,
+  // listed on the clearance page above the one-off pieces.
+  let designs: any[] = [];
+  try {
+    const ds = await db.collection("products").where("designSale.price", ">", 0).get();
+    designs = ds.docs.map((d) => d.data() as any).filter((p) => p.status === "active").map((p) => ({
+      title: String(p.title || ""), slug: String(p.slug || ""), price: Number(p.designSale?.price) || 0,
+      image: String((p.images || []).find((i: any) => i?.url)?.url || ""), code: String(p.designSale?.code || ""),
+    })).filter((p) => p.slug);
+  } catch (e: any) { console.warn("listClearance designs:", e?.message || e); }
+  return { items, designs };
 });
 
 /**
