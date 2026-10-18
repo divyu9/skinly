@@ -40,7 +40,8 @@ function CardVideo({ src, poster }: { src: string; poster?: string }) {
   }, []);
   return (
     <>
-      <video ref={ref} src={src} poster={poster} muted loop playsInline preload="none" className="size-full object-cover" />
+      {/* Absolute: a tall clip's own height would otherwise stretch the square card. */}
+      <video ref={ref} src={src} poster={poster} muted loop playsInline preload="none" className="absolute inset-0 size-full object-cover" />
       <span className="absolute right-2 top-2 flex items-center gap-1 rounded-full bg-black/70 px-2 py-0.5 text-[11px] font-bold text-white">▶ Video</span>
     </>
   );

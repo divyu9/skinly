@@ -69,7 +69,7 @@ export function ProductSheet({ p, device, coverageLabel, busy, added, soldOut = 
             {imgs.map((u, i) => (
               <div key={u + i} className="h-full w-full shrink-0 snap-center">
                 {isVideo(i) ? (
-                  <video src={u} poster={photos[0] ? sizedImage(photos[0], 900) : undefined} autoPlay muted loop playsInline controls className="size-full object-contain" />
+                  <video src={u} poster={photos[0] ? sizedImage(photos[0], 900) : undefined} autoPlay muted loop playsInline controls className="size-full bg-black object-contain" />
                 ) : (
                   <img src={sizedImage(u, 900)} alt={`${p.productTitle} — photo ${i + 1} of ${imgs.length}`} loading={i < 2 ? "eager" : "lazy"} className="size-full object-contain" />
                 )}
