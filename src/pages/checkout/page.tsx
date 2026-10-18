@@ -723,7 +723,8 @@ function CheckoutPageInner() {
     finalTotal,
     totalCashback,
     cashbackNeedsAccount: !isAuthenticated,
-    gstBreakdown,
+    // A personal sale (clearance gadgets by direct UPI) carries no GST.
+    gstBreakdown: clearanceOnly ? null : gstBreakdown,
     couponCode,
     appliedCoupon,
     isApplyingCoupon,
