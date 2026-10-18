@@ -13,6 +13,8 @@ export interface GuestCartItem {
   coverage?: "only_back" | "full_body_wrap";
   /** The lens a camera skin's "With Lens" finish is cut for. */
   lensModel?: string;
+  /** A clearance piece (an RTO skin cut for one device): one only, its own price. */
+  clearanceItemId?: string;
   /** Added from a checkout upsell: placeOrder prices it by that rule's offer. */
   upsellRuleId?: string;
   /** Where the add-on was offered: product, cart, checkout (dashboard figures). */
@@ -82,13 +84,14 @@ export function useGuestCart() {
     const existingIndex = prev.findIndex(
       (i) => i.productId === item.productId && i.variant === item.variant &&
         (i.phoneModel || "") === (item.phoneModel || "") && (i.coverage || "") === (item.coverage || "") &&
-        (i.lensModel || "") === (item.lensModel || "")
+        (i.lensModel || "") === (item.lensModel || "") && (i.clearanceItemId || "") === (item.clearanceItemId || "")
     );
 
     let newCart;
     if (existingIndex > -1) {
       newCart = [...prev];
-      newCart[existingIndex].quantity += item.quantity || 1;
+      // A clearance piece is one of a kind: adding it again changes nothing.
+      if (!item.clearanceItemId) newCart[existingIndex].quantity += item.quantity || 1;
     } else {
       newCart = [...prev, { ...item, quantity: item.quantity || 1 }];
     }

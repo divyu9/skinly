@@ -2576,7 +2576,9 @@ export async function runMutation(path: string, args?: any) {
           const cartData: any = {
             ...args,
             // An upsell line keeps its offer price, never above the real one; placeOrder checks the rule.
-            price: args.upsellRuleId ? Math.min(Number(realPrice) || 0, Number(args.price) || Number(realPrice) || 0) : realPrice,
+            // A clearance piece keeps its own price (placeOrder prices it from the piece).
+            price: args.clearanceItemId ? Number(args.price) || 0
+              : args.upsellRuleId ? Math.min(Number(realPrice) || 0, Number(args.price) || Number(realPrice) || 0) : realPrice,
             addedAt: Date.now()
           };
           

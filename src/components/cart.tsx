@@ -107,7 +107,7 @@ function CartContent({ onCheckoutClick }: { onCheckoutClick: () => void }) {
   const displayItems = user ? (cartItems || []) : guestCart;
 
   // Check stock status for cart items
-  const cartItemsForStockCheck = displayItems?.map(item => ({
+  const cartItemsForStockCheck = displayItems?.filter((i: any) => !i.clearanceItemId).map(item => ({
     productId: item.productId,
     variant: item.variant,
     quantity: item.quantity,
@@ -202,7 +202,7 @@ function CartContent({ onCheckoutClick }: { onCheckoutClick: () => void }) {
           const itemId = "_id" in item ? (item._id as Id<"cart">) : undefined;
           const key = itemId || `${item.productId}-${item.variant}-${idx}`;
           const stockInfo = stockStatusMap.get(`${item.productId}-${item.variant}`);
-          const isOutOfStock = stockInfo?.isOutOfStock || false;
+          const isOutOfStock = !(item as any).clearanceItemId && (stockInfo?.isOutOfStock || false);
           
           return (
             <div key={key}>
@@ -292,7 +292,7 @@ function CartContent({ onCheckoutClick }: { onCheckoutClick: () => void }) {
                           size="sm"
                           variant="ghost"
                           className="h-7 w-7 p-0"
-                          disabled={isOutOfStock}
+                          disabled={isOutOfStock || !!(item as any).clearanceItemId}
                           onClick={() => handleUpdateQuantity(
                             item.productId,
                             item.variant,

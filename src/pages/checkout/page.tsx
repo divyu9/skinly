@@ -240,7 +240,8 @@ function CheckoutPageInner() {
     return () => { window.removeEventListener("pagehide", leave); leave(); };
   }, []);
 
-  const cartItemsForStockCheck = cartItems?.map((item) => ({
+  // A clearance piece is checked when the order is placed (it is reserved there), not against variant stock.
+  const cartItemsForStockCheck = cartItems?.filter((item: any) => !item.clearanceItemId).map((item) => ({
     productId: item.productId, variant: item.variant, quantity: item.quantity,
   })) || [];
 

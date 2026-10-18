@@ -233,6 +233,14 @@ export const placeOrder = functions
       }
     }
 
+    // Clearance pieces (clearance.ts): one each, priced by the piece, held for
+    // this order before anything is charged; a piece already gone stops here.
+    if (orderItems.some((it) => it?.clearanceItemId)) {
+      orderItems = orderItems.map((it) => (it?.clearanceItemId ? { ...it, quantity: 1 } : it));
+      const { reserveClearance } = await import("./clearance");
+      for (const [i, p] of await reserveClearance(db, orderId, orderItems)) upsellPrice.set(i, p);
+    }
+
     // Price comes from the variant document, always. The old fallback to
     // `item.price` meant a cart line naming a variant that does not exist was
     // billed at whatever the caller claimed — send variant "zzz" with price 1

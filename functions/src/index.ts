@@ -63,3 +63,4 @@ export * from "./orderItems";
 export * from "./modelRequestsAdmin";
 export * from "./activity";
 export * from "./stockHistory";
+export { addRtoToClearance, removeClearanceItem, listClearance } from "./clearance";

@@ -40,6 +40,7 @@ import {
   LogInIcon,
   ChevronDownIcon,
   ChevronUpIcon,
+  TagIcon,
 } from "lucide-react";
 
 interface MobileNavProps {
@@ -147,6 +148,12 @@ export function MobileNav({ open: controlledOpen, onOpenChange, onGadgetSelector
       label: "Devices",
       icon: ListIcon,
       href: "/devices",
+    },
+    {
+      // Skins back from the courier, already cut for one device (pages/clearance).
+      label: "Clearance Sale",
+      icon: TagIcon,
+      href: "/clearance",
     },
     {
       label: "My Orders",

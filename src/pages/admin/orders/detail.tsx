@@ -19,6 +19,7 @@ import { PaymentRefundPanel, type RefundFormData } from "./_components/PaymentRe
 import { ReferralPanel } from "./_components/ReferralPanel.tsx";
 import { SourceCard } from "./_components/SourceCard.tsx";
 import { ManualConfirmPanel } from "./_components/ManualConfirmPanel.tsx";
+import { RtoClearancePanel } from "./_components/RtoClearancePanel.tsx";
 import { PaymentTestPanel } from "./_components/PaymentTestPanel.tsx";
 import { ShippingTrackingPanel, type ShippingFormData, type ManualTrackingFormData } from "./_components/ShippingTrackingPanel.tsx";
 import { DelhiveryShipPanel } from "./_components/DelhiveryShipPanel.tsx";
@@ -710,6 +711,7 @@ function OrderDetailPageInner() {
             onSaveAddress={handleUpdateShippingAddress}
           />
 
+          <RtoClearancePanel order={order} />
           <ManualConfirmPanel order={order} />
           <SourceCard attribution={(order as any).attribution} tracking={(order as any).tracking} metaCapi={(order as any).metaCapi} />
           <PaymentTestPanel order={order} />
@@ -779,7 +781,7 @@ function AddOnAdminBanner({ order }: { order: any }) {
     if (!ids.length) { setKids([]); return; }
     let live = true;
     import("firebase/firestore").then(async ({ doc, getDoc }) => {
-      const { db } = await import("@/lib/firebase");
+      const { db } = await import("@/lib/firebase-db");
       const rows = await Promise.all(ids.map((id) => getDoc(doc(db, "orders", id)).then((d) => ({ _id: d.id, ...(d.data() as any) }))));
       if (live) setKids(rows.filter((k) => k.orderNumber && k.paymentStatus !== "failed" && k.status !== "pending_payment"));
     });

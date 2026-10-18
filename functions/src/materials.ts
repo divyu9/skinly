@@ -168,6 +168,8 @@ export async function reserveMaterialForOrder(
   const unresolved: string[] = [];
 
   for (const item of items) {
+    // A clearance piece (an RTO skin, already cut) takes nothing from the rolls or sheets.
+    if ((item as any)?.clearanceItemId) continue;
     const qty = Math.max(1, Number(item?.quantity) || 1);
     /*
      * An order line names its variant in `variant` ("Only Top"); this read

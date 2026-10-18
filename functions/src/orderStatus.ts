@@ -244,7 +244,10 @@ export async function setOrderStatus(
   // its own: an order's status must not depend on MSG91 being reachable.
   const order = outcome.order;
 
-  if (next === "cancelled" || next === "rto") {
+  // Cancelled goes back to stock. RTO does not: a returned skin is already
+  // cut for one device, so it goes to the clearance page instead (the admin
+  // puts it there from the order page once the parcel is back: clearance.ts).
+  if (next === "cancelled") {
     try {
       const { releaseMaterialForOrder } = await import("./materials");
       await releaseMaterialForOrder(db, ref);

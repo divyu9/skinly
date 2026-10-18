@@ -101,7 +101,7 @@ function AuthenticatedCartContent() {
   const [hasError, setHasError] = useState(false);
 
   // Check stock status for cart items (Must be called unconditionally at the very top)
-  const cartItemsForStockCheck = (cartItems || []).map(item => ({
+  const cartItemsForStockCheck = (cartItems || []).filter((i: any) => !i.clearanceItemId).map(item => ({
     productId: item.productId,
     variant: item.variant,
     quantity: item.quantity,
@@ -268,7 +268,7 @@ function AuthenticatedCartContent() {
         <div className="min-w-0 lg:col-span-2 space-y-3">
           {cartItems.map((item) => {
             const stockInfo = stockStatusMap.get(`${item.productId}-${item.variant}`);
-            const isOutOfStock = stockInfo?.isOutOfStock || false;
+            const isOutOfStock = !(item as any).clearanceItemId && (stockInfo?.isOutOfStock || false);
             
             return (
               <Card key={item._id} className={`rounded-2xl border-2 border-ink/15 py-0 ${isOutOfStock ? 'opacity-50' : ''}`}>
@@ -350,7 +350,7 @@ function AuthenticatedCartContent() {
                           variant="ghost"
                           className="size-9 p-0"
                           aria-label="Increase quantity"
-                          disabled={isOutOfStock}
+                          disabled={isOutOfStock || !!(item as any).clearanceItemId}
                           onClick={() => handleUpdateQuantity(item._id, item.quantity + 1)}
                         >
                           <PlusIcon className="size-4" />
@@ -518,7 +518,7 @@ function GuestCartContent() {
   useSmartRepricing(guestCart as any, true);
 
   // Check stock status for guest cart items (Must be called unconditionally)
-  const cartItemsForStockCheck = (guestCart || []).map(item => ({
+  const cartItemsForStockCheck = (guestCart || []).filter((i: any) => !i.clearanceItemId).map(item => ({
     productId: item.productId,
     variant: item.variant,
     quantity: item.quantity,
@@ -627,7 +627,7 @@ function GuestCartContent() {
           {guestCart.map((item, idx) => {
             const key = `${item.productId}-${item.variant}-${idx}`;
             const stockInfo = stockStatusMap.get(`${item.productId}-${item.variant}`);
-            const isOutOfStock = stockInfo?.isOutOfStock || false;
+            const isOutOfStock = !(item as any).clearanceItemId && (stockInfo?.isOutOfStock || false);
             
             return (
               <Card key={key} className={`rounded-2xl border-2 border-ink/15 py-0 ${isOutOfStock ? 'opacity-50' : ''}`}>
@@ -707,7 +707,7 @@ function GuestCartContent() {
                             variant="ghost"
                             className="size-9 p-0"
                             aria-label="Increase quantity"
-                            disabled={isOutOfStock}
+                            disabled={isOutOfStock || !!(item as any).clearanceItemId}
                             onClick={() => handleUpdateQuantity(item.productId, item.variant, item.quantity + 1)}
                           >
                             <PlusIcon className="size-4" />
