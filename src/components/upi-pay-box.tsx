@@ -16,13 +16,16 @@ export function UpiPayBox({ orderId, upiPay, utr, submittedAt }: {
   submittedAt?: number;
 }) {
   const amount = Math.round(Number(upiPay.amount) || 0);
-  const link = `upi://pay?${new URLSearchParams({
-    pa: upiPay.vpa,
-    ...(upiPay.payeeName ? { pn: upiPay.payeeName } : {}),
-    am: String(amount),
-    cu: "INR",
-    ...(upiPay.note ? { tn: `GoSkinly ${upiPay.note}` } : {}),
-  }).toString()}`;
+  // The UPI ID stays as written (some apps reject "%40" for "@"); the rest is
+  // percent-encoded with %20 for spaces, which every UPI app reads.
+  const enc = (v: string) => encodeURIComponent(v);
+  const link = "upi://pay?" + [
+    `pa=${upiPay.vpa}`,
+    upiPay.payeeName ? `pn=${enc(upiPay.payeeName)}` : "",
+    `am=${amount}`,
+    "cu=INR",
+    upiPay.note ? `tn=${enc(`GoSkinly ${upiPay.note}`)}` : "",
+  ].filter(Boolean).join("&");
   // The same payment for each app by name: iPhones have no app chooser for
   // upi:// links, so each app gets its own button there.
   const query = link.slice("upi://pay?".length);
