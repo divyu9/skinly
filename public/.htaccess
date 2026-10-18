@@ -131,6 +131,20 @@ RewriteRule ^pages/(terms-of-service|terms)$ https://goskinly.com/policies/terms
 RewriteRule ^pages/(shop|store)$ https://goskinly.com/products [R=301,L]
 RewriteRule ^pages(/.*)?$ https://goskinly.com/ [R=301,L]
 RewriteRule ^account/(login|register|signup)$ https://goskinly.com/account [R=301,L]
+# Gadget listings moved to the clearance sale (18 Oct 2026): the listing is a draft,
+# so its old link goes to /clearance instead of a 404.
+RewriteRule ^products/retro-game/?$ https://goskinly.com/clearance [R=301,L]
+RewriteRule ^products/smart-glasses-d11-plus/?$ https://goskinly.com/clearance [R=301,L]
+RewriteRule ^products/mini-cooler/?$ https://goskinly.com/clearance [R=301,L]
+RewriteRule ^products/cyber-charger-tesla-model-3-in-1-wireless-charger-for-phone-airpods-and-apple-watch/?$ https://goskinly.com/clearance [R=301,L]
+RewriteRule ^products/hp-webcam/?$ https://goskinly.com/clearance [R=301,L]
+RewriteRule ^products/portronics-car/?$ https://goskinly.com/clearance [R=301,L]
+RewriteRule ^products/fire-spin-double-edged-sword-lightsaber-toy/?$ https://goskinly.com/clearance [R=301,L]
+RewriteRule ^products/noise-vivid-call/?$ https://goskinly.com/clearance [R=301,L]
+RewriteRule ^products/backbone-ps5/?$ https://goskinly.com/clearance [R=301,L]
+RewriteRule ^products/vantro-tripod/?$ https://goskinly.com/clearance [R=301,L]
+RewriteRule ^products/ps5-camera/?$ https://goskinly.com/clearance [R=301,L]
+RewriteRule ^products/eye-massager/?$ https://goskinly.com/clearance [R=301,L]
 # Odd old URLs from the 8 Oct 2026 Search Console 404 export
 RewriteRule ^Skinly$ https://goskinly.com/ [R=301,L]
 RewriteRule ^buy-phone-skin$ https://goskinly.com/phone-skins [R=301,L]
