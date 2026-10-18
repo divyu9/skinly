@@ -2828,20 +2828,18 @@ export async function runMutation(path: string, args?: any) {
         }
         
         if (actualActionName === 'updateOrderShippingAddress') {
-          await updateDoc(doc(db, trueCollection, args.orderId), { 
-            shippingAddress: {
-              firstName: args.firstName,
-              lastName: args.lastName,
-              address1: args.address1,
-              address2: args.address2,
-              city: args.city,
-              state: args.state,
-              pincode: args.pincode,
-              phone: args.phone,
-              email: args.email
-            },
-            updatedAt: Date.now()
-          });
+          // Orders keep checkout's shape (fullName, phone, addressLine1/2, city,
+          // state, pincode). Only the address lines change here; the name and
+          // phone on the order stay. This wrote address1/firstName/phone/email
+          // as undefined, which Firestore refuses, so every save failed.
+          const patch: Record<string, unknown> = { updatedAt: Date.now() };
+          const set = (k: string, v: unknown) => { if (v !== undefined) patch[`shippingAddress.${k}`] = String(v ?? '').trim(); };
+          set('addressLine1', args.addressLine1 ?? args.address1);
+          set('addressLine2', args.addressLine2 ?? args.address2);
+          set('city', args.city);
+          set('state', args.state);
+          set('pincode', args.pincode);
+          await updateDoc(doc(db, trueCollection, args.orderId), patch);
           return args.orderId;
         }
         
