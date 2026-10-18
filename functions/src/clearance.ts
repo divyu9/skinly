@@ -1,3 +1,4 @@
+import * as functionsV1 from "firebase-functions/v1";
 import * as admin from "firebase-admin";
 import { onCall, HttpsError } from "firebase-functions/v1/https";
 import { requireAdmin } from "./auth";
@@ -395,4 +396,41 @@ export const confirmUpiPayment = onCall(async (data: any, context: any) => {
     }
   }
   return { ok: true };
+});
+
+/**
+ * Every 5 minutes: a direct-UPI order with no UTR once its 10-minute hold is
+ * over is cancelled and its pieces go back on sale (owner's call: 5–10 minutes,
+ * not 30). An order whose UTR is in waits for the admin instead.
+ */
+export const upiOrderSweep = functionsV1.pubsub.schedule("every 5 minutes").onRun(async () => {
+  const db = admin.firestore();
+  const snap = await db.collection("orders").where("paymentMethod", "==", "upi_direct").where("status", "==", "pending_payment").get();
+  const now = Date.now();
+  let cancelled = 0;
+  for (const d of snap.docs) {
+    const o = d.data() as any;
+    if (o.upiUtr || o.paymentStatus === "success" || o.isDeleted) continue;
+    const until = Number(o.upiPay?.holdUntil) || Number(o.createdAt) + UPI_HOLD_MS;
+    if (until > now) continue;
+    await d.ref.update({ status: "cancelled", paymentStatus: "failed", statusChangedAt: now, cancelReason: "upi_timeout", updatedAt: now });
+    for (const it of o.items || []) {
+      if (!it?.clearanceItemId) continue;
+      const cref = db.collection("clearanceItems").doc(String(it.clearanceItemId));
+      await db.runTransaction(async (tx) => {
+        const c = (await tx.get(cref)).data() as any;
+        if (c?.status === "reserved" && c.reservedOrderId === d.id) {
+          tx.update(cref, {
+            status: "available",
+            reservedOrderId: admin.firestore.FieldValue.delete(),
+            reservedAt: admin.firestore.FieldValue.delete(),
+            reservedUntil: admin.firestore.FieldValue.delete(),
+          });
+        }
+      });
+    }
+    cancelled++;
+  }
+  if (cancelled) console.log("upiOrderSweep cancelled", cancelled);
+  return null;
 });
