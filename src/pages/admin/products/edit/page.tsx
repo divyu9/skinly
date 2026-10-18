@@ -1,6 +1,7 @@
 import { useAction, useQuery, useMutation } from "@/lib/firebase-hooks";
 import { MaterialSection, useMaterialDesigns, inferDesignCode } from "../_components/material-section.tsx";
 import { ListingPictures } from "../_components/listing-pictures.tsx";
+import { StockHistory } from "../_components/stock-history.tsx";
 import { api } from "@/lib/firebase-api";
 import { resolveMaterialMultiplier } from "@/lib/material-multiplier";
 import { Button } from "@/components/ui/button.tsx";
@@ -660,6 +661,8 @@ function EditProductPageInner() {
               />
             </CardContent>
           </Card>
+
+          {productId && <StockHistory productId={productId} />}
         </div>
 
         {/* Sidebar */}

@@ -232,7 +232,8 @@ export async function reserveMaterialForOrder(
       // Clamped: an oversell is a counting problem to look at later, not a
       // reason to write a negative stock figure.
       const after = Math.max(0, Number((before - e.amount).toFixed(4)));
-      tx.update(refs[i], { [field]: after, updatedAt: Date.now() });
+      // _move tells the stock ledger (stockHistory.ts) why this figure moved.
+      tx.update(refs[i], { [field]: after, updatedAt: Date.now(), _move: { id: `order-${orderRef.id}-${Date.now()}`, reason: "order", orderId: orderRef.id } });
       applied.push({ code: e.code, unit: e.unit, requested: e.amount, before, after, short: e.amount > before });
     });
     return applied;
@@ -580,7 +581,7 @@ export async function releaseMaterialForOrder(
       if (!snaps[i].exists) return;
       const before = Number((snaps[i].data() as any)?.[e.field]) || 0;
       const after = Number((before + e.amount).toFixed(4));
-      tx.update(refs[i], { [e.field]: after, updatedAt: Date.now() });
+      tx.update(refs[i], { [e.field]: after, updatedAt: Date.now(), _move: { id: `release-${orderRef.id}-${Date.now()}`, reason: "order_release", orderId: orderRef.id } });
       applied.push({ code: e.code, unit: e.unit, returned: e.amount });
     });
     return applied;
