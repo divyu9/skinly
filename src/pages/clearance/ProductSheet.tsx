@@ -17,12 +17,13 @@ export type SheetPiece = {
  * phone, a centred panel on a wider screen. The card showed only the first
  * photo and nothing said there were more.
  */
-export function ProductSheet({ p, device, coverageLabel, busy, added, onBuy, onAdd, onClose }: {
+export function ProductSheet({ p, device, coverageLabel, busy, added, soldOut = false, onBuy, onAdd, onClose }: {
   p: SheetPiece;
   device: string;
   coverageLabel: string;
   busy: boolean;
   added: boolean;
+  soldOut?: boolean;
   onBuy: () => void;
   onAdd: () => void;
   onClose: () => void;
@@ -111,9 +112,13 @@ export function ProductSheet({ p, device, coverageLabel, busy, added, onBuy, onA
             {device && <p className="text-sm font-semibold text-brand">Cut for {device}</p>}
             <div className="flex flex-wrap items-center gap-1.5">
               {p.condition && <span className="rounded-full bg-sunny px-2 py-0.5 text-xs font-bold text-ink">{p.condition}</span>}
-              <span className={cn("rounded-full px-2 py-0.5 text-xs font-bold", left <= 1 ? "bg-heart/15 text-heart" : "bg-muted text-foreground")}>
-                {left <= 1 ? "Only 1 left" : `${left} left`}
-              </span>
+              {soldOut ? (
+                <span className="rounded-full bg-ink px-2 py-0.5 text-xs font-bold text-background">Sold out</span>
+              ) : (
+                <span className={cn("rounded-full px-2 py-0.5 text-xs font-bold", left <= 1 ? "bg-heart/15 text-heart" : "bg-muted text-foreground")}>
+                  {left <= 1 ? "Only 1 left" : `${left} left`}
+                </span>
+              )}
             </div>
             {[p.variant && !/^default/i.test(p.variant) ? p.variant : "", coverageLabel, p.lensModel ? `Lens: ${p.lensModel}` : ""].filter(Boolean).length > 0 && (
               <p className="text-xs text-muted-foreground">
@@ -132,6 +137,9 @@ export function ProductSheet({ p, device, coverageLabel, busy, added, onBuy, onA
               <p className="text-xl font-extrabold leading-none">₹{p.price}</p>
               {p.originalPrice > p.price && <p className="text-xs text-muted-foreground line-through">₹{p.originalPrice}</p>}
             </div>
+            {soldOut ? (
+              <span className="rounded-xl bg-muted px-5 py-3 text-sm font-bold text-muted-foreground">Sold out</span>
+            ) : (<>
             <button type="button" disabled={busy || added} onClick={onAdd} aria-label="Add to cart"
               className="grid size-11 place-items-center rounded-xl border-2 border-ink/20 disabled:opacity-50">
               <ShoppingCartIcon className="size-5" />
@@ -140,6 +148,7 @@ export function ProductSheet({ p, device, coverageLabel, busy, added, onBuy, onA
               className="sticker-sm sticker-press flex items-center gap-1.5 rounded-xl bg-brand px-5 py-3 text-sm font-bold text-brand-foreground disabled:opacity-60">
               <ZapIcon className="size-4" /> Buy now
             </button>
+            </>)}
           </div>
         </div>
       </div>

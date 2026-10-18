@@ -20,7 +20,7 @@ type Piece = {
   id: string; productId: string; productTitle: string; productSlug?: string; productImage?: string;
   variant: string; phoneBrand: string; phoneModel: string; coverage?: string | null; lensModel?: string | null;
   price: number; originalPrice: number; createdAt: number;
-  images?: string[]; condition?: string; description?: string; amazonUrl?: string; personal?: boolean;
+  images?: string[]; condition?: string; description?: string; amazonUrl?: string; personal?: boolean; sold?: boolean;
 };
 
 const coverageLabel = (c?: string | null) => (c === "only_back" ? "Back only" : c === "full_body_wrap" ? "Full body wrap" : "");
@@ -45,7 +45,7 @@ export default function ClearancePage() {
   const [q, setQ] = useState("");
   const [busy, setBusy] = useState("");
   // The photo viewer: which piece, which photo.
-  const [view, setView] = useState<{ p: Piece & { pieces: Piece[] }; i: number } | null>(null);
+  const [view, setView] = useState<{ p: Piece & { pieces: Piece[]; soldOut?: boolean }; i: number } | null>(null);
   const { user } = useAuth();
   const { guestCart, addToGuestCart } = useGuestCart();
   const addToCartMutation = useMutation(api.cart.addToCart);
@@ -78,7 +78,13 @@ export default function ClearancePage() {
       const k = [p.productId, p.variant, p.phoneBrand, p.phoneModel, p.coverage || "", p.lensModel || "", p.price].join("|");
       m.set(k, [...(m.get(k) || []), p]);
     }
-    return [...m.values()].map((ps) => ({ ...ps[0], pieces: ps }));
+    // `pieces` are the ones still for sale; a kind with none left is a sold-out card, last.
+    return [...m.values()]
+      .map((ps) => {
+        const open = ps.filter((x) => !x.sold);
+        return { ...(open[0] || ps[0]), pieces: open, soldOut: open.length === 0 };
+      })
+      .sort((a, b) => Number(a.soldOut) - Number(b.soldOut));
   }, [items]);
 
   const shown = useMemo(() => {
@@ -179,7 +185,7 @@ export default function ClearancePage() {
             </div>
             {brands.length > 1 && (
               <div data-drag-scroll className="no-scrollbar -mx-4 mt-4 flex gap-2 overflow-x-auto px-4 pb-1 md:justify-center">
-                {chip("all", `All (${items.length})`)}
+                {chip("all", `All (${items.filter((x) => !x.sold).length})`)}
                 {brands.map((b) => chip(b, b))}
               </div>
             )}
@@ -201,7 +207,10 @@ export default function ClearancePage() {
             const left = p.pieces.length;
             const added = !freePiece(p);
             return (
-              <div key={p.id} className="tile flex flex-col overflow-hidden rounded-2xl">
+              <div key={p.id} className={cn("tile relative flex flex-col overflow-hidden rounded-2xl", p.soldOut && "opacity-60 grayscale")}>
+                {p.soldOut && (
+                  <span className="absolute left-1/2 top-[30%] z-10 -translate-x-1/2 -rotate-6 rounded-lg border-2 border-ink bg-ink px-3 py-1 text-sm font-extrabold uppercase tracking-wide text-background shadow">Sold out</span>
+                )}
                 <button type="button" onClick={() => setView({ p, i: 0 })} className="relative block aspect-square w-full bg-muted" aria-label={`See photos of ${p.productTitle}`}>
                   {(p.images?.length || 0) > 1 && (
                     <span className="absolute bottom-2 right-2 flex items-center gap-1 rounded-full bg-black/70 px-2 py-0.5 text-[11px] font-bold text-white">
@@ -223,9 +232,13 @@ export default function ClearancePage() {
                   {device(p) && <p className="text-xs font-semibold text-brand">Cut for {device(p)}</p>}
                   <div className="flex flex-wrap items-center gap-1.5">
                     {p.condition && <span className="rounded-full bg-sunny px-2 py-0.5 text-[11px] font-bold text-ink">{p.condition}</span>}
-                    <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-bold", left <= 1 ? "bg-heart/15 text-heart" : "bg-muted text-foreground")}>
-                      {left <= 1 ? "Only 1 left" : `${left} left`}
-                    </span>
+                    {p.soldOut ? (
+                      <span className="rounded-full bg-ink px-2 py-0.5 text-[11px] font-bold text-background">Sold out</span>
+                    ) : (
+                      <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-bold", left <= 1 ? "bg-heart/15 text-heart" : "bg-muted text-foreground")}>
+                        {left <= 1 ? "Only 1 left" : `${left} left`}
+                      </span>
+                    )}
                   </div>
                   {p.description && <p className="whitespace-pre-line text-[11px] leading-snug text-muted-foreground">{p.description}</p>}
                   <p className="text-[11px] text-muted-foreground">
@@ -241,6 +254,9 @@ export default function ClearancePage() {
                     <span className="text-lg font-extrabold">₹{p.price}</span>
                     {p.originalPrice > p.price && <span className="ml-1.5 text-xs text-muted-foreground line-through">₹{p.originalPrice}</span>}
                   </p>
+                  {p.soldOut ? (
+                    <p className="rounded-xl border-2 border-ink/15 py-2 text-center text-xs font-bold text-muted-foreground">Sold out</p>
+                  ) : (
                   <div className="flex gap-1.5">
                     <button type="button" disabled={busy === p.id} onClick={() => add(p, true)}
                       className="sticker-sm sticker-press flex flex-1 items-center justify-center gap-1 rounded-xl bg-brand px-2 py-2 text-xs font-bold text-brand-foreground disabled:opacity-60">
@@ -251,6 +267,7 @@ export default function ClearancePage() {
                       <ShoppingCartIcon className="size-4" />
                     </button>
                   </div>
+                  )}
                 </div>
               </div>
             );
@@ -264,6 +281,7 @@ export default function ClearancePage() {
             coverageLabel={coverageLabel(view.p.coverage)}
             busy={busy === view.p.id}
             added={!freePiece(view.p)}
+            soldOut={(view.p as any).soldOut === true}
             onBuy={() => add(view.p, true)}
             onAdd={() => add(view.p, false)}
             onClose={() => setView(null)}

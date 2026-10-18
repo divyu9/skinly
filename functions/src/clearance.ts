@@ -198,17 +198,20 @@ export const listClearance = onCall(async (data: any, context: any) => {
   const db = admin.firestore();
   const forAdmin = data?.admin === true && !!context?.auth;
   if (forAdmin) await requireAdmin(context);
-  // The admin page sees sold pieces too (what sold, to whom); the shop only what is on sale.
-  const snap = await db.collection("clearanceItems").where("status", "in", forAdmin ? ["draft", "available", "reserved", "sold"] : ["available", "reserved"]).get();
+  // The shop shows what is on sale and, greyed out at the bottom, what has sold
+  // (owner's call: sold pieces stay, marked sold out). A piece held by an
+  // order still waiting for its money is hidden until it sells or comes back.
+  const snap = await db.collection("clearanceItems").where("status", "in", ["draft", "available", "reserved", "sold"]).get();
   const now = Date.now();
   const items = snap.docs
     .map((d) => ({ id: d.id, ...(d.data() as any) }))
-    .filter((c) => forAdmin || isBuyable(c, now))
+    .filter((c) => forAdmin || isBuyable(c, now) || c.status === "sold")
     .sort((a, b) => Number(b.createdAt) - Number(a.createdAt))
     .map((c) => ({
       id: c.id, productId: c.productId, productTitle: c.productTitle, productSlug: c.productSlug,
       productImage: c.productImage, images: Array.isArray(c.images) ? c.images : (c.productImage ? [c.productImage] : []),
       condition: c.condition || "", description: c.description || "",
+      sold: c.status === "sold",
       // The owner's own stock (gadgets): paid by direct UPI, no invoice. Skins are the shop's and go through checkout.
       personal: c.personal === true,
       // Amazon.in search for the same model with the owner's associate tag: "compare the price".
