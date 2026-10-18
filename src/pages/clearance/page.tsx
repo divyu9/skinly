@@ -10,6 +10,7 @@ import { useGuestCart } from "@/hooks/use-guest-cart";
 import { sizedImage } from "@/lib/image-cdn";
 import { searchRows } from "@/lib/search-match";
 import { AnnouncementBar } from "@/components/announcement-bar.tsx";
+import { ProductSheet } from "./ProductSheet.tsx";
 import { MobileHeader } from "@/components/mobile-header.tsx";
 import { MobileNav } from "@/components/mobile-nav.tsx";
 import { SiteFooter } from "@/components/site-footer.tsx";
@@ -44,7 +45,7 @@ export default function ClearancePage() {
   const [q, setQ] = useState("");
   const [busy, setBusy] = useState("");
   // The photo viewer: which piece, which photo.
-  const [view, setView] = useState<{ p: Piece; i: number } | null>(null);
+  const [view, setView] = useState<{ p: Piece & { pieces: Piece[] }; i: number } | null>(null);
   const { user } = useAuth();
   const { guestCart, addToGuestCart } = useGuestCart();
   const addToCartMutation = useMutation(api.cart.addToCart);
@@ -216,7 +217,9 @@ export default function ClearancePage() {
                   )}
                 </button>
                 <div className="flex flex-1 flex-col gap-1 p-3">
-                  <p className="line-clamp-2 text-sm font-bold leading-snug">{p.productTitle}</p>
+                  <button type="button" onClick={() => setView({ p, i: 0 })} className="text-left">
+                    <p className="line-clamp-2 text-sm font-bold leading-snug">{p.productTitle}</p>
+                  </button>
                   {device(p) && <p className="text-xs font-semibold text-brand">Cut for {device(p)}</p>}
                   <div className="flex flex-wrap items-center gap-1.5">
                     {p.condition && <span className="rounded-full bg-sunny px-2 py-0.5 text-[11px] font-bold text-ink">{p.condition}</span>}
@@ -254,27 +257,18 @@ export default function ClearancePage() {
           })}
         </div>
 
-        {view && (() => {
-          const imgs = view.p.images?.length ? view.p.images : view.p.productImage ? [view.p.productImage] : [];
-          const go = (d: number) => setView({ p: view.p, i: (view.i + d + imgs.length) % imgs.length });
-          return (
-            <div className="fixed inset-0 z-[60] flex flex-col bg-black/90 p-4" role="dialog" aria-modal="true" onClick={() => setView(null)}>
-              <div className="flex items-center justify-between text-white">
-                <p className="truncate text-sm font-semibold">{view.p.productTitle} · {view.i + 1}/{imgs.length}</p>
-                <button type="button" aria-label="Close" className="grid size-10 place-items-center"><XIcon className="size-6" /></button>
-              </div>
-              <div className="relative flex flex-1 items-center justify-center" onClick={(e) => e.stopPropagation()}>
-                {imgs[view.i] && <img src={sizedImage(imgs[view.i], 1200)} alt={`${view.p.productTitle} photo ${view.i + 1}`} className="max-h-full max-w-full object-contain" />}
-                {imgs.length > 1 && (
-                  <>
-                    <button type="button" onClick={() => go(-1)} className="absolute left-0 grid size-11 place-items-center rounded-full bg-white/15 text-white" aria-label="Previous photo"><ChevronLeftIcon className="size-6" /></button>
-                    <button type="button" onClick={() => go(1)} className="absolute right-0 grid size-11 place-items-center rounded-full bg-white/15 text-white" aria-label="Next photo"><ChevronRightIcon className="size-6" /></button>
-                  </>
-                )}
-              </div>
-            </div>
-          );
-        })()}
+        {view && (
+          <ProductSheet
+            p={view.p}
+            device={device(view.p)}
+            coverageLabel={coverageLabel(view.p.coverage)}
+            busy={busy === view.p.id}
+            added={!freePiece(view.p)}
+            onBuy={() => add(view.p, true)}
+            onAdd={() => add(view.p, false)}
+            onClose={() => setView(null)}
+          />
+        )}
 
         <div className="mx-auto mt-10 max-w-2xl space-y-2 rounded-2xl border-2 border-ink/15 bg-card p-4 text-sm">
           <p className="font-bold">Before you buy</p>
