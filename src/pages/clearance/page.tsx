@@ -87,7 +87,7 @@ export default function ClearancePage() {
       if (user) await addToCartMutation(line);
       else if (!inCart(p.id)) addToGuestCart(line);
       if (buyNow) navigate("/checkout");
-      else toast.success(`Added — ${p.productTitle} for ${device(p)}`);
+      else toast.success(device(p) ? `Added — ${p.productTitle} for ${device(p)}` : `Added — ${p.productTitle}`);
     } catch (e: any) {
       toast.error(e?.message || "Could not add it to the cart");
     } finally {
@@ -160,7 +160,7 @@ export default function ClearancePage() {
               <div key={p.id} className="tile flex flex-col overflow-hidden rounded-2xl">
                 <div className="relative aspect-square bg-muted">
                   {p.productImage && (
-                    <img src={sizedImage(p.productImage, 480)} alt={`${p.productTitle} for ${device(p)}`} loading="lazy"
+                    <img src={sizedImage(p.productImage, 480)} alt={device(p) ? `${p.productTitle} for ${device(p)}` : p.productTitle} loading="lazy"
                       className="size-full object-cover" />
                   )}
                   {off > 0 && (
@@ -169,7 +169,7 @@ export default function ClearancePage() {
                 </div>
                 <div className="flex flex-1 flex-col gap-1 p-3">
                   <p className="line-clamp-2 text-sm font-bold leading-snug">{p.productTitle}</p>
-                  <p className="text-xs font-semibold text-brand">Cut for {device(p)}</p>
+                  {device(p) && <p className="text-xs font-semibold text-brand">Cut for {device(p)}</p>}
                   <p className="text-[11px] text-muted-foreground">
                     {[p.variant && !/^default/i.test(p.variant) ? p.variant : "", coverageLabel(p.coverage), p.lensModel ? `Lens: ${p.lensModel}` : ""].filter(Boolean).join(" · ")}
                   </p>

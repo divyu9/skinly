@@ -97,7 +97,6 @@ function AddStock({ onAdded }: { onAdded: () => void }) {
   const submit = async () => {
     if (mode === "listing" && !product) { toast.error("Pick the listing"); return; }
     if (mode === "custom" && !title.trim()) { toast.error("Give the piece a title"); return; }
-    if (!model.trim()) { toast.error("Which device is it cut for?"); return; }
     if (!(Number(price) > 0)) { toast.error("Set a clearance price"); return; }
     setBusy(true);
     try {
@@ -180,7 +179,7 @@ function AddStock({ onAdded }: { onAdded: () => void }) {
 
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="space-y-1.5 sm:col-span-2">
-            <Label>Cut for (device)</Label>
+            <Label>Cut for (device) — leave empty for a gadget or accessory</Label>
             <ModelSearch gadget={gadget} value={model ? device({ phoneBrand: brand, phoneModel: model }) : ""} onPick={(b, m) => { setBrand(b); setModel(m); setLens(""); }} />
           </div>
           <div className="space-y-1.5">
@@ -334,7 +333,7 @@ function AdminClearanceInner() {
                     <div className="min-w-0 flex-1">
                       <p className="font-semibold">{f.productTitle}</p>
                       <p className="text-xs text-muted-foreground">
-                        {[`Cut for ${device(f) || "?"}`, f.variant && !/^default/i.test(f.variant) ? f.variant : "", f.coverage === "only_back" ? "Back only" : f.coverage === "full_body_wrap" ? "Full body" : "", f.lensModel ? `lens ${f.lensModel}` : "", f.sku || ""].filter(Boolean).join(" · ")}
+                        {[device(f) ? `Cut for ${device(f)}` : "Gadget / accessory", f.variant && !/^default/i.test(f.variant) ? f.variant : "", f.coverage === "only_back" ? "Back only" : f.coverage === "full_body_wrap" ? "Full body" : "", f.lensModel ? `lens ${f.lensModel}` : "", f.sku || ""].filter(Boolean).join(" · ")}
                       </p>
                       <p className="text-xs text-muted-foreground">
                         {f.source === "manual" ? "Added by hand" : f.sourceOrderId ? <>From RTO <Link className="underline" to={`/backend-skinly/orders/${f.sourceOrderId}`}>{f.sourceOrderNumber || "order"}</Link></> : "From RTO"}

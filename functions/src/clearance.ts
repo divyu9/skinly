@@ -104,8 +104,8 @@ export const addClearanceStock = onCall(async (data: any, context: any) => {
   const qty = Math.max(1, Math.min(200, Math.floor(Number(data?.quantity) || 1)));
   const price = Math.round(Number(data?.price) || 0);
   if (!(price > 0)) throw new HttpsError("invalid-argument", "Set a clearance price");
+  // A skin is cut for one device; a gadget or accessory is not, and leaves it empty.
   const phoneModel = String(data?.phoneModel || "").trim();
-  if (!phoneModel) throw new HttpsError("invalid-argument", "Say which device the piece is cut for");
 
   let productId = String(data?.productId || "").trim();
   let productTitle = String(data?.productTitle || "").trim();
