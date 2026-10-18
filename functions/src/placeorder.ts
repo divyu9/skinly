@@ -261,6 +261,14 @@ export const placeOrder = functions
       for (const [i, p] of await reserveClearance(db, orderId, orderItems, upiDirect ? UPI_HOLD_MS : RESERVE_MS)) upsellPrice.set(i, p);
     }
 
+    // Products on the design sale (product.designSale): no coupon, no cashback on them.
+    const saleIds = new Set<string>();
+    {
+      const ids = [...new Set(orderItems.map((it) => String(it?.productId || "")).filter((id) => id && !id.startsWith("custom-")))];
+      const docs = ids.length ? await db.getAll(...ids.map((id) => db.collection("products").doc(id))) : [];
+      docs.forEach((d) => { if (Number((d.data() as any)?.designSale?.price) > 0) saleIds.add(d.id); });
+    }
+
     // Price comes from the variant document, always. The old fallback to
     // `item.price` meant a cart line naming a variant that does not exist was
     // billed at whatever the caller claimed — send variant "zzz" with price 1
@@ -376,12 +384,17 @@ export const placeOrder = functions
        * cart over ₹1,500 of anything. The discount is now worked out on the
        * lines it is for, and a cart with none of them is told so.
        */
-      const eligible = await couponEligibleTotal(db, c, orderItems.map((item) => {
+      // Sale designs are already at their floor price: the coupon works on the rest of the cart.
+      const couponLines = orderItems.filter((item) => !saleIds.has(String(item?.productId || ""))).map((item) => {
         const key = `${String(item?.productId)}::${String(item?.variant)}`;
         const qty = Math.max(1, Math.floor(Number(item?.quantity || 1)));
         return { productId: String(item?.productId || ""), variantId: variantIdMap.get(key) || "", amount: (priceMap.get(key) || 0) * qty };
-      }));
-      const discountBase = eligible ?? itemsTotal;
+      });
+      const eligible = await couponEligibleTotal(db, c, couponLines);
+      const discountBase = eligible ?? couponLines.reduce((s, l) => s + l.amount, 0);
+      if (couponLines.length === 0) {
+        throw new HttpsError("failed-precondition", "Coupons don't apply to sale designs");
+      }
       if (eligible !== null && eligible <= 0) {
         throw new HttpsError("failed-precondition", "This coupon doesn't apply to anything in your cart");
       }
@@ -452,7 +465,7 @@ export const placeOrder = functions
     // Clearance pieces earn none: their price is already the floor.
     const cashback = await cashbackForLines(
       db,
-      orderItems.filter((item) => !item?.clearanceItemId).map((item) => {
+      orderItems.filter((item) => !item?.clearanceItemId && !saleIds.has(String(item?.productId || ""))).map((item) => {
         const key = `${String(item?.productId)}::${String(item?.variant)}`;
         return {
           productId: String(item?.productId || ""),

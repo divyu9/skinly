@@ -294,8 +294,24 @@ function CheckoutPageInner() {
    * variant is its name, not an id, so it never asked at all: the server paid
    * cashback the checkout never mentioned. The lookup matches variants by name.
    */
-  // Clearance pieces earn no cashback (placeOrder leaves them out too).
-  const cashbackItems = (cartItems || []).filter((i: any) => !i.clearanceItemId);
+  // Which cart products are on the design sale (product.designSale): no coupon, no cashback.
+  const saleKey = (cartItems || []).map((i: any) => i.productId).filter((id: any) => id && !String(id).startsWith("custom-")).join(",");
+  const [saleIds, setSaleIds] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    if (!saleKey) { setSaleIds(new Set()); return; }
+    let live = true;
+    (async () => {
+      try {
+        const { db, doc, getDoc } = await (await import("@/lib/fs")).loadFs();
+        const ids = Array.from(new Set<string>(saleKey.split(",")));
+        const snaps = await Promise.all(ids.map((id) => getDoc(doc(db as any, "products", id) as any)));
+        if (live) setSaleIds(new Set(snaps.filter((s) => Number((s.data() as any)?.designSale?.price) > 0).map((s) => s.id)));
+      } catch { /* the server decides anyway */ }
+    })();
+    return () => { live = false; };
+  }, [saleKey]);
+  // Clearance pieces and sale designs earn no cashback (placeOrder leaves them out too).
+  const cashbackItems = (cartItems || []).filter((i: any) => !i.clearanceItemId && !saleIds.has(String(i.productId)));
   const cashbackData = useQuery(
     api.cashbackHelpers.calculateCartCashback,
     cashbackItems.length
@@ -449,14 +465,20 @@ function CheckoutPageInner() {
       setCouponMessage({ type: "error", text: "Coupons don't apply to clearance items — they're already at the lowest price." });
       return;
     }
+    // Sale designs are left out of the coupon; a cart of only sale designs gets none.
+    const couponItems = cartItems.filter((i: any) => !saleIds.has(String(i.productId)));
+    if (!couponItems.length) {
+      setCouponMessage({ type: "error", text: "Coupons don't apply to sale designs — they're already at the lowest price." });
+      return;
+    }
 
     setIsApplyingCoupon(true);
     try {
       const result = await convex.query(api.coupons.validateCoupon, {
         code: code.trim(),
-        cartTotal: subtotal,
+        cartTotal: couponItems.reduce((s: number, i: any) => s + i.price * i.quantity, 0),
         userEmail: formData.email || undefined,
-        cartItems: cartItems.map((i) => ({ productId: i.productId, productTitle: i.productTitle, variant: i.variant, price: i.price, quantity: i.quantity })),
+        cartItems: couponItems.map((i: any) => ({ productId: i.productId, productTitle: i.productTitle, variant: i.variant, price: i.price, quantity: i.quantity })),
       });
       if (!result) {
         setCouponMessage({ type: "error", text: "That coupon could not be found" });
