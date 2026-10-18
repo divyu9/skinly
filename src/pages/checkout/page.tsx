@@ -368,8 +368,25 @@ function CheckoutPageInner() {
 
   // A cart of clearance pieces only is paid straight by UPI; a cart mixing them
   // with shop items has to be split (they are separate sales).
+  // Which clearance pieces are the owner's personal stock, asked of the server:
+  // a cart line added before the flag existed doesn't carry it.
+  const clearanceIds = (cartItems || []).map((i: any) => i.clearanceItemId).filter(Boolean).join(",");
+  const [personalIds, setPersonalIds] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    if (!clearanceIds) return;
+    let live = true;
+    (async () => {
+      try {
+        const [{ functions }, { httpsCallable }] = await Promise.all([import("@/lib/firebase"), import("firebase/functions")]);
+        const r: any = await httpsCallable(functions, "listClearance")({});
+        if (live) setPersonalIds(new Set((r?.data?.items || []).filter((x: any) => x.personal).map((x: any) => String(x.id))));
+      } catch { /* fall back to the flag on the line */ }
+    })();
+    return () => { live = false; };
+  }, [clearanceIds]);
+  const isPersonal = (i: any) => !!i.clearanceItemId && (i.clearancePersonal === true || personalIds.has(String(i.clearanceItemId)));
   // Personal-stock pieces (gadgets) are paid by direct UPI; shop clearance pieces (skins) check out as usual.
-  const clearanceCount = (cartItems || []).filter((i: any) => i.clearanceItemId && i.clearancePersonal).length;
+  const clearanceCount = (cartItems || []).filter(isPersonal).length;
   const clearanceOnly = clearanceUpiOn && clearanceCount > 0 && clearanceCount === (cartItems || []).length;
   const clearanceMixed = clearanceUpiOn && clearanceCount > 0 && !clearanceOnly;
   useEffect(() => {
