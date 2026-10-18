@@ -109,7 +109,7 @@ export async function sendPaymentNudges(db: admin.firestore.Firestore, now = Dat
     const o = d.data() as any;
     const created = Number(o.createdAt) || 0;
     const quietSince = Math.max(created, Number(o.updatedAt) || 0);
-    if (o.isDeleted || o.payNudgeAt || o.paymentMethod === "cod") continue;
+    if (o.isDeleted || o.payNudgeAt || o.paymentMethod === "cod" || o.paymentMethod === "upi_direct") continue;
     if (o.paymentStatus === "success") continue;
     if (normalizeOrderStatus(o.status, o.paymentStatus, o) !== "pending_payment") continue;
     if (!(Number(o.amountPayable ?? o.total) > 0)) continue;

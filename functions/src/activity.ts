@@ -80,6 +80,18 @@ export async function adminActivityEvents(db: admin.firestore.Firestore, limit =
     });
   }
 
+  // Direct-UPI clearance orders waiting for the admin to check the money (clearance.ts).
+  for (const d of orders) {
+    const o = d.data() as any;
+    if (o.paymentMethod !== "upi_direct" || o.paymentStatus === "success" || o.status === "cancelled" || o.isDeleted) continue;
+    out.push({
+      id: `upi-${d.id}`, kind: "delivery", at: num(o.upiSubmittedAt, o.createdAt),
+      title: o.upiUtr ? `UPI payment to verify: ${inr(o.upiPay?.amount ?? o.total)} (UTR ${o.upiUtr})` : `Clearance order waiting for UPI payment: ${inr(o.upiPay?.amount ?? o.total)}`,
+      sub: [o.shippingAddress?.fullName || o.customerName, o.checkoutRef].filter(Boolean).join(" · "),
+      link: `/backend-skinly/orders/${d.id}`, status: "pending_payment",
+    });
+  }
+
   for (const d of changed) {
     const o = d.data() as any;
     if (o.isDeleted || !["undelivered", "rto"].includes(String(o.status))) continue;

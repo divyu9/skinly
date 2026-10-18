@@ -90,6 +90,19 @@ async function numberOrder(db: admin.firestore.Firestore, orderId: string, at: n
     if (Number(o.createdAt || o._creationTime || at) < INVOICE_START) return null;
     if (o.invoiceNumber) return { orderNumber: o.orderNumber as string, invoiceNumber: o.invoiceNumber as string, already: true };
 
+    // A personal sale (a clearance gadget paid to the owner's UPI: clearance.ts)
+    // is not the shop's sale: its own number series, CL-1001 onwards, and no
+    // GST invoice, so it never mixes with the #40xx orders or the invoice run.
+    if (o.personalSale === true) {
+      if (o.orderNumber) return { orderNumber: o.orderNumber as string, invoiceNumber: "", already: true };
+      const pc = db.collection("settings").doc("personal_order_counter");
+      const next = Number(((await tx.get(pc)).data() as any)?.value) || 1001;
+      const personalNumber = `CL-${next}`;
+      tx.set(pc, { value: next + 1 }, { merge: true });
+      tx.update(orderRef, { orderNumber: personalNumber, confirmedAt: at });
+      return { orderNumber: personalNumber, invoiceNumber: "", already: false };
+    }
+
     const fy = financialYear(at);
     const orderCounter = db.collection("settings").doc("order_counter");
     const invoiceCounter = db.collection("settings").doc(`invoice_counter_${fy}`);
@@ -125,6 +138,8 @@ export const onOrderConfirmed = functionsV1.firestore
   .onWrite(async (change, context) => {
     const after = change.after.exists ? change.after.data() : null;
     if (!after || after.invoiceNumber || !isConfirmed(after)) return null;
+    // A personal sale is numbered once and never invoiced.
+    if (after.personalSale === true && after.orderNumber) return null;
     try {
       await confirmOrder(admin.firestore(), context.params.id);
     } catch (e) {

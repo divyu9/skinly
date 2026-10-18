@@ -218,6 +218,40 @@ function AddStock({ onAdded }: { onAdded: () => void }) {
   );
 }
 
+
+/** Where clearance-only orders are paid: the owner's UPI (functions: saveClearanceUpi). */
+function UpiSettings() {
+  const [vpa, setVpa] = useState("");
+  const [name, setName] = useState("");
+  const [on, setOn] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    call("getClearanceUpi", { admin: true }).then((r) => { setVpa(r?.vpa || ""); setName(r?.payeeName || ""); setOn(r?.enabled === true); setLoaded(true); }).catch(() => setLoaded(true));
+  }, []);
+  const save = async () => {
+    setBusy(true);
+    try { await call("saveClearanceUpi", { vpa: vpa.trim(), payeeName: name.trim(), enabled: on }); toast.success(on ? "Direct UPI is on for clearance orders" : "Saved (direct UPI off)"); }
+    catch (e: any) { toast.error(e?.message || "Could not save"); } finally { setBusy(false); }
+  };
+  return (
+    <Card>
+      <CardHeader><CardTitle className="text-base">Payment for clearance orders (direct UPI)</CardTitle></CardHeader>
+      <CardContent className="space-y-3 text-sm">
+        <p className="text-xs text-muted-foreground">
+          When on, a cart of clearance items only is paid straight to this UPI ID (QR + app button on the order page). These are personal sales: numbered CL-1001 onwards, no GST invoice. You confirm each payment on the order page.
+        </p>
+        <div className="grid gap-3 sm:grid-cols-3">
+          <div className="space-y-1.5"><Label>UPI ID</Label><Input value={vpa} onChange={(e) => setVpa(e.target.value)} placeholder="name@ybl" disabled={!loaded} /></div>
+          <div className="space-y-1.5"><Label>Name shown to the customer</Label><Input value={name} onChange={(e) => setName(e.target.value)} placeholder="optional" disabled={!loaded} /></div>
+          <label className="flex items-end gap-2 pb-2"><input type="checkbox" checked={on} onChange={(e) => setOn(e.target.checked)} disabled={!loaded} /> <span>Direct UPI on</span></label>
+        </div>
+        <Button type="button" onClick={save} disabled={busy || !loaded}>{busy ? "Saving…" : "Save"}</Button>
+      </CardContent>
+    </Card>
+  );
+}
+
 function AdminClearanceInner() {
   const [pieces, setPieces] = useState<Piece[] | null>(null);
   const [view, setView] = useState<"live" | "sold">("live");
@@ -304,6 +338,8 @@ function AdminClearanceInner() {
         <div className="rounded-lg border p-3"><p className="text-xs text-muted-foreground">Held by an unpaid order · waiting for a price</p><p className="text-2xl font-bold">{pieces ? held : "…"} <span className="text-sm font-medium text-amber-700">· {pieces ? drafts : "…"} need a price</span></p></div>
         <div className="rounded-lg border p-3"><p className="text-xs text-muted-foreground">Sold</p><p className="text-2xl font-bold">{pieces ? sold.length : "…"} <span className="text-sm font-medium text-muted-foreground">· ₹{sold.reduce((s, p) => s + (Number(p.price) || 0), 0).toLocaleString("en-IN")}</span></p></div>
       </div>
+
+      <UpiSettings />
 
       <AddStock onAdded={load} />
 

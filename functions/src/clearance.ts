@@ -27,7 +27,11 @@ export const RESERVE_MS = 30 * 60_000;
 /** On sale now: available, or held by an order that never paid. */
 export const isBuyable = (c: any, now = Date.now()) =>
   Number(c?.price) > 0 &&
-  (c?.status === "available" || (c?.status === "reserved" && Number(c?.reservedAt || 0) < now - RESERVE_MS));
+  (c?.status === "available" ||
+    (c?.status === "reserved" && (c?.reservedUntil ? Number(c.reservedUntil) < now : Number(c?.reservedAt || 0) < now - RESERVE_MS)));
+
+/** A direct-UPI order waits for the customer to pay and the admin to check: its pieces are held a day. */
+export const UPI_HOLD_MS = 24 * 3600_000;
 
 /** The admin puts an RTO order's pieces on the clearance page. */
 export const addRtoToClearance = onCall(async (data: any, context: any) => {
@@ -219,7 +223,8 @@ export const listClearance = onCall(async (data: any, context: any) => {
 export async function reserveClearance(
   db: admin.firestore.Firestore,
   orderId: string,
-  orderItems: any[]
+  orderItems: any[],
+  holdMs = RESERVE_MS
 ): Promise<Map<number, number>> {
   const prices = new Map<number, number>();
   const lines = orderItems.map((it, i) => ({ it, i })).filter(({ it }) => it?.clearanceItemId);
@@ -230,7 +235,7 @@ export async function reserveClearance(
       if (!c || String(c.productId) !== String(it.productId)) throw new HttpsError("failed-precondition", "That clearance piece is not on sale");
       const mine = c.status === "reserved" && c.reservedOrderId === orderId;
       if (!mine && !isBuyable(c)) throw new HttpsError("failed-precondition", `Sorry — the clearance ${c.productTitle || "piece"} for ${c.phoneModel || "that device"} was just bought by someone else`);
-      tx.update(ref, { status: "reserved", reservedOrderId: orderId, reservedAt: Date.now() });
+      tx.update(ref, { status: "reserved", reservedOrderId: orderId, reservedAt: Date.now(), reservedUntil: Date.now() + holdMs });
       return Number(c.price) || 0;
     });
     if (!(price > 0)) throw new HttpsError("failed-precondition", "That clearance piece has no price");
@@ -254,3 +259,98 @@ export async function markClearanceSold(db: admin.firestore.Firestore, orderId: 
     });
   }
 }
+
+
+/*
+ * Direct UPI for clearance-only orders.
+ *
+ * Clearance gadgets are the owner's own stock (bought personally or sent for
+ * review), sold the way one would on OLX: paid straight to their UPI rather
+ * than through the gateway, and kept apart from the shop's orders — a
+ * `personalSale` order is numbered in its own series (CL-1001, CL-1002…) and
+ * gets no GST invoice (orderConfirm.ts). The customer pays from the order
+ * page (QR or UPI app) and submits the UTR; the admin checks the bank and
+ * marks it received, which confirms the order.
+ *
+ *   settings/clearanceUpi: { enabled, vpa, payeeName }
+ */
+const VPA_RE = /^[\w.\-]{2,}@[a-zA-Z]{2,}$/;
+
+export async function clearanceUpiSettings(db: admin.firestore.Firestore) {
+  const s = (await db.doc("settings/clearanceUpi").get()).data() as any;
+  const vpa = String(s?.vpa || "").trim();
+  return { enabled: s?.enabled === true && VPA_RE.test(vpa), vpa, payeeName: String(s?.payeeName || "").trim() };
+}
+
+/** Checkout: whether direct UPI is on for clearance-only carts. */
+export const getClearanceUpi = onCall(async (data: any, context: any) => {
+  const s = await clearanceUpiSettings(admin.firestore());
+  if (data?.admin === true) {
+    await requireAdmin(context);
+    const raw = (await admin.firestore().doc("settings/clearanceUpi").get()).data() as any;
+    return { enabled: raw?.enabled === true, vpa: String(raw?.vpa || ""), payeeName: String(raw?.payeeName || "") };
+  }
+  return { enabled: s.enabled };
+});
+
+export const saveClearanceUpi = onCall(async (data: any, context: any) => {
+  await requireAdmin(context);
+  const vpa = String(data?.vpa || "").trim();
+  if (data?.enabled === true && !VPA_RE.test(vpa)) throw new HttpsError("invalid-argument", "That does not look like a UPI ID (name@bank)");
+  await admin.firestore().doc("settings/clearanceUpi").set({
+    enabled: data?.enabled === true, vpa, payeeName: String(data?.payeeName || "").trim().slice(0, 60), updatedAt: Date.now(),
+  }, { merge: true });
+  return { ok: true };
+});
+
+/** The customer says they paid: the UTR / reference from their UPI app. The admin checks it. */
+export const submitUpiPayment = onCall(async (data: any) => {
+  const orderId = String(data?.orderId || "");
+  const utr = String(data?.utr || "").replace(/\s+/g, "").slice(0, 40);
+  if (!orderId || !/^[A-Za-z0-9]{6,40}$/.test(utr)) throw new HttpsError("invalid-argument", "Enter the UPI reference / UTR number from your payment app");
+  const db = admin.firestore();
+  const ref = db.collection("orders").doc(orderId);
+  const o = (await ref.get()).data() as any;
+  if (!o || o.paymentMethod !== "upi_direct") throw new HttpsError("not-found", "No such UPI order");
+  if (o.paymentStatus === "success") return { ok: true, already: true };
+  await ref.update({ upiUtr: utr, upiSubmittedAt: Date.now(), updatedAt: Date.now() });
+  return { ok: true };
+});
+
+/** Admin: the UPI money arrived (confirm the order) or did not (cancel it, pieces back on sale). */
+export const confirmUpiPayment = onCall(async (data: any, context: any) => {
+  const { uid } = await requireAdmin(context);
+  const orderId = String(data?.orderId || "");
+  const received = data?.received === true;
+  const db = admin.firestore();
+  const ref = db.collection("orders").doc(orderId);
+  const o = (await ref.get()).data() as any;
+  if (!o || o.paymentMethod !== "upi_direct") throw new HttpsError("not-found", "No such UPI order");
+  if (o.paymentStatus === "success") throw new HttpsError("failed-precondition", "Already marked as paid");
+  if (received) {
+    await ref.update({ paymentStatus: "success", status: "processing", statusChangedAt: Date.now(), paidAt: Date.now(), upiVerifiedBy: uid, updatedAt: Date.now() });
+    const { confirmOrder } = await import("./orderConfirm");
+    await confirmOrder(db, orderId);
+    await markClearanceSold(db, orderId, o.items || []);
+    const { notifyOrderPlaced } = await import("./orderNotifications");
+    await notifyOrderPlaced(db, orderId).catch((e: any) => console.error("upi notify failed", orderId, e?.message || e));
+  } else {
+    await ref.update({ paymentStatus: "failed", status: "cancelled", statusChangedAt: Date.now(), upiRejectedBy: uid, updatedAt: Date.now() });
+    for (const it of o.items || []) {
+      if (!it?.clearanceItemId) continue;
+      const cref = db.collection("clearanceItems").doc(String(it.clearanceItemId));
+      await db.runTransaction(async (tx) => {
+        const c = (await tx.get(cref)).data() as any;
+        if (c?.status === "reserved" && c.reservedOrderId === orderId) {
+          tx.update(cref, {
+            status: "available",
+            reservedOrderId: admin.firestore.FieldValue.delete(),
+            reservedAt: admin.firestore.FieldValue.delete(),
+            reservedUntil: admin.firestore.FieldValue.delete(),
+          });
+        }
+      });
+    }
+  }
+  return { ok: true };
+});

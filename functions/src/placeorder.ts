@@ -235,10 +235,21 @@ export const placeOrder = functions
 
     // Clearance pieces (clearance.ts): one each, priced by the piece, held for
     // this order before anything is charged; a piece already gone stops here.
+    // Direct UPI (clearance.ts): only for a cart of clearance pieces only, and only when switched on.
+    let upiDirect: { vpa: string; payeeName: string } | null = null;
+    if (paymentMethod === "upi_direct") {
+      if (!orderItems.length || orderItems.some((it) => !it?.clearanceItemId)) {
+        throw new HttpsError("failed-precondition", "Direct UPI is only for clearance items — check them out on their own");
+      }
+      const { clearanceUpiSettings } = await import("./clearance");
+      const st = await clearanceUpiSettings(db);
+      if (!st.enabled) throw new HttpsError("failed-precondition", "UPI payment is not available right now");
+      upiDirect = { vpa: st.vpa, payeeName: st.payeeName };
+    }
     if (orderItems.some((it) => it?.clearanceItemId)) {
       orderItems = orderItems.map((it) => (it?.clearanceItemId ? { ...it, quantity: 1 } : it));
-      const { reserveClearance } = await import("./clearance");
-      for (const [i, p] of await reserveClearance(db, orderId, orderItems)) upsellPrice.set(i, p);
+      const { reserveClearance, UPI_HOLD_MS, RESERVE_MS } = await import("./clearance");
+      for (const [i, p] of await reserveClearance(db, orderId, orderItems, upiDirect ? UPI_HOLD_MS : RESERVE_MS)) upsellPrice.set(i, p);
     }
 
     // Price comes from the variant document, always. The old fallback to
@@ -523,6 +534,11 @@ export const placeOrder = functions
        */
       status: paymentMethod === "cod" && !(prepaidAmount > 0) ? "processing" : "pending_payment",
       paymentStatus: "pending",
+      // Paid straight to the owner's UPI: a personal sale, CL- numbered, no invoice (clearance.ts).
+      ...(upiDirect ? {
+        personalSale: true,
+        upiPay: { vpa: upiDirect.vpa, payeeName: upiDirect.payeeName, amount: amountPayable, note: checkoutRef },
+      } : {}),
       itemsTotal,
       shippingFee,
       couponId: couponId || null,
@@ -611,7 +627,8 @@ export const placeOrder = functions
     // COD only. An online order is notified once PhonePe confirms the money,
     // from applyPaymentResult — "we've got your order" before payment is worse
     // than silence. Non-blocking for the same reason as the stock draw-down.
-    if (paymentMethod !== "phonepe") {
+    // A direct-UPI order is confirmed when the admin sees the money (confirmUpiPayment).
+    if (paymentMethod !== "phonepe" && paymentMethod !== "upi_direct") {
       // Confirmed now: number and invoice first, so the message carries them.
       try {
         orderNumber = (await confirmOrder(db, docRef.id))?.orderNumber || "";

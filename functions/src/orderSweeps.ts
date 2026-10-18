@@ -76,6 +76,8 @@ export async function sweepUnpaidOrders(
     if (o.isDeleted === true) { out.skipped++; continue; }
     if (String(o.paymentStatus || "").toLowerCase() === "success") { out.skipped++; continue; }
     if (normalizeOrderStatus(o.status, o.paymentStatus, o) !== "pending_payment") { out.skipped++; continue; }
+    // Direct UPI: the admin confirms or cancels it (clearance.ts confirmUpiPayment).
+    if (o.paymentMethod === "upi_direct") { out.skipped++; continue; }
 
     const ageHours = Math.round((Date.now() - (Number(o.createdAt) || 0)) / 3600000);
     out.orders.push({ orderNumber: String(o.orderNumber || o.failedOrderNumber || d.id), ageHours });

@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useAction } from "@/lib/firebase-hooks";
+import { UpiPayBox } from "@/components/upi-pay-box.tsx";
 import { api } from "@/lib/firebase-api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
@@ -240,7 +241,8 @@ function OrderDetailPageInner() {
 
   // Failed at PhonePe, or left there (the tab closed before it answered):
   // either way the order is waiting for its money and can be paid.
-  const canPay = order.paymentStatus !== "success" && order.paymentMethod !== "cod" && !order.isDeleted &&
+  // A direct-UPI clearance order is paid by UPI below, never through PhonePe.
+  const canPay = order.paymentStatus !== "success" && order.paymentMethod !== "cod" && order.paymentMethod !== "upi_direct" && !order.isDeleted &&
     (order.paymentStatus === "failed" || order.status === "pending_payment");
 
   return (
@@ -261,6 +263,12 @@ function OrderDetailPageInner() {
       </header>
 
       <div className="container mx-auto px-4 py-8 max-w-5xl">
+        {(order as any).paymentMethod === "upi_direct" && (order as any).upiPay && order.paymentStatus !== "success"
+          && order.status !== "cancelled" && !order.isDeleted && (
+          <div className="mb-6">
+            <UpiPayBox orderId={String(order._id)} upiPay={(order as any).upiPay} utr={(order as any).upiUtr} submittedAt={(order as any).upiSubmittedAt} />
+          </div>
+        )}
         {/* Order Header */}
         <div className="mb-8">
           <div className="flex items-start justify-between mb-4">

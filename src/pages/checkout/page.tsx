@@ -79,6 +79,19 @@ function CheckoutPageInner() {
   const verifyCodOtp = useMutation(api.codOtp.verifyCodOtp);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // Direct UPI for clearance-only carts (functions/src/clearance.ts).
+  const [clearanceUpiOn, setClearanceUpiOn] = useState(false);
+  useEffect(() => {
+    let live = true;
+    (async () => {
+      try {
+        const [{ functions }, { httpsCallable }] = await Promise.all([import("@/lib/firebase"), import("firebase/functions")]);
+        const r: any = await httpsCallable(functions, "getClearanceUpi")({});
+        if (live) setClearanceUpiOn(r?.data?.enabled === true);
+      } catch { /* off: the usual payment methods */ }
+    })();
+    return () => { live = false; };
+  }, []);
   const [isSendingOtp, setIsSendingOtp] = useState(false);
   const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
   const [otpSent, setOtpSent] = useState(false);
@@ -353,6 +366,16 @@ function CheckoutPageInner() {
   const handleFieldChange = (field: keyof FormData, value: string) =>
     setFormData((prev) => ({ ...prev, [field]: value }));
 
+  // A cart of clearance pieces only is paid straight by UPI; a cart mixing them
+  // with shop items has to be split (they are separate sales).
+  const clearanceCount = (cartItems || []).filter((i: any) => i.clearanceItemId).length;
+  const clearanceOnly = clearanceUpiOn && clearanceCount > 0 && clearanceCount === (cartItems || []).length;
+  const clearanceMixed = clearanceUpiOn && clearanceCount > 0 && !clearanceOnly;
+  useEffect(() => {
+    if (clearanceOnly && formData.paymentMethod !== "upi_direct") setFormData((prev) => ({ ...prev, paymentMethod: "upi_direct" }));
+    if (!clearanceOnly && formData.paymentMethod === "upi_direct") setFormData((prev) => ({ ...prev, paymentMethod: "phonepe" }));
+  }, [clearanceOnly, formData.paymentMethod]);
+
   const handlePaymentMethodChange = (value: string) => {
     setFormData((prev) => ({ ...prev, paymentMethod: value }));
     if (value !== "cod") { setOtpSent(false); setOtpVerified(false); setOtpInput(""); setOtpExpiresAt(null); setCodOtpToken(null); }
@@ -523,6 +546,10 @@ function CheckoutPageInner() {
     if (!/^[1-9]\d{5}$/.test(formData.pincode.trim())) {
       invalid("pincode", "Please enter a valid 6-digit pincode"); return;
     }
+    if (clearanceMixed) {
+      invalid("clearance_mixed", "Clearance items are paid separately by UPI. Remove them from this cart and check them out on their own.");
+      return;
+    }
     // Only while Admin › COD › OTP is on; placeOrder checks the same switch.
     if (formData.paymentMethod === "cod" && codAvailability?.otpRequired && !otpVerified) { invalid("cod_otp", "Please verify your phone number with OTP before placing a COD order"); return; }
 
@@ -590,7 +617,7 @@ function CheckoutPageInner() {
       } else {
         if (!isAuthenticated) clearGuestCart();
         else clearUserCart();
-        toast.success("Order placed successfully!");
+        toast.success(formData.paymentMethod === "upi_direct" ? "Order placed — pay by UPI on the next screen" : "Order placed successfully!");
         guestNav();
       }
     } catch (error) {
@@ -812,11 +839,27 @@ function CheckoutPageInner() {
                 />
               )}
 
-              <PaymentMethodSelector
-                paymentMethod={formData.paymentMethod}
-                codAvailability={codAvailability}
-                onPaymentMethodChange={handlePaymentMethodChange}
-              />
+              {clearanceOnly ? (
+                <div className="space-y-1 rounded-2xl border-2 border-ink bg-card p-4 text-sm">
+                  <p className="font-bold">Payment: UPI (clearance items)</p>
+                  <p className="text-muted-foreground">
+                    After you place the order you'll get a UPI QR and an app button for the exact amount. Pay, enter the UTR, and we confirm your order. Your item is held for 24 hours.
+                  </p>
+                </div>
+              ) : (
+                <>
+                  {clearanceMixed && (
+                    <p className="rounded-xl border-2 border-heart/40 bg-heart/10 p-3 text-sm font-semibold text-heart">
+                      Clearance items are paid separately by UPI. Remove them from this cart and check them out on their own.
+                    </p>
+                  )}
+                  <PaymentMethodSelector
+                    paymentMethod={formData.paymentMethod}
+                    codAvailability={codAvailability}
+                    onPaymentMethodChange={handlePaymentMethodChange}
+                  />
+                </>
+              )}
 
               {formData.paymentMethod === "cod" && codAvailability?.available && codAvailability?.otpRequired && (
                 <CodOtpSection

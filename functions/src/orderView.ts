@@ -22,6 +22,8 @@ import { linkTokenValid, payLinkValid } from "./payLink";
 
 /** Fields safe to show whoever has the link: nothing that identifies or locates a person. */
 const PUBLIC_FIELDS = [
+  // Direct UPI for clearance orders (clearance.ts): where to pay, and whether the UTR is in.
+  "upiPay", "upiUtr", "upiSubmittedAt", "personalSale",
   "orderNumber", "checkoutRef", "invoiceNumber", "status", "paymentStatus", "paymentMethod",
   "subtotal", "itemsTotal", "shippingFee", "codFee", "codAmount", "discount", "couponDiscount", "couponCode",
   "walletUsed", "walletAmountUsed", "total", "amountPayable", "gstAmount", "cgst", "sgst", "igst",
