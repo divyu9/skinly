@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils.ts";
 export type SheetPiece = {
   id: string; productTitle: string; productImage?: string; images?: string[];
   variant: string; coverage?: string | null; lensModel?: string | null;
-  price: number; originalPrice: number; condition?: string; description?: string; amazonUrl?: string;
+  price: number; originalPrice: number; condition?: string; description?: string; amazonUrl?: string; videoUrl?: string;
   pieces: unknown[];
 };
 
@@ -28,7 +28,10 @@ export function ProductSheet({ p, device, coverageLabel, busy, added, soldOut = 
   onAdd: () => void;
   onClose: () => void;
 }) {
-  const imgs = p.images?.length ? p.images : p.productImage ? [p.productImage] : [];
+  const photos = p.images?.length ? p.images : p.productImage ? [p.productImage] : [];
+  // A video (a UGC clip of it in use) is the first slide; its thumbnail is the first photo.
+  const imgs = p.videoUrl ? [p.videoUrl, ...photos] : photos;
+  const isVideo = (i: number) => !!p.videoUrl && i === 0;
   const [at, setAt] = useState(0);
   const strip = useRef<HTMLDivElement>(null);
   const left = p.pieces.length;
@@ -65,7 +68,11 @@ export function ProductSheet({ p, device, coverageLabel, busy, added, soldOut = 
           <div ref={strip} onScroll={onScroll} className="no-scrollbar flex aspect-square w-full snap-x snap-mandatory overflow-x-auto">
             {imgs.map((u, i) => (
               <div key={u + i} className="h-full w-full shrink-0 snap-center">
-                <img src={sizedImage(u, 900)} alt={`${p.productTitle} — photo ${i + 1} of ${imgs.length}`} loading={i < 2 ? "eager" : "lazy"} className="size-full object-contain" />
+                {isVideo(i) ? (
+                  <video src={u} poster={photos[0] ? sizedImage(photos[0], 900) : undefined} autoPlay muted loop playsInline controls className="size-full object-contain" />
+                ) : (
+                  <img src={sizedImage(u, 900)} alt={`${p.productTitle} — photo ${i + 1} of ${imgs.length}`} loading={i < 2 ? "eager" : "lazy"} className="size-full object-contain" />
+                )}
               </div>
             ))}
           </div>
@@ -103,7 +110,14 @@ export function ProductSheet({ p, device, coverageLabel, busy, added, soldOut = 
                 {imgs.map((u, i) => (
                   <button key={u + i} type="button" onClick={() => go(i)} aria-label={`Photo ${i + 1}`}
                     className={cn("size-14 shrink-0 overflow-hidden rounded-lg border-2", i === at ? "border-ink" : "border-transparent opacity-70")}>
-                    <img src={sizedImage(u, 120)} alt="" className="size-full object-cover" loading="lazy" />
+                    {isVideo(i) ? (
+                      <span className="relative block size-full bg-black">
+                        {photos[0] && <img src={sizedImage(photos[0], 120)} alt="" className="size-full object-cover opacity-70" loading="lazy" />}
+                        <span className="absolute inset-0 grid place-items-center text-lg text-white">▶</span>
+                      </span>
+                    ) : (
+                      <img src={sizedImage(u, 120)} alt="" className="size-full object-cover" loading="lazy" />
+                    )}
                   </button>
                 ))}
               </div>

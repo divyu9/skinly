@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
-import { ExternalLinkIcon, MinusIcon, PlusIcon, TagIcon, TrashIcon } from "lucide-react";
+import { ExternalLinkIcon, MinusIcon, PlusIcon, TagIcon, TrashIcon, VideoIcon } from "lucide-react";
 import { useQuery } from "@/lib/firebase-hooks";
 import { api } from "@/lib/firebase-api";
 import { Authenticated, Unauthenticated, AuthLoading } from "@/lib/firebase-hooks";
@@ -27,7 +27,7 @@ async function call(name: string, data: unknown) {
 type Piece = {
   id: string; productId: string; productTitle: string; productImage?: string; variant: string; sku?: string;
   phoneBrand: string; phoneModel: string; coverage?: string | null; lensModel?: string | null;
-  price: number; originalPrice: number; createdAt: number;
+  price: number; originalPrice: number; createdAt: number; videoUrl?: string;
   status: string; buyable: boolean; source: string; note?: string;
   sourceOrderId?: string | null; sourceOrderNumber?: string; reservedOrderId?: string | null; soldOrderId?: string | null; soldAt?: number | null;
 };
@@ -309,6 +309,18 @@ function AdminClearanceInner() {
     } catch (e: any) { toast.error(e?.message || "Could not add"); } finally { setBusy(""); }
   };
 
+  // A UGC clip of the piece in use: the card plays it instead of the first photo.
+  const setVideo = async (g: { key: string; first: Piece; pieces: Piece[] }) => {
+    const url = window.prompt("Video link (.mp4 from Media Library). Leave empty to remove the video.", g.first.videoUrl || "");
+    if (url === null) return;
+    setBusy(g.key);
+    try {
+      await call("setClearanceVideo", { ids: g.pieces.filter((x) => x.status !== "sold").map((x) => x.id), videoUrl: url.trim() });
+      toast.success(url.trim() ? "Video added" : "Video removed");
+      await load();
+    } catch (e: any) { toast.error(e?.message || "Could not set the video"); } finally { setBusy(""); }
+  };
+
   const removeOne = async (g: { key: string; pieces: Piece[] }) => {
     const p = g.pieces.find((x) => x.status === "available" || x.status === "draft");
     if (!p) { toast.error("No free piece to remove (the rest are held by an order)"); return; }
@@ -364,7 +376,7 @@ function AdminClearanceInner() {
                       {f.productImage && <img src={f.productImage} alt="" className="size-full object-cover" loading="lazy" />}
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className="font-semibold">{f.productTitle}</p>
+                      <p className="font-semibold">{f.productTitle}{f.videoUrl && <span className="ml-1.5 rounded-full bg-sky-100 px-1.5 py-0.5 text-[10px] font-bold text-sky-800">▶ video</span>}</p>
                       <p className="text-xs text-muted-foreground">
                         {[device(f) ? `Cut for ${device(f)}` : "Gadget / accessory", f.variant && !/^default/i.test(f.variant) ? f.variant : "", f.coverage === "only_back" ? "Back only" : f.coverage === "full_body_wrap" ? "Full body" : "", f.lensModel ? `lens ${f.lensModel}` : "", f.sku || ""].filter(Boolean).join(" · ")}
                       </p>
@@ -392,6 +404,9 @@ function AdminClearanceInner() {
                           <Button type="button" size="sm" variant="outline" disabled={busy === g.key} onClick={() => removeOne(g)} aria-label="Remove one piece"><MinusIcon className="size-4" /></Button>
                           <Button type="button" size="sm" variant="outline" disabled={busy === g.key} onClick={() => addMore(g, 1)} aria-label="Add one piece"><PlusIcon className="size-4" /></Button>
                         </div>
+                        <Button type="button" size="sm" variant="outline" disabled={busy === g.key} onClick={() => setVideo(g)}>
+                          <VideoIcon className="mr-1 size-4" /> {f.videoUrl ? "Video" : "Add video"}
+                        </Button>
                         <Button type="button" size="sm" variant="ghost" className="text-red-600" disabled={busy === g.key}
                           onClick={async () => { for (const p of g.pieces.filter((x) => x.status === "available" || x.status === "draft")) { await call("removeClearanceItem", { id: p.id }).catch(() => {}); } toast.success("Removed from clearance"); void load(); }}>
                           <TrashIcon className="size-4" />

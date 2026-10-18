@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
 import { toast } from "sonner";
@@ -20,8 +20,31 @@ type Piece = {
   id: string; productId: string; productTitle: string; productSlug?: string; productImage?: string;
   variant: string; phoneBrand: string; phoneModel: string; coverage?: string | null; lensModel?: string | null;
   price: number; originalPrice: number; createdAt: number;
-  images?: string[]; condition?: string; description?: string; amazonUrl?: string; personal?: boolean; sold?: boolean;
+  images?: string[]; condition?: string; description?: string; amazonUrl?: string; personal?: boolean; sold?: boolean; videoUrl?: string;
 };
+
+/**
+ * A clearance card's video: muted and looping, played only while the card is
+ * on screen (a grid of playing videos would eat a phone's data and battery).
+ */
+function CardVideo({ src, poster }: { src: string; poster?: string }) {
+  const ref = useRef<HTMLVideoElement>(null);
+  useEffect(() => {
+    const v = ref.current;
+    if (!v || typeof IntersectionObserver === "undefined") return;
+    const io = new IntersectionObserver(([e]) => {
+      if (e.isIntersecting) { v.play().catch(() => {}); } else { v.pause(); }
+    }, { threshold: 0.4 });
+    io.observe(v);
+    return () => io.disconnect();
+  }, []);
+  return (
+    <>
+      <video ref={ref} src={src} poster={poster} muted loop playsInline preload="none" className="size-full object-cover" />
+      <span className="absolute right-2 top-2 flex items-center gap-1 rounded-full bg-black/70 px-2 py-0.5 text-[11px] font-bold text-white">▶ Video</span>
+    </>
+  );
+}
 
 const coverageLabel = (c?: string | null) => (c === "only_back" ? "Back only" : c === "full_body_wrap" ? "Full body wrap" : "");
 const device = (p: Piece) => {
@@ -217,7 +240,9 @@ export default function ClearancePage() {
                       <ImagesIcon className="size-3" /> {p.images!.length}
                     </span>
                   )}
-                  {p.productImage && (
+                  {p.videoUrl ? (
+                    <CardVideo src={p.videoUrl} poster={p.productImage ? sizedImage(p.productImage, 480) : undefined} />
+                  ) : p.productImage && (
                     <img src={sizedImage(p.productImage, 480)} alt={device(p) ? `${p.productTitle} for ${device(p)}` : p.productTitle} loading="lazy"
                       className="size-full object-cover" />
                   )}

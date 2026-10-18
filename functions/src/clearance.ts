@@ -123,7 +123,7 @@ export const addClearanceStock = onCall(async (data: any, context: any) => {
     if (!src) throw new HttpsError("not-found", "No such piece");
     const keep = [
       "productId", "productTitle", "productSlug", "productImage", "images", "variant", "sku", "phoneBrand", "phoneModel",
-      "coverage", "lensModel", "price", "originalPrice", "condition", "description", "amazonUrl", "note", "personal",
+      "coverage", "lensModel", "price", "originalPrice", "condition", "description", "amazonUrl", "note", "personal", "videoUrl",
     ];
     const copy: Record<string, unknown> = {};
     for (const k of keep) if (src[k] !== undefined) copy[k] = src[k];
@@ -206,6 +206,33 @@ export const updateClearanceItem = onCall(async (data: any, context: any) => {
  *   status "draft" with price 0: not shown until the admin sets a price.
  */
 
+/** A video file on our own storage (Media Library → R2): an mp4 / webm / mov link. */
+const VIDEO_URL = /^https:\/\/[^\s"'<>]+\.(mp4|webm|mov)(\?[^\s"'<>]*)?$/i;
+
+/**
+ * A video for a clearance card (a UGC clip of it in use). Shown as the card's
+ * main picture and the first slide of its product sheet. Set on every piece
+ * of the kind at once; an empty link takes it off.
+ */
+export const setClearanceVideo = onCall(async (data: any, context: any) => {
+  await requireAdmin(context);
+  const ids: string[] = Array.isArray(data?.ids) ? data.ids.map(String).filter(Boolean).slice(0, 200) : [];
+  const videoUrl = String(data?.videoUrl || "").trim();
+  if (!ids.length) throw new HttpsError("invalid-argument", "No pieces given");
+  if (videoUrl && !VIDEO_URL.test(videoUrl)) {
+    throw new HttpsError("invalid-argument", "Paste a link to a video file (.mp4) — upload it in Media Library first. An Instagram link won't play here.");
+  }
+  const db = admin.firestore();
+  const batch = db.batch();
+  for (const id of ids) {
+    batch.update(db.collection("clearanceItems").doc(id), {
+      videoUrl: videoUrl || admin.firestore.FieldValue.delete(), updatedAt: Date.now(),
+    });
+  }
+  await batch.commit();
+  return { ok: true };
+});
+
 /** Take a piece off the clearance page (sold elsewhere, damaged…). */
 export const removeClearanceItem = onCall(async (data: any, context: any) => {
   await requireAdmin(context);
@@ -242,6 +269,7 @@ export const listClearance = onCall(async (data: any, context: any) => {
       personal: c.personal === true,
       // Amazon.in search for the same model with the owner's associate tag: "compare the price".
       amazonUrl: /^https:\/\/www\.amazon\.in\//.test(String(c.amazonUrl || "")) ? c.amazonUrl : "",
+      videoUrl: VIDEO_URL.test(String(c.videoUrl || "")) ? c.videoUrl : "",
       variant: c.variant, phoneBrand: c.phoneBrand, phoneModel: c.phoneModel,
       coverage: c.coverage || null, lensModel: c.lensModel || null, price: c.price, originalPrice: c.originalPrice,
       createdAt: c.createdAt,
