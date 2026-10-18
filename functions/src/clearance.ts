@@ -81,6 +81,8 @@ export const addRtoToClearance = onCall(async (data: any, context: any) => {
         originalPrice: Number(it.price) || 0,
         sourceOrderId: orderId,
         sourceOrderNumber: String(order.orderNumber || ""),
+        // Clearance is sold by direct UPI (owner's call, 18 Oct 2026), skins included.
+        personal: true,
         createdAt: Date.now(),
         createdBy: uid,
       });
@@ -146,6 +148,7 @@ export const addClearanceStock = onCall(async (data: any, context: any) => {
       price, originalPrice,
       ...(String(data?.note || "").trim() ? { note: String(data.note).trim().slice(0, 200) } : {}),
       source: "manual",
+      personal: data?.personal !== false,
       createdAt: Date.now(),
       createdBy: uid,
     });
