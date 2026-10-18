@@ -85,6 +85,13 @@ export const syncCart = onCall(async (data: any, context: any) => {
     if (/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) patch.email = email;
     if (str(data?.name, 80)) patch.name = str(data.name, 80);
     if (data?.optIn === true) patch.optIn = true;
+    // Whatever address they typed so far, for the admin to see (and call about) if they leave.
+    const a = data?.address || {};
+    const address = {
+      line1: str(a.line1, 200), line2: str(a.line2, 200), city: str(a.city, 80),
+      state: str(a.state, 80), pincode: str(a.pincode, 6).replace(/\D/g, ""),
+    };
+    if (Object.values(address).some(Boolean)) patch.address = address;
   } else if (items.length) {
     // Adding to a cart after an order, or before checkout: back to "cart",
     // unless this cart already reached checkout (its contact still counts).
@@ -99,4 +106,15 @@ export const syncCart = onCall(async (data: any, context: any) => {
     await recordOptIn(phone, stage === "saved" ? "cart_save" : "checkout_draft").catch((e) => console.warn("[syncCart] opt-in:", e?.message || e));
   }
   return { ok: true };
+});
+
+/** One checkout left half-way, for the admin (the activity log links to it). */
+export const getCheckoutSnapshot = onCall(async (data: any, context: any) => {
+  const { requireAdmin } = await import("./auth");
+  await requireAdmin(context);
+  const id = str(data?.id, 64);
+  if (!/^[A-Za-z0-9_-]{8,64}$/.test(id)) throw new HttpsError("invalid-argument", "Bad cart id");
+  const d = await admin.firestore().collection("cartSnapshots").doc(id).get();
+  if (!d.exists) throw new HttpsError("not-found", "This checkout is no longer there");
+  return { id: d.id, ...(d.data() as any) };
 });

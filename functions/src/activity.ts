@@ -144,7 +144,7 @@ export async function adminActivityEvents(db: admin.firestore.Firestore, limit =
       id: `cart-${d.id}`, kind: "cart", at: num(c.checkoutAt, c.updatedAt),
       title: `Checkout left by ${c.name || c.phone} for ${inr(c.total)}`,
       sub: [`${c.itemCount || (c.items || []).length} item${(c.itemCount || 0) === 1 ? "" : "s"}`, c.phoneVerified ? "number verified" : "", c.phone].filter(Boolean).join(" · "),
-      link: "/backend-skinly/abandoned-carts",
+      link: `/backend-skinly/abandoned-carts?checkout=${encodeURIComponent(d.id)}`,
     });
   }
 

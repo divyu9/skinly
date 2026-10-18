@@ -45,6 +45,7 @@ import { Authenticated, Unauthenticated, AuthLoading } from "@/lib/firebase-hook
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from "@/components/ui/empty.tsx";
 import { SignInButton } from "@/components/ui/signin.tsx";
 import { AbandonedCartSettings } from "./settings.tsx";
+import { CheckoutSnapshotCard } from "./CheckoutSnapshotCard.tsx";
 import {
   Dialog,
   DialogContent,
@@ -172,6 +173,8 @@ function AbandonedCartsPageInner() {
           </Button>
         </div>
       </div>
+
+      <CheckoutSnapshotCard />
 
       {/* Automation Status Banner */}
       <Card className="border-green-500/30 bg-green-500/5">

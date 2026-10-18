@@ -378,8 +378,12 @@ function CheckoutPageInner() {
       email: emailOk ? email : undefined,
       name: formData.fullName.trim() || undefined,
       optIn: marketingOptIn || undefined,
+      address: {
+        line1: formData.addressLine1.trim(), line2: formData.addressLine2.trim(),
+        city: formData.city.trim(), state: formData.state.trim(), pincode: formData.pincode.trim(),
+      },
     }, 2500);
-  }, [formData.phone, formData.email, formData.fullName, marketingOptIn, cartItems, isPhoneValid]);
+  }, [formData.phone, formData.email, formData.fullName, formData.addressLine1, formData.addressLine2, formData.city, formData.state, formData.pincode, marketingOptIn, cartItems, isPhoneValid]);
 
   const handleFieldChange = (field: keyof FormData, value: string) =>
     setFormData((prev) => ({ ...prev, [field]: value }));

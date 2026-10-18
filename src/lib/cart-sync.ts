@@ -14,6 +14,7 @@ type Payload = {
   items: Line[];
   stage: "cart" | "saved" | "checkout" | "ordered";
   phone?: string; email?: string; name?: string; optIn?: boolean; orderId?: string;
+  address?: { line1?: string; line2?: string; city?: string; state?: string; pincode?: string };
 };
 
 const ID_KEY = "skinly_cart_id";
@@ -53,6 +54,7 @@ async function send(p: Payload) {
     ...(p.name ? { name: p.name } : {}),
     ...(p.optIn ? { optIn: true } : {}),
     ...(p.orderId ? { orderId: p.orderId } : {}),
+    ...(p.address && Object.values(p.address).some(Boolean) ? { address: p.address } : {}),
   };
   const key = JSON.stringify(body);
   if (key === lastSent) return;
