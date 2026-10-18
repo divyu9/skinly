@@ -112,6 +112,31 @@ export const addClearanceStock = onCall(async (data: any, context: any) => {
   const { uid } = await requireAdmin(context);
   const db = admin.firestore();
   const qty = Math.max(1, Math.min(200, Math.floor(Number(data?.quantity) || 1)));
+
+  // "+1 more of this": copy the piece itself — same listing id (so it joins
+  // the same card), photos, condition, description, Amazon link and owner.
+  // Building it from the title gave a photo-made piece a fresh custom- id and
+  // only its first photo, so it showed as a second, bare card.
+  const sameAs = String(data?.sameAs || "").trim();
+  if (sameAs) {
+    const src = (await db.collection("clearanceItems").doc(sameAs).get()).data() as any;
+    if (!src) throw new HttpsError("not-found", "No such piece");
+    const keep = [
+      "productId", "productTitle", "productSlug", "productImage", "images", "variant", "sku", "phoneBrand", "phoneModel",
+      "coverage", "lensModel", "price", "originalPrice", "condition", "description", "amazonUrl", "note", "personal",
+    ];
+    const copy: Record<string, unknown> = {};
+    for (const k of keep) if (src[k] !== undefined) copy[k] = src[k];
+    const batch = db.batch();
+    for (let n = 0; n < qty; n++) {
+      batch.set(db.collection("clearanceItems").doc(), {
+        ...copy, status: "available", source: "manual", copiedFrom: sameAs, createdAt: Date.now(), createdBy: uid,
+      });
+    }
+    await batch.commit();
+    return { ok: true, created: qty };
+  }
+
   const price = Math.round(Number(data?.price) || 0);
   if (!(price > 0)) throw new HttpsError("invalid-argument", "Set a clearance price");
   // A skin is cut for one device; a gadget or accessory is not, and leaves it empty.

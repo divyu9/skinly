@@ -302,12 +302,8 @@ function AdminClearanceInner() {
     const f = g.first;
     setBusy(g.key);
     try {
-      await call("addClearanceStock", {
-        ...(f.productId.startsWith("custom-") ? { productTitle: f.productTitle, productImage: f.productImage } : { productId: f.productId }),
-        variant: f.variant, phoneBrand: f.phoneBrand, phoneModel: f.phoneModel,
-        coverage: f.coverage || undefined, lensModel: f.lensModel || undefined,
-        price: f.price, originalPrice: f.originalPrice, quantity: n,
-      });
+      // A copy of this piece (photos, condition, description), so it joins the same card.
+      await call("addClearanceStock", { sameAs: f.id, quantity: n });
       toast.success(`+${n} piece${n === 1 ? "" : "s"}`);
       await load();
     } catch (e: any) { toast.error(e?.message || "Could not add"); } finally { setBusy(""); }
