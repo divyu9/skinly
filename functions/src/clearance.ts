@@ -91,6 +91,76 @@ export const addRtoToClearance = onCall(async (data: any, context: any) => {
   return { ok: true, created: created.length };
 });
 
+/**
+ * Stock put on clearance by hand — pieces already cut that never sold, or
+ * that were never listed — from Admin › Clearance. Either an existing
+ * listing (draft or unlisted included: its picture and title) or a piece
+ * described from scratch (title + picture), which gets a "custom-" product
+ * id of its own. One document per piece.
+ */
+export const addClearanceStock = onCall(async (data: any, context: any) => {
+  const { uid } = await requireAdmin(context);
+  const db = admin.firestore();
+  const qty = Math.max(1, Math.min(200, Math.floor(Number(data?.quantity) || 1)));
+  const price = Math.round(Number(data?.price) || 0);
+  if (!(price > 0)) throw new HttpsError("invalid-argument", "Set a clearance price");
+  const phoneModel = String(data?.phoneModel || "").trim();
+  if (!phoneModel) throw new HttpsError("invalid-argument", "Say which device the piece is cut for");
+
+  let productId = String(data?.productId || "").trim();
+  let productTitle = String(data?.productTitle || "").trim();
+  let productSlug = "";
+  let productImage = String(data?.productImage || "").trim();
+  let originalPrice = Math.round(Number(data?.originalPrice) || 0);
+  let sku = String(data?.sku || "").trim();
+  const variant = String(data?.variant || "").trim() || "Default";
+  if (productId) {
+    const p = (await db.doc(`products/${productId}`).get()).data() as any;
+    if (!p) throw new HttpsError("not-found", "No such product");
+    productTitle = productTitle || String(p.title || "");
+    productSlug = String(p.slug || "");
+    productImage = productImage || String((p.images || []).find((i: any) => i?.url)?.url || "");
+    const v = (await db.collection("variants").where("productId", "==", productId).where("title", "==", variant).limit(1).get()).docs[0]?.data() as any;
+    if (v) { originalPrice = originalPrice || Math.round(Number(v.compareAtPrice) || Number(v.price) || 0); sku = sku || String(v.sku || ""); }
+  } else {
+    if (!productTitle) throw new HttpsError("invalid-argument", "Give the piece a title");
+    productId = `custom-${db.collection("clearanceItems").doc().id}`;
+  }
+
+  const batch = db.batch();
+  for (let n = 0; n < qty; n++) {
+    batch.set(db.collection("clearanceItems").doc(), {
+      status: "available",
+      productId, productTitle, productSlug, productImage, variant, sku,
+      phoneBrand: String(data?.phoneBrand || "").trim(),
+      phoneModel,
+      ...(data?.coverage === "only_back" || data?.coverage === "full_body_wrap" ? { coverage: data.coverage } : {}),
+      ...(String(data?.lensModel || "").trim() ? { lensModel: String(data.lensModel).trim() } : {}),
+      price, originalPrice,
+      ...(String(data?.note || "").trim() ? { note: String(data.note).trim().slice(0, 200) } : {}),
+      source: "manual",
+      createdAt: Date.now(),
+      createdBy: uid,
+    });
+  }
+  await batch.commit();
+  return { ok: true, created: qty };
+});
+
+/** Change a piece's clearance price. */
+export const updateClearanceItem = onCall(async (data: any, context: any) => {
+  await requireAdmin(context);
+  const id = String(data?.id || "");
+  const price = Math.round(Number(data?.price) || 0);
+  if (!id || !(price > 0)) throw new HttpsError("invalid-argument", "id and a price are required");
+  const ref = admin.firestore().collection("clearanceItems").doc(id);
+  const c = (await ref.get()).data() as any;
+  if (!c) throw new HttpsError("not-found", "No such piece");
+  if (c.status === "sold") throw new HttpsError("failed-precondition", "That piece is already sold");
+  await ref.update({ price, updatedAt: Date.now() });
+  return { ok: true };
+});
+
 /** Take a piece off the clearance page (sold elsewhere, damaged…). */
 export const removeClearanceItem = onCall(async (data: any, context: any) => {
   await requireAdmin(context);
@@ -107,10 +177,11 @@ export const removeClearanceItem = onCall(async (data: any, context: any) => {
 /** The clearance page: every piece on sale, newest first. Public, and carries no customer data. */
 export const listClearance = onCall(async (data: any, context: any) => {
   const db = admin.firestore();
-  const snap = await db.collection("clearanceItems").where("status", "in", ["available", "reserved"]).get();
-  const now = Date.now();
   const forAdmin = data?.admin === true && !!context?.auth;
   if (forAdmin) await requireAdmin(context);
+  // The admin page sees sold pieces too (what sold, to whom); the shop only what is on sale.
+  const snap = await db.collection("clearanceItems").where("status", "in", forAdmin ? ["available", "reserved", "sold"] : ["available", "reserved"]).get();
+  const now = Date.now();
   const items = snap.docs
     .map((d) => ({ id: d.id, ...(d.data() as any) }))
     .filter((c) => forAdmin || isBuyable(c, now))
@@ -120,7 +191,11 @@ export const listClearance = onCall(async (data: any, context: any) => {
       productImage: c.productImage, variant: c.variant, phoneBrand: c.phoneBrand, phoneModel: c.phoneModel,
       coverage: c.coverage || null, lensModel: c.lensModel || null, price: c.price, originalPrice: c.originalPrice,
       createdAt: c.createdAt,
-      ...(forAdmin ? { status: c.status, sourceOrderId: c.sourceOrderId, sourceOrderNumber: c.sourceOrderNumber, reservedOrderId: c.reservedOrderId || null } : {}),
+      ...(forAdmin ? {
+        status: c.status, buyable: isBuyable(c, now), source: c.source || "rto", note: c.note || "", sku: c.sku || "",
+        sourceOrderId: c.sourceOrderId || null, sourceOrderNumber: c.sourceOrderNumber || "",
+        reservedOrderId: c.reservedOrderId || null, soldOrderId: c.soldOrderId || null, soldAt: c.soldAt || null,
+      } : {}),
     }));
   return { items };
 });

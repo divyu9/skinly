@@ -71,6 +71,7 @@ const AdminReviewsPage = lazyWithReload(() => import("./pages/admin/reviews.tsx"
 const AdminContactsPage = lazyWithReload(() => import("./pages/admin/contacts/page.tsx"), "./pages/admin/contacts/page.tsx");
 const AdminAbandonedCartsPage = lazyWithReload(() => import("./pages/admin/abandoned-carts/page.tsx"), "./pages/admin/abandoned-carts/page.tsx");
 const AdminStockNotificationsPage = lazyWithReload(() => import("./pages/admin/stock-notifications/page.tsx"), "./pages/admin/stock-notifications/page.tsx");
+const AdminClearancePage = lazyWithReload(() => import("./pages/admin/clearance/page.tsx"), "./pages/admin/clearance/page.tsx");
 const AdminOOSPage = lazyWithReload(() => import("./pages/admin/oos/page.tsx"), "./pages/admin/oos/page.tsx");
 const AdminMockupsAdvancedPage = lazyWithReload(() => import("./pages/admin/mockups-advanced.tsx"), "./pages/admin/mockups-advanced.tsx");
 const AdminGoogleDriveImportPage = lazyWithReload(() => import("./pages/admin/google-drive-import.tsx"), "./pages/admin/google-drive-import.tsx");
@@ -247,6 +248,7 @@ export default function App() {
             <Route path="/backend-skinly/contacts" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminContactsPage /></AdminPageWrapper></Suspense>} />
             <Route path="/backend-skinly/abandoned-carts" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminAbandonedCartsPage /></AdminPageWrapper></Suspense>} />
             <Route path="/backend-skinly/stock-notifications" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminStockNotificationsPage /></AdminPageWrapper></Suspense>} />
+            <Route path="/backend-skinly/clearance" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminClearancePage /></AdminPageWrapper></Suspense>} />
             <Route path="/backend-skinly/oos" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminOOSPage /></AdminPageWrapper></Suspense>} />
             <Route path="/backend-skinly/cod" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminCODPage /></AdminPageWrapper></Suspense>} />
             <Route path="/backend-skinly/shipping" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminShippingPage /></AdminPageWrapper></Suspense>} />
