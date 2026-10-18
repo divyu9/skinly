@@ -19,7 +19,7 @@ type Piece = {
   id: string; productId: string; productTitle: string; productSlug?: string; productImage?: string;
   variant: string; phoneBrand: string; phoneModel: string; coverage?: string | null; lensModel?: string | null;
   price: number; originalPrice: number; createdAt: number;
-  images?: string[]; condition?: string; description?: string;
+  images?: string[]; condition?: string; description?: string; amazonUrl?: string;
 };
 
 const coverageLabel = (c?: string | null) => (c === "only_back" ? "Back only" : c === "full_body_wrap" ? "Full body wrap" : "");
@@ -204,6 +204,12 @@ export default function ClearancePage() {
                   <p className="text-[11px] text-muted-foreground">
                     {[p.variant && !/^default/i.test(p.variant) ? p.variant : "", coverageLabel(p.coverage), p.lensModel ? `Lens: ${p.lensModel}` : ""].filter(Boolean).join(" · ")}
                   </p>
+                  {p.amazonUrl && (
+                    <a href={p.amazonUrl} target="_blank" rel="nofollow sponsored noopener noreferrer"
+                      className="w-fit text-[11px] font-semibold text-primary underline underline-offset-2">
+                      Compare price on Amazon ↗
+                    </a>
+                  )}
                   <p className="mt-auto pt-1">
                     <span className="text-lg font-extrabold">₹{p.price}</span>
                     {p.originalPrice > p.price && <span className="ml-1.5 text-xs text-muted-foreground line-through">₹{p.originalPrice}</span>}

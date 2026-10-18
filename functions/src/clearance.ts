@@ -204,6 +204,8 @@ export const listClearance = onCall(async (data: any, context: any) => {
       id: c.id, productId: c.productId, productTitle: c.productTitle, productSlug: c.productSlug,
       productImage: c.productImage, images: Array.isArray(c.images) ? c.images : (c.productImage ? [c.productImage] : []),
       condition: c.condition || "", description: c.description || "",
+      // Amazon.in search for the same model with the owner's associate tag: "compare the price".
+      amazonUrl: /^https:\/\/www\.amazon\.in\//.test(String(c.amazonUrl || "")) ? c.amazonUrl : "",
       variant: c.variant, phoneBrand: c.phoneBrand, phoneModel: c.phoneModel,
       coverage: c.coverage || null, lensModel: c.lensModel || null, price: c.price, originalPrice: c.originalPrice,
       createdAt: c.createdAt,
