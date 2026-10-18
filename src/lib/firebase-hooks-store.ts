@@ -2066,6 +2066,12 @@ export async function runQuery(c: QueryCtx) {
             setData({ hasCashback: false, displayText: null });
           } else {
             (async () => {
+              // A product on the design sale earns no cashback (placeOrder agrees).
+              const prod = await getDoc(doc(db, 'products', args.productId));
+              if (Number((prod.data() as any)?.designSale?.price) > 0) {
+                setData({ hasCashback: false, displayText: null });
+                return;
+              }
               const rsnap = await getDocs(query(collection(db, 'cashbackRules'), where('isActive', '==', true)));
               const rules = rsnap.docs.map(d => ({ _id: d.id, ...d.data() } as any));
 
