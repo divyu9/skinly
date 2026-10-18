@@ -202,10 +202,14 @@ export function OrderItemsTable({
                     </DropdownMenuContent>
                   </DropdownMenu>
                   <div className="text-sm text-muted-foreground space-y-0.5">
-                    {live[item.productId]?.gone && (
+                    {/* A clearance piece described from scratch has a "custom-" id that was never a product. */}
+                    {live[item.productId]?.gone && !String(item.productId || "").startsWith("custom-") && !(item as any).clearanceItemId && (
                       <Badge variant="outline" className="text-amber-700 border-amber-300 dark:text-amber-400">
                         Product deleted since this order
                       </Badge>
+                    )}
+                    {(item as any).clearanceItemId && (
+                      <Badge variant="outline" className="border-sky-300 text-sky-700">Clearance piece</Badge>
                     )}
                     <p>Variant: {item.variant}</p>
                     {item.sku && <p>SKU: <span className="font-mono">{item.sku}</span></p>}
