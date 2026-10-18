@@ -449,9 +449,10 @@ export const placeOrder = functions
     }
 
     // What this order earns back on delivery, settled now at today's rules.
+    // Clearance pieces earn none: their price is already the floor.
     const cashback = await cashbackForLines(
       db,
-      orderItems.map((item) => {
+      orderItems.filter((item) => !item?.clearanceItemId).map((item) => {
         const key = `${String(item?.productId)}::${String(item?.variant)}`;
         return {
           productId: String(item?.productId || ""),

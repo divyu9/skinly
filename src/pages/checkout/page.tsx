@@ -294,10 +294,12 @@ function CheckoutPageInner() {
    * variant is its name, not an id, so it never asked at all: the server paid
    * cashback the checkout never mentioned. The lookup matches variants by name.
    */
+  // Clearance pieces earn no cashback (placeOrder leaves them out too).
+  const cashbackItems = (cartItems || []).filter((i: any) => !i.clearanceItemId);
   const cashbackData = useQuery(
     api.cashbackHelpers.calculateCartCashback,
-    cartItems?.length
-      ? { items: cartItems.map((i: any) => ({ productId: i.productId as Id<"products">, variantTitle: i.variant, finalPrice: i.price, quantity: i.quantity })) }
+    cashbackItems.length
+      ? { items: cashbackItems.map((i: any) => ({ productId: i.productId as Id<"products">, variantTitle: i.variant, finalPrice: i.price, quantity: i.quantity })) }
       : "skip"
   );
 
