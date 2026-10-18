@@ -46,6 +46,8 @@ export function normalizePaymentStatus(value: any): string {
  */
 export const ORDER_STATUSES = [
   "pending_payment",
+  // A direct-UPI clearance order whose UTR is in, waiting for the admin to check the bank (clearance.ts).
+  "payment_verification",
   "processing",
   "ready_to_ship",
   "shipped",

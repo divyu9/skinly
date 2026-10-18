@@ -45,6 +45,7 @@ export function orderLabel(order: {
 export function orderStatusLabel(status?: string | null): string {
   switch (String(status || "").toLowerCase()) {
     case "pending_payment": return "Payment pending";
+    case "payment_verification": return "Verifying payment";
     case "pending": return "Payment pending";
     case "processing": return "Preparing";
     case "ready_to_ship": return "Packed";
@@ -71,6 +72,7 @@ export function orderStatusLabel(status?: string | null): string {
  */
 export const ADMIN_STATUS_LABELS: Record<string, string> = {
   pending_payment: "Pending Payment",
+  payment_verification: "Payment Verification Pending",
   processing: "Processing",
   ready_to_ship: "Ready to Ship",
   shipped: "Shipped",
@@ -87,6 +89,7 @@ export const adminStatusLabel = (status?: string | null): string =>
 /** Badge classes per status: one hue per stage, warnings in amber and red. */
 export const STATUS_BADGE: Record<string, string> = {
   pending_payment: "bg-yellow-500/10 text-yellow-600 border-yellow-500/20",
+  payment_verification: "bg-amber-500/10 text-amber-700 border-amber-500/30",
   processing: "bg-purple-500/10 text-purple-600 border-purple-500/20",
   ready_to_ship: "bg-sky-500/10 text-sky-600 border-sky-500/20",
   shipped: "bg-indigo-500/10 text-indigo-600 border-indigo-500/20",
@@ -107,6 +110,7 @@ export const STATUS_BADGE: Record<string, string> = {
  */
 export const STATUS_TAB: Record<string, string> = {
   pending_payment: "data-[state=active]:bg-yellow-500/10 dark:data-[state=active]:bg-yellow-500/20 data-[state=active]:text-yellow-600 data-[state=active]:shadow-none",
+  payment_verification: "data-[state=active]:bg-amber-500/10 dark:data-[state=active]:bg-amber-500/20 data-[state=active]:text-amber-700 data-[state=active]:shadow-none",
   processing: "data-[state=active]:bg-purple-500/10 dark:data-[state=active]:bg-purple-500/20 data-[state=active]:text-purple-600 data-[state=active]:shadow-none",
   ready_to_ship: "data-[state=active]:bg-sky-500/10 dark:data-[state=active]:bg-sky-500/20 data-[state=active]:text-sky-600 data-[state=active]:shadow-none",
   shipped: "data-[state=active]:bg-indigo-500/10 dark:data-[state=active]:bg-indigo-500/20 data-[state=active]:text-indigo-600 data-[state=active]:shadow-none",
@@ -120,6 +124,7 @@ export const STATUS_TAB: Record<string, string> = {
 /** The dot beside a status in the pipeline row. */
 export const STATUS_DOT: Record<string, string> = {
   pending_payment: "bg-yellow-500",
+  payment_verification: "bg-amber-500",
   processing: "bg-purple-500",
   ready_to_ship: "bg-sky-500",
   shipped: "bg-indigo-500",

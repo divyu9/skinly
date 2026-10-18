@@ -334,7 +334,12 @@ export const submitUpiPayment = onCall(async (data: any) => {
       } else lost++;
     });
   }
-  await ref.update({ upiUtr: utr, upiSubmittedAt: Date.now(), updatedAt: Date.now(), ...(lost ? { upiLostPieces: lost } : {}) });
+  await ref.update({
+    upiUtr: utr, upiSubmittedAt: Date.now(), updatedAt: Date.now(),
+    // The admin's queue: nothing goes to the customer until they confirm (confirmUpiPayment).
+    status: "payment_verification", statusChangedAt: Date.now(),
+    ...(lost ? { upiLostPieces: lost } : {}),
+  });
   return { ok: true, lost };
 });
 

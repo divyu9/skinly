@@ -21,6 +21,8 @@ import { orderLinkFor, queueWhatsApp, sendUsecaseEmail, trackingLinkFor } from "
 
 export const ORDER_STATUSES = [
   "pending_payment",
+  // A direct-UPI clearance order whose UTR is in, waiting for the admin to check the bank (clearance.ts).
+  "payment_verification",
   "processing",
   "ready_to_ship",
   "shipped",
@@ -102,7 +104,8 @@ export function normalizeOrderStatus(
  * for in the first place.
  */
 const TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
-  pending_payment: ["processing", "cancelled"],
+  pending_payment: ["processing", "cancelled", "payment_verification"],
+  payment_verification: ["processing", "cancelled"],
   processing: ["ready_to_ship", "shipped", "out_for_delivery", "delivered", "cancelled"],
   ready_to_ship: ["shipped", "out_for_delivery", "delivered", "processing", "cancelled"],
   shipped: ["out_for_delivery", "undelivered", "delivered", "rto", "cancelled"],
