@@ -68,16 +68,31 @@ export default function ClearancePage() {
     return [...m.entries()].sort((a, b) => b[1] - a[1]).map(([b]) => b);
   }, [items]);
 
+  // Alike pieces (same listing, variant, device, coverage, lens and price) are
+  // one card with a count: ten pairs of the same glasses showed as ten cards.
+  const groups = useMemo(() => {
+    const m = new Map<string, Piece[]>();
+    for (const p of items || []) {
+      const k = [p.productId, p.variant, p.phoneBrand, p.phoneModel, p.coverage || "", p.lensModel || "", p.price].join("|");
+      m.set(k, [...(m.get(k) || []), p]);
+    }
+    return [...m.values()].map((ps) => ({ ...ps[0], pieces: ps }));
+  }, [items]);
+
   const shown = useMemo(() => {
-    let list = (items || []).filter((p) => brand === "all" || p.phoneBrand === brand);
+    let list = groups.filter((p) => brand === "all" || p.phoneBrand === brand);
     if (q.trim()) list = searchRows(list, q, (p) => device(p), (p) => `${device(p)} ${p.productTitle} ${p.variant}`);
     return list;
-  }, [items, brand, q]);
+  }, [groups, brand, q]);
 
   const inCart = (id: string) => (guestCart || []).some((i: any) => i.clearanceItemId === id);
+  /** A piece of this kind not already in the cart, or null when every one is. */
+  const freePiece = (g: { pieces: Piece[] }) => g.pieces.find((x) => !inCart(x.id)) || null;
 
-  const add = async (p: Piece, buyNow: boolean) => {
-    setBusy(p.id);
+  const add = async (g: Piece & { pieces: Piece[] }, buyNow: boolean) => {
+    const p = freePiece(g);
+    if (!p) { if (buyNow) navigate("/checkout"); else toast.info("All of these are already in your cart"); return; }
+    setBusy(g.id);
     const line: any = {
       productId: p.productId, productTitle: p.productTitle, productImage: p.productImage || "",
       variant: p.variant, price: p.price, quantity: 1,
@@ -158,7 +173,8 @@ export default function ClearancePage() {
         <div className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
           {shown.map((p) => {
             const off = p.originalPrice > p.price ? Math.round((1 - p.price / p.originalPrice) * 100) : 0;
-            const added = inCart(p.id);
+            const left = p.pieces.length;
+            const added = !freePiece(p);
             return (
               <div key={p.id} className="tile flex flex-col overflow-hidden rounded-2xl">
                 <button type="button" onClick={() => setView({ p, i: 0 })} className="relative block aspect-square w-full bg-muted" aria-label={`See photos of ${p.productTitle}`}>
@@ -178,7 +194,12 @@ export default function ClearancePage() {
                 <div className="flex flex-1 flex-col gap-1 p-3">
                   <p className="line-clamp-2 text-sm font-bold leading-snug">{p.productTitle}</p>
                   {device(p) && <p className="text-xs font-semibold text-brand">Cut for {device(p)}</p>}
-                  {p.condition && <p className="w-fit rounded-full bg-sunny px-2 py-0.5 text-[11px] font-bold text-ink">{p.condition}</p>}
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {p.condition && <span className="rounded-full bg-sunny px-2 py-0.5 text-[11px] font-bold text-ink">{p.condition}</span>}
+                    <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-bold", left <= 1 ? "bg-heart/15 text-heart" : "bg-muted text-foreground")}>
+                      {left <= 1 ? "Only 1 left" : `${left} left`}
+                    </span>
+                  </div>
                   {p.description && <p className="whitespace-pre-line text-[11px] leading-snug text-muted-foreground">{p.description}</p>}
                   <p className="text-[11px] text-muted-foreground">
                     {[p.variant && !/^default/i.test(p.variant) ? p.variant : "", coverageLabel(p.coverage), p.lensModel ? `Lens: ${p.lensModel}` : ""].filter(Boolean).join(" · ")}
