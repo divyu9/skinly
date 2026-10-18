@@ -26,7 +26,8 @@ export const RESERVE_MS = 30 * 60_000;
 
 /** On sale now: available, or held by an order that never paid. */
 export const isBuyable = (c: any, now = Date.now()) =>
-  c?.status === "available" || (c?.status === "reserved" && Number(c?.reservedAt || 0) < now - RESERVE_MS);
+  Number(c?.price) > 0 &&
+  (c?.status === "available" || (c?.status === "reserved" && Number(c?.reservedAt || 0) < now - RESERVE_MS));
 
 /** The admin puts an RTO order's pieces on the clearance page. */
 export const addRtoToClearance = onCall(async (data: any, context: any) => {
@@ -157,9 +158,18 @@ export const updateClearanceItem = onCall(async (data: any, context: any) => {
   const c = (await ref.get()).data() as any;
   if (!c) throw new HttpsError("not-found", "No such piece");
   if (c.status === "sold") throw new HttpsError("failed-precondition", "That piece is already sold");
-  await ref.update({ price, updatedAt: Date.now() });
+  // A piece added without a price waits as a draft; its first price puts it on sale.
+  await ref.update({ price, updatedAt: Date.now(), ...(c.status === "draft" ? { status: "available", publishedAt: Date.now() } : {}) });
   return { ok: true };
 });
+
+/*
+ * Pieces may also carry, for gadgets put up from photos:
+ *   images[]     every photo (the card shows the first, the viewer all)
+ *   condition    e.g. "Open box · Unused"
+ *   description  the terms shown on the card (no bill or warranty, final sale…)
+ *   status "draft" with price 0: not shown until the admin sets a price.
+ */
 
 /** Take a piece off the clearance page (sold elsewhere, damaged…). */
 export const removeClearanceItem = onCall(async (data: any, context: any) => {
@@ -180,7 +190,7 @@ export const listClearance = onCall(async (data: any, context: any) => {
   const forAdmin = data?.admin === true && !!context?.auth;
   if (forAdmin) await requireAdmin(context);
   // The admin page sees sold pieces too (what sold, to whom); the shop only what is on sale.
-  const snap = await db.collection("clearanceItems").where("status", "in", forAdmin ? ["available", "reserved", "sold"] : ["available", "reserved"]).get();
+  const snap = await db.collection("clearanceItems").where("status", "in", forAdmin ? ["draft", "available", "reserved", "sold"] : ["available", "reserved"]).get();
   const now = Date.now();
   const items = snap.docs
     .map((d) => ({ id: d.id, ...(d.data() as any) }))
@@ -188,7 +198,9 @@ export const listClearance = onCall(async (data: any, context: any) => {
     .sort((a, b) => Number(b.createdAt) - Number(a.createdAt))
     .map((c) => ({
       id: c.id, productId: c.productId, productTitle: c.productTitle, productSlug: c.productSlug,
-      productImage: c.productImage, variant: c.variant, phoneBrand: c.phoneBrand, phoneModel: c.phoneModel,
+      productImage: c.productImage, images: Array.isArray(c.images) ? c.images : (c.productImage ? [c.productImage] : []),
+      condition: c.condition || "", description: c.description || "",
+      variant: c.variant, phoneBrand: c.phoneBrand, phoneModel: c.phoneModel,
       coverage: c.coverage || null, lensModel: c.lensModel || null, price: c.price, originalPrice: c.originalPrice,
       createdAt: c.createdAt,
       ...(forAdmin ? {

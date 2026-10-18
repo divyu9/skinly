@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
 import { toast } from "sonner";
-import { SearchIcon, ShoppingCartIcon, TagIcon, ZapIcon } from "lucide-react";
+import { ChevronLeftIcon, ChevronRightIcon, ImagesIcon, MessageCircleIcon, SearchIcon, ShoppingCartIcon, TagIcon, XIcon, ZapIcon } from "lucide-react";
 import { useMutation } from "@/lib/firebase-hooks";
 import { api } from "@/lib/firebase-api";
 import { useAuth } from "@/hooks/use-auth";
@@ -19,6 +19,7 @@ type Piece = {
   id: string; productId: string; productTitle: string; productSlug?: string; productImage?: string;
   variant: string; phoneBrand: string; phoneModel: string; coverage?: string | null; lensModel?: string | null;
   price: number; originalPrice: number; createdAt: number;
+  images?: string[]; condition?: string; description?: string;
 };
 
 const coverageLabel = (c?: string | null) => (c === "only_back" ? "Back only" : c === "full_body_wrap" ? "Full body wrap" : "");
@@ -41,6 +42,8 @@ export default function ClearancePage() {
   const [brand, setBrand] = useState("all");
   const [q, setQ] = useState("");
   const [busy, setBusy] = useState("");
+  // The photo viewer: which piece, which photo.
+  const [view, setView] = useState<{ p: Piece; i: number } | null>(null);
   const { user } = useAuth();
   const { guestCart, addToGuestCart } = useGuestCart();
   const addToCartMutation = useMutation(api.cart.addToCart);
@@ -158,7 +161,12 @@ export default function ClearancePage() {
             const added = inCart(p.id);
             return (
               <div key={p.id} className="tile flex flex-col overflow-hidden rounded-2xl">
-                <div className="relative aspect-square bg-muted">
+                <button type="button" onClick={() => setView({ p, i: 0 })} className="relative block aspect-square w-full bg-muted" aria-label={`See photos of ${p.productTitle}`}>
+                  {(p.images?.length || 0) > 1 && (
+                    <span className="absolute bottom-2 right-2 flex items-center gap-1 rounded-full bg-black/70 px-2 py-0.5 text-[11px] font-bold text-white">
+                      <ImagesIcon className="size-3" /> {p.images!.length}
+                    </span>
+                  )}
                   {p.productImage && (
                     <img src={sizedImage(p.productImage, 480)} alt={device(p) ? `${p.productTitle} for ${device(p)}` : p.productTitle} loading="lazy"
                       className="size-full object-cover" />
@@ -166,10 +174,12 @@ export default function ClearancePage() {
                   {off > 0 && (
                     <span className="absolute left-2 top-2 rounded-full border-2 border-ink bg-heart px-2 py-0.5 text-xs font-extrabold text-white">{off}% off</span>
                   )}
-                </div>
+                </button>
                 <div className="flex flex-1 flex-col gap-1 p-3">
                   <p className="line-clamp-2 text-sm font-bold leading-snug">{p.productTitle}</p>
                   {device(p) && <p className="text-xs font-semibold text-brand">Cut for {device(p)}</p>}
+                  {p.condition && <p className="w-fit rounded-full bg-sunny px-2 py-0.5 text-[11px] font-bold text-ink">{p.condition}</p>}
+                  {p.description && <p className="whitespace-pre-line text-[11px] leading-snug text-muted-foreground">{p.description}</p>}
                   <p className="text-[11px] text-muted-foreground">
                     {[p.variant && !/^default/i.test(p.variant) ? p.variant : "", coverageLabel(p.coverage), p.lensModel ? `Lens: ${p.lensModel}` : ""].filter(Boolean).join(" · ")}
                   </p>
@@ -193,9 +203,44 @@ export default function ClearancePage() {
           })}
         </div>
 
-        <p className="mx-auto mt-10 max-w-2xl text-center text-xs text-muted-foreground">
+        {view && (() => {
+          const imgs = view.p.images?.length ? view.p.images : view.p.productImage ? [view.p.productImage] : [];
+          const go = (d: number) => setView({ p: view.p, i: (view.i + d + imgs.length) % imgs.length });
+          return (
+            <div className="fixed inset-0 z-[60] flex flex-col bg-black/90 p-4" role="dialog" aria-modal="true" onClick={() => setView(null)}>
+              <div className="flex items-center justify-between text-white">
+                <p className="truncate text-sm font-semibold">{view.p.productTitle} · {view.i + 1}/{imgs.length}</p>
+                <button type="button" aria-label="Close" className="grid size-10 place-items-center"><XIcon className="size-6" /></button>
+              </div>
+              <div className="relative flex flex-1 items-center justify-center" onClick={(e) => e.stopPropagation()}>
+                {imgs[view.i] && <img src={sizedImage(imgs[view.i], 1200)} alt={`${view.p.productTitle} photo ${view.i + 1}`} className="max-h-full max-w-full object-contain" />}
+                {imgs.length > 1 && (
+                  <>
+                    <button type="button" onClick={() => go(-1)} className="absolute left-0 grid size-11 place-items-center rounded-full bg-white/15 text-white" aria-label="Previous photo"><ChevronLeftIcon className="size-6" /></button>
+                    <button type="button" onClick={() => go(1)} className="absolute right-0 grid size-11 place-items-center rounded-full bg-white/15 text-white" aria-label="Next photo"><ChevronRightIcon className="size-6" /></button>
+                  </>
+                )}
+              </div>
+            </div>
+          );
+        })()}
+
+        <div className="mx-auto mt-10 max-w-2xl space-y-2 rounded-2xl border-2 border-ink/15 bg-card p-4 text-sm">
+          <p className="font-bold">Before you buy</p>
+          <ul className="list-disc space-y-1 pl-5 text-muted-foreground">
+            <li>Gadgets here are <b className="text-foreground">open box and unused</b> — bought by us or sent by brands for our review videos.</li>
+            <li><b className="text-foreground">No bill or warranty</b> comes with these products.</li>
+            <li>Want to see it first? Ask for more photos, details or a video on <a href="https://wa.me/919761011121" className="font-semibold text-primary underline">WhatsApp support</a> before we dispatch.</li>
+            <li>Clearance items are <b className="text-foreground">non-returnable and non-refundable</b>.</li>
+          </ul>
+          <a href="https://wa.me/919761011121?text=Hi%2C%20I%20have%20a%20question%20about%20a%20clearance%20product" className="inline-flex items-center gap-1.5 text-xs font-bold text-primary">
+            <MessageCircleIcon className="size-4" /> Ask on WhatsApp
+          </a>
+        </div>
+
+        <p className="mx-auto mt-6 max-w-2xl text-center text-xs text-muted-foreground">
           Each piece is printed and cut for the device shown and fits only that model. One of each; as soon as someone buys it, it's gone.
-          Clearance pieces are final sale except for damage in transit.
+          Clearance items are final sale: non-returnable and non-refundable.
         </p>
       </main>
       <SiteFooter />

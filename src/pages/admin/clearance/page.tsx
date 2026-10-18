@@ -248,7 +248,8 @@ function AdminClearanceInner() {
 
   const live = (pieces || []).filter((p) => p.status !== "sold");
   const onSale = live.filter((p) => p.buyable).length;
-  const held = live.filter((p) => !p.buyable).length;
+  const held = live.filter((p) => p.status === "reserved" && !p.buyable).length;
+  const drafts = live.filter((p) => p.status === "draft").length;
   const sold = (pieces || []).filter((p) => p.status === "sold");
 
   const setGroupPrice = async (g: { key: string; pieces: Piece[] }) => {
@@ -279,7 +280,7 @@ function AdminClearanceInner() {
   };
 
   const removeOne = async (g: { key: string; pieces: Piece[] }) => {
-    const p = g.pieces.find((x) => x.status === "available");
+    const p = g.pieces.find((x) => x.status === "available" || x.status === "draft");
     if (!p) { toast.error("No free piece to remove (the rest are held by an order)"); return; }
     setBusy(g.key);
     try { await call("removeClearanceItem", { id: p.id }); toast.success("One piece removed"); await load(); }
@@ -300,7 +301,7 @@ function AdminClearanceInner() {
 
       <div className="grid gap-3 sm:grid-cols-3">
         <div className="rounded-lg border p-3"><p className="text-xs text-muted-foreground">On sale</p><p className="text-2xl font-bold">{pieces ? onSale : "…"}</p></div>
-        <div className="rounded-lg border p-3"><p className="text-xs text-muted-foreground">Held by an unpaid order</p><p className="text-2xl font-bold">{pieces ? held : "…"}</p></div>
+        <div className="rounded-lg border p-3"><p className="text-xs text-muted-foreground">Held by an unpaid order · waiting for a price</p><p className="text-2xl font-bold">{pieces ? held : "…"} <span className="text-sm font-medium text-amber-700">· {pieces ? drafts : "…"} need a price</span></p></div>
         <div className="rounded-lg border p-3"><p className="text-xs text-muted-foreground">Sold</p><p className="text-2xl font-bold">{pieces ? sold.length : "…"} <span className="text-sm font-medium text-muted-foreground">· ₹{sold.reduce((s, p) => s + (Number(p.price) || 0), 0).toLocaleString("en-IN")}</span></p></div>
       </div>
 
@@ -324,7 +325,7 @@ function AdminClearanceInner() {
             <ul className="divide-y">
               {groups.map((g) => {
                 const f = g.first;
-                const free = g.pieces.filter((p) => p.status === "available" || p.buyable).length;
+                const free = g.pieces.filter((p) => p.buyable).length;
                 return (
                   <li key={g.key} className="flex flex-wrap items-center gap-3 py-3 text-sm">
                     <div className="size-14 shrink-0 overflow-hidden rounded-md bg-muted">
@@ -342,7 +343,11 @@ function AdminClearanceInner() {
                       </p>
                     </div>
                     <div className="text-right">
-                      <p className="font-bold">₹{f.price}{f.originalPrice > f.price && <span className="ml-1 text-xs font-normal text-muted-foreground line-through">₹{f.originalPrice}</span>}</p>
+                      {f.status === "draft" || !(f.price > 0) ? (
+                        <p className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-800">Needs price — not live{f.originalPrice ? ` · MRP ₹${f.originalPrice}` : ""}</p>
+                      ) : (
+                        <p className="font-bold">₹{f.price}{f.originalPrice > f.price && <span className="ml-1 text-xs font-normal text-muted-foreground line-through">₹{f.originalPrice}</span>}</p>
+                      )}
                       <p className="text-xs text-muted-foreground">{view === "sold" ? `${g.pieces.length} sold` : `${free} on sale${g.pieces.length - free ? ` · ${g.pieces.length - free} held` : ""}`}</p>
                     </div>
                     {view === "live" && (
@@ -356,7 +361,7 @@ function AdminClearanceInner() {
                           <Button type="button" size="sm" variant="outline" disabled={busy === g.key} onClick={() => addMore(g, 1)} aria-label="Add one piece"><PlusIcon className="size-4" /></Button>
                         </div>
                         <Button type="button" size="sm" variant="ghost" className="text-red-600" disabled={busy === g.key}
-                          onClick={async () => { for (const p of g.pieces.filter((x) => x.status === "available")) { await call("removeClearanceItem", { id: p.id }).catch(() => {}); } toast.success("Removed from clearance"); void load(); }}>
+                          onClick={async () => { for (const p of g.pieces.filter((x) => x.status === "available" || x.status === "draft")) { await call("removeClearanceItem", { id: p.id }).catch(() => {}); } toast.success("Removed from clearance"); void load(); }}>
                           <TrashIcon className="size-4" />
                         </Button>
                       </div>
