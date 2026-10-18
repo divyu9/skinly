@@ -442,6 +442,11 @@ function CheckoutPageInner() {
       return; 
     }
     if (!cartItems?.length) { setCouponMessage({ type: "error", text: "Your cart is empty" }); return; }
+    // Clearance prices are final: no coupon on a cart holding a clearance piece (placeOrder refuses it too).
+    if (cartItems.some((i: any) => i.clearanceItemId)) {
+      setCouponMessage({ type: "error", text: "Coupons don't apply to clearance items — they're already at the lowest price." });
+      return;
+    }
 
     setIsApplyingCoupon(true);
     try {

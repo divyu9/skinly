@@ -251,6 +251,10 @@ export const placeOrder = functions
       if (!st.enabled) throw new HttpsError("failed-precondition", "UPI payment is not available right now");
       upiDirect = { vpa: st.vpa, payeeName: st.payeeName };
     }
+    // Clearance prices are final: no coupon with a clearance piece in the order.
+    if (couponId && orderItems.some((it) => it?.clearanceItemId)) {
+      throw new HttpsError("failed-precondition", "Coupons don't apply to clearance items — remove the coupon to continue");
+    }
     if (orderItems.some((it) => it?.clearanceItemId)) {
       orderItems = orderItems.map((it) => (it?.clearanceItemId ? { ...it, quantity: 1 } : it));
       const { reserveClearance, UPI_HOLD_MS, RESERVE_MS } = await import("./clearance");
