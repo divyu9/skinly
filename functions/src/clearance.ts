@@ -204,6 +204,8 @@ export const listClearance = onCall(async (data: any, context: any) => {
       id: c.id, productId: c.productId, productTitle: c.productTitle, productSlug: c.productSlug,
       productImage: c.productImage, images: Array.isArray(c.images) ? c.images : (c.productImage ? [c.productImage] : []),
       condition: c.condition || "", description: c.description || "",
+      // The owner's own stock (gadgets): paid by direct UPI, no invoice. Skins are the shop's and go through checkout.
+      personal: c.personal === true,
       // Amazon.in search for the same model with the owner's associate tag: "compare the price".
       amazonUrl: /^https:\/\/www\.amazon\.in\//.test(String(c.amazonUrl || "")) ? c.amazonUrl : "",
       variant: c.variant, phoneBrand: c.phoneBrand, phoneModel: c.phoneModel,

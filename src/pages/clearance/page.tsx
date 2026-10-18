@@ -19,7 +19,7 @@ type Piece = {
   id: string; productId: string; productTitle: string; productSlug?: string; productImage?: string;
   variant: string; phoneBrand: string; phoneModel: string; coverage?: string | null; lensModel?: string | null;
   price: number; originalPrice: number; createdAt: number;
-  images?: string[]; condition?: string; description?: string; amazonUrl?: string;
+  images?: string[]; condition?: string; description?: string; amazonUrl?: string; personal?: boolean;
 };
 
 const coverageLabel = (c?: string | null) => (c === "only_back" ? "Back only" : c === "full_body_wrap" ? "Full body wrap" : "");
@@ -100,6 +100,7 @@ export default function ClearancePage() {
       ...(p.coverage ? { coverage: p.coverage } : {}),
       ...(p.lensModel ? { lensModel: p.lensModel } : {}),
       clearanceItemId: p.id,
+      ...(p.personal ? { clearancePersonal: true } : {}),
     };
     try {
       if (user) await addToCartMutation(line);

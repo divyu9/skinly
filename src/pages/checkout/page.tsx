@@ -368,7 +368,8 @@ function CheckoutPageInner() {
 
   // A cart of clearance pieces only is paid straight by UPI; a cart mixing them
   // with shop items has to be split (they are separate sales).
-  const clearanceCount = (cartItems || []).filter((i: any) => i.clearanceItemId).length;
+  // Personal-stock pieces (gadgets) are paid by direct UPI; shop clearance pieces (skins) check out as usual.
+  const clearanceCount = (cartItems || []).filter((i: any) => i.clearanceItemId && i.clearancePersonal).length;
   const clearanceOnly = clearanceUpiOn && clearanceCount > 0 && clearanceCount === (cartItems || []).length;
   const clearanceMixed = clearanceUpiOn && clearanceCount > 0 && !clearanceOnly;
   useEffect(() => {
@@ -547,7 +548,7 @@ function CheckoutPageInner() {
       invalid("pincode", "Please enter a valid 6-digit pincode"); return;
     }
     if (clearanceMixed) {
-      invalid("clearance_mixed", "Clearance items are paid separately by UPI. Remove them from this cart and check them out on their own.");
+      invalid("clearance_mixed", "Clearance gadgets are paid separately by UPI. Remove them from this cart and check them out on their own.");
       return;
     }
     // Only while Admin › COD › OTP is on; placeOrder checks the same switch.
@@ -850,7 +851,7 @@ function CheckoutPageInner() {
                 <>
                   {clearanceMixed && (
                     <p className="rounded-xl border-2 border-heart/40 bg-heart/10 p-3 text-sm font-semibold text-heart">
-                      Clearance items are paid separately by UPI. Remove them from this cart and check them out on their own.
+                      Clearance gadgets are paid separately by UPI. Remove them from this cart and check them out on their own.
                     </p>
                   )}
                   <PaymentMethodSelector

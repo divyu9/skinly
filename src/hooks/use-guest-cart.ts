@@ -15,6 +15,8 @@ export interface GuestCartItem {
   lensModel?: string;
   /** A clearance piece (an RTO skin cut for one device): one only, its own price. */
   clearanceItemId?: string;
+  /** The piece is the owner's personal stock: paid by direct UPI (clearance.ts). */
+  clearancePersonal?: boolean;
   /** Added from a checkout upsell: placeOrder prices it by that rule's offer. */
   upsellRuleId?: string;
   /** Where the add-on was offered: product, cart, checkout (dashboard figures). */

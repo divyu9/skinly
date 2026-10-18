@@ -242,6 +242,11 @@ export const placeOrder = functions
         throw new HttpsError("failed-precondition", "Direct UPI is only for clearance items — check them out on their own");
       }
       const { clearanceUpiSettings } = await import("./clearance");
+      // Only the owner's personal stock is sold this way; a shop item (a ready-cut skin) is invoiced as usual.
+      const pieces = await Promise.all(orderItems.map((it) => db.collection("clearanceItems").doc(String(it.clearanceItemId)).get()));
+      if (pieces.some((p) => (p.data() as any)?.personal !== true)) {
+        throw new HttpsError("failed-precondition", "These items are paid at the usual checkout, not by direct UPI");
+      }
       const st = await clearanceUpiSettings(db);
       if (!st.enabled) throw new HttpsError("failed-precondition", "UPI payment is not available right now");
       upiDirect = { vpa: st.vpa, payeeName: st.payeeName };
