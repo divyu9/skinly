@@ -52,7 +52,6 @@ function OrderDetailPageInner() {
   const updateShippingInfo = useMutation(api.admin.orders.updateShippingInfo);
   const sendOrderEmail = useMutation(api.admin.orders.sendOrderStatusEmail);
   const sendOrderWhatsApp = useMutation(api.admin.orders.sendOrderStatusWhatsApp);
-  const updateShippingAddress = useMutation(api.admin.orders.updateOrderShippingAddress);
   const updateOrderItems = useMutation(api.admin.orders.updateOrderItems);
   const createShipment = useAction(api.rapidshyp.createShipment);
   const createOrderOnly = useAction(api.rapidshyp.createRapidshypOrder);
@@ -236,11 +235,12 @@ function OrderDetailPageInner() {
   const handleUpdateShippingAddress = async () => {
     if (!orderId) return;
     try {
-      await updateShippingAddress({ orderId: orderId as Id<"orders">, ...addressForm });
+      const { getFunctions, httpsCallable } = await import("firebase/functions");
+      await httpsCallable(getFunctions(), "updateOrderAddress")({ orderId: String(orderId), ...addressForm });
       toast.success("Shipping address updated");
       setShowEditAddressDialog(false);
-    } catch {
-      toast.error("Failed to update shipping address");
+    } catch (err: any) {
+      toast.error(`Failed to update shipping address${err?.message ? `: ${err.message}` : ""}`);
     }
   };
 

@@ -52,6 +52,39 @@ export const updateOrderCustomer = onCall(async (data: any, context: any) => {
   return { success: true, email: emailResult };
 });
 
+/**
+ * The shipping-address card's Save: the address lines only (name and phone are
+ * the customer card's). The browser wrote the order straight to Firestore,
+ * which the rules allow only to a login with the `admin` claim, so an admin
+ * let in by the email allowlist was refused on every save.
+ */
+export const updateOrderAddress = onCall(async (data: any, context: any) => {
+  const { uid } = await requireAdmin(context);
+  const orderId = String(data?.orderId || "");
+  if (!orderId) throw new HttpsError("invalid-argument", "Missing orderId");
+  const ref = admin.firestore().collection("orders").doc(orderId);
+  const snap = await ref.get();
+  if (!snap.exists) throw new HttpsError("not-found", "Order not found");
+  const clean = (v: unknown, n: number) => String(v ?? "").trim().slice(0, n);
+  const pincode = clean(data?.pincode, 10).replace(/\D/g, "");
+  if (!clean(data?.addressLine1, 200)) throw new HttpsError("invalid-argument", "Address line 1 is empty");
+  if (!/^\d{6}$/.test(pincode)) throw new HttpsError("invalid-argument", "Pincode must be 6 digits");
+  const before = (snap.data() as any).shippingAddress || {};
+  await ref.update({
+    "shippingAddress.addressLine1": clean(data?.addressLine1, 200),
+    "shippingAddress.addressLine2": clean(data?.addressLine2, 200),
+    "shippingAddress.city": clean(data?.city, 80),
+    "shippingAddress.state": clean(data?.state, 80),
+    "shippingAddress.pincode": pincode,
+    addressChanges: admin.firestore.FieldValue.arrayUnion({
+      from: [before.addressLine1, before.addressLine2, before.city, before.state, before.pincode].filter(Boolean).join(", "),
+      at: Date.now(), by: uid,
+    }),
+    updatedAt: Date.now(),
+  });
+  return { success: true };
+});
+
 export const changeOrderEmail = onCall(async (data: any, context: any) => {
   const { uid } = await requireAdmin(context);
   const orderId = String(data?.orderId || "");
