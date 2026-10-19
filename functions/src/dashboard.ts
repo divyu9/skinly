@@ -312,10 +312,11 @@ export async function buildDashboard(db: admin.firestore.Firestore) {
    * first, each linking to where it gets fixed. Empty when all is well.
    */
   const dayAgo = now - DAY;
-  const [waFailed, mailFailed, settingsSnap] = await Promise.all([
+  const [waFailed, mailFailed, settingsSnap, smsWallet] = await Promise.all([
     db.collection("whatsappMessages").where("createdAt", ">=", dayAgo).get(),
     db.collection("emailMessages").where("createdAt", ">=", dayAgo).get(),
     db.collection("settings").doc("dashboard").get(),
+    fast2smsBalance(),
   ]);
   const waFail = waFailed.docs.filter((d) => (d.data() as any).status === "failed" && !(d.data() as any).test).length;
   const mailFail = mailFailed.docs.filter((d) => (d.data() as any).status === "failed").length;
@@ -328,6 +329,20 @@ export async function buildDashboard(db: admin.firestore.Firestore) {
   add(pickupLate.length > 0, "amber", `${pickupLate.length} parcel${pickupLate.length === 1 ? "" : "s"} not picked up 2+ days after booking`, "/backend-skinly/orders?status=ready_to_ship");
   add(slow.length > 0, "amber", `${slow.length} parcel${slow.length === 1 ? "" : "s"} in transit for 6+ days`, "/backend-skinly/orders?status=shipped");
   add(soldOutEverywhere > 0, "amber", `${soldOutEverywhere} design${soldOutEverywhere === 1 ? "" : "s"} out of material`, "/backend-skinly/oos");
+  // Fast2SMS sends every WhatsApp message, the checkout OTP included: at ₹0
+  // nobody can verify their number and no order can be placed. It ran out on
+  // 19 Oct 2026 and the first sign was a customer's screenshot.
+  const smsFloor = Number((settingsSnap.data() as any)?.smsBalanceFloor) || 150;
+  const balanceOutRecently = waFailed.docs.some((d) => {
+    const m = d.data() as any;
+    return m.status === "failed" && /insufficient wallet/i.test(String(m.failureReason || "")) && now - Number(m.createdAt || 0) < 2 * 3600e3;
+  });
+  if (smsWallet !== null) {
+    add(smsWallet < 20, "red", `WhatsApp balance ₹${Math.floor(smsWallet)} — recharge Fast2SMS now: checkout OTP and order messages stop at ₹0`, FAST2SMS_RECHARGE);
+    add(smsWallet >= 20 && smsWallet < smsFloor, "amber", `WhatsApp balance low: ₹${Math.floor(smsWallet)} left on Fast2SMS — recharge soon`, FAST2SMS_RECHARGE);
+  } else {
+    add(balanceOutRecently, "red", "Fast2SMS balance ran out — checkout OTP and WhatsApp messages are failing. Recharge now", FAST2SMS_RECHARGE);
+  }
   add(waFail > 0, "amber", `${waFail} WhatsApp message${waFail === 1 ? "" : "s"} failed today`, "/backend-skinly/whatsapp/messages");
   add(mailFail > 0, "amber", `${mailFail} email${mailFail === 1 ? "" : "s"} failed today`, "/backend-skinly/emails");
   add(unpaid.length >= 3, "amber", `${unpaid.length} checkouts unpaid in the last 24h (₹${Math.round(unpaid.reduce((s, o) => s + money(o), 0)).toLocaleString("en-IN")})`, "/backend-skinly/orders?status=pending_payment");
@@ -348,6 +363,7 @@ export async function buildDashboard(db: admin.firestore.Firestore) {
   return {
     generatedAt: now,
     alerts,
+    smsBalance: smsWallet === null ? null : { wallet: Math.round(smsWallet * 100) / 100, floor: smsFloor, rechargeUrl: FAST2SMS_RECHARGE },
     dailyTarget,
     shipping30,
     kpis: {
@@ -410,4 +426,22 @@ async function currentImages(db: admin.firestore.Firestore, ids: string[]): Prom
     if (first) out[s.id] = String(first);
   }
   return out;
+}
+
+const FAST2SMS_RECHARGE = "https://www.fast2sms.com/dashboard/wallet";
+
+/** The Fast2SMS wallet in rupees, or null when it can't be read (no key, timeout, bad reply). */
+async function fast2smsBalance(): Promise<number | null> {
+  const key = process.env.FAST2SMS_API_KEY || "";
+  if (!key) return null;
+  try {
+    const res = await fetch("https://www.fast2sms.com/dev/wallet", {
+      method: "POST", headers: { authorization: key }, signal: AbortSignal.timeout(5000),
+    });
+    const j: any = await res.json();
+    const n = Number(j?.wallet);
+    return j?.return === true && Number.isFinite(n) ? n : null;
+  } catch {
+    return null;
+  }
 }

@@ -48,6 +48,8 @@ type Dashboard = {
   topProducts: Array<{ productId: string; title: string; image: string; qty: number; sales: number }>;
   topModels: Array<{ model: string; qty: number }>;
   alerts?: Array<{ level: "red" | "amber"; text: string; href: string }>;
+  /** The Fast2SMS wallet (pays for every WhatsApp message and the checkout OTP); null when it couldn't be read. */
+  smsBalance?: { wallet: number; floor: number; rechargeUrl: string } | null;
   dailyTarget?: number;
   cartsToday?: { started: number; value: number; reachedCheckout: number; withContact: number; ordered: number; topProducts: Array<{ title: string; qty: number }> };
   shipping30?: { parcels: number; of: number; spend: number; avg: number; pctOfSales: number; afterShipping: number };
@@ -173,13 +175,20 @@ function AlertStrip({ alerts }: { alerts: NonNullable<Dashboard["alerts"]> }) {
   if (!alerts.length) return null;
   return (
     <div className="flex flex-wrap gap-2">
-      {alerts.map((a) => (
-        <Link key={a.text} to={a.href}
-          className={cn("inline-flex items-center gap-1.5 rounded-full border-2 px-3 py-1 text-xs font-bold hover:shadow-[2px_2px_0_0_var(--ink)]",
-            a.level === "red" ? "border-heart bg-heart/10 text-heart" : "border-amber-500 bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-200")}>
-          <AlertTriangleIcon className="size-3.5" /> {a.text}
-        </Link>
-      ))}
+      {alerts.map((a) => {
+        const cls = cn("inline-flex items-center gap-1.5 rounded-full border-2 px-3 py-1 text-xs font-bold hover:shadow-[2px_2px_0_0_var(--ink)]",
+          a.level === "red" ? "border-heart bg-heart/10 text-heart" : "border-amber-500 bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-200");
+        // An outside page (the Fast2SMS recharge) opens in a new tab.
+        return /^https?:\/\//.test(a.href) ? (
+          <a key={a.text} href={a.href} target="_blank" rel="noopener noreferrer" className={cls}>
+            <AlertTriangleIcon className="size-3.5" /> {a.text}
+          </a>
+        ) : (
+          <Link key={a.text} to={a.href} className={cls}>
+            <AlertTriangleIcon className="size-3.5" /> {a.text}
+          </Link>
+        );
+      })}
     </div>
   );
 }
@@ -389,6 +398,20 @@ function DashboardInner() {
       )}
 
       <AlertStrip alerts={data.alerts || []} />
+      {data.smsBalance && (() => {
+        const b = data.smsBalance;
+        const tone = b.wallet < 20 ? "text-heart" : b.wallet < b.floor ? "text-amber-700 dark:text-amber-300" : "text-emerald-700 dark:text-emerald-300";
+        return (
+          <div className="tile flex flex-wrap items-center gap-x-4 gap-y-1 rounded-2xl px-5 py-3 text-sm">
+            <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-muted-foreground">WhatsApp balance · Fast2SMS</span>
+            <b className={cn("tabular-nums", tone)}>₹{b.wallet.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</b>
+            <span className="text-xs text-muted-foreground">
+              {b.wallet < 20 ? "Almost empty — checkout OTP and order messages stop at ₹0" : b.wallet < b.floor ? `Below ₹${b.floor} — recharge soon` : "Pays for every WhatsApp message and the checkout OTP"}
+            </span>
+            <a href={b.rechargeUrl} target="_blank" rel="noopener noreferrer" className="ml-auto text-xs font-bold underline underline-offset-2">Recharge ↗</a>
+          </div>
+        );
+      })()}
       <TargetBar today={k.today.sales} target={targetOverride ?? data.dailyTarget ?? 0} onSaved={setTargetOverride} />
       {data.shipping30 && data.shipping30.parcels > 0 && (
         <div className="tile flex flex-wrap items-center gap-x-4 gap-y-1 rounded-2xl px-5 py-3 text-sm">
