@@ -236,6 +236,11 @@ export const placeOrder = functions
     // Clearance pieces (clearance.ts): one each, priced by the piece, held for
     // this order before anything is charged; a piece already gone stops here.
     // Direct UPI (clearance.ts): only for a cart of clearance pieces only, and only when switched on.
+    if (orderItems.some((it) => it?.clearanceItemId)) {
+      // A cart names one exact piece; if that one has gone, take another of the same kind.
+      const { swapTakenPieces } = await import("./clearance");
+      orderItems = await swapTakenPieces(db, orderId, orderItems);
+    }
     let upiDirect: { vpa: string; payeeName: string } | null = null;
     if (paymentMethod === "upi_direct") {
       if (!orderItems.length || orderItems.some((it) => !it?.clearanceItemId)) {

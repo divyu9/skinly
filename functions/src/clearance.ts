@@ -296,6 +296,42 @@ export const listClearance = onCall(async (data: any, context: any) => {
  * placeOrder: the price of each clearance line, after holding its piece for
  * this order. Throws when a piece is gone, before anything is charged.
  */
+/**
+ * A cart line names one exact piece, picked when it was added. Alike pieces
+ * are one card (Magneto X had 40), so when that piece has since sold or is
+ * held by someone else's checkout, the shopper was told it "was just bought
+ * by someone else" with 39 more on the shelf. Swap in a free piece of the
+ * same kind (listing, variant, device, price) instead; only when none is left
+ * does reserveClearance refuse. Two lines never get the same piece.
+ */
+export async function swapTakenPieces(db: admin.firestore.Firestore, orderId: string, orderItems: any[]): Promise<any[]> {
+  const used = new Set<string>();
+  const out: any[] = [];
+  const now = Date.now();
+  for (const it of orderItems) {
+    if (!it?.clearanceItemId) { out.push(it); continue; }
+    const id = String(it.clearanceItemId);
+    const c = (await db.collection("clearanceItems").doc(id).get()).data() as any;
+    const mine = c?.status === "reserved" && c?.reservedOrderId === orderId;
+    if (c && !used.has(id) && (mine || isBuyable(c, now))) { used.add(id); out.push(it); continue; }
+    const pid = String(c?.productId || it.productId || "");
+    const same = (x: any) => String(x.variant || "") === String(c?.variant ?? it.variant ?? "")
+      && String(x.phoneModel || "") === String(c?.phoneModel ?? it.phoneModel ?? "")
+      && Number(x.price) === Number(c?.price ?? x.price);
+    const sib = pid ? (await db.collection("clearanceItems").where("productId", "==", pid).get()).docs
+      .find((d) => !used.has(d.id) && same(d.data()) && isBuyable(d.data(), now)) : undefined;
+    if (sib) {
+      console.log("clearance piece swapped", { orderId, from: id, to: sib.id });
+      used.add(sib.id);
+      out.push({ ...it, clearanceItemId: sib.id });
+    } else {
+      used.add(id);
+      out.push(it);
+    }
+  }
+  return out;
+}
+
 export async function reserveClearance(
   db: admin.firestore.Firestore,
   orderId: string,
