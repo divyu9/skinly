@@ -49,7 +49,7 @@ const needsAction = (e: Event) =>
   (e.kind === "order" && ["processing", "confirmed", "pending"].includes(String(e.status)));
 
 /**
- * The last 20 things that happened in the shop, newest first (functions:
+ * The latest things that happened in the shop (20, or up to 200 with Show more), newest first (functions:
  * adminActivity): orders, failed deliveries, model requests, reviews, stock
  * alerts, checkouts left. Each row opens the page to act on it; a pending
  * review can be approved or rejected right here. Refreshes every minute.
@@ -61,11 +61,13 @@ export function ActivityLog() {
   const [onlyAction, setOnlyAction] = useState(false);
   const [busy, setBusy] = useState("");
   const [, tick] = useState(0);
+  // How far back: 20, then "Show more" goes to 50, 100 and 200.
+  const [limit, setLimit] = useState(20);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res: any = await httpsCallable(getFunctions(), "adminActivity")({ limit: 20 });
+      const res: any = await httpsCallable(getFunctions(), "adminActivity")({ limit });
       setEvents(res.data?.events || []);
       setError("");
     } catch (e: any) {
@@ -73,16 +75,17 @@ export function ActivityLog() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [limit]);
 
   useEffect(() => {
     void load();
-    const t = setInterval(() => { void load(); }, 60_000);
+    // Every minute only for the short list: a 200-event read each minute would cost ~1,450 reads a go.
+    const t = limit <= 20 ? setInterval(() => { void load(); }, 60_000) : undefined;
     const relabel = setInterval(() => tick((n) => n + 1), 30_000);
     const onFocus = () => { void load(); };
     window.addEventListener("focus", onFocus);
-    return () => { clearInterval(t); clearInterval(relabel); window.removeEventListener("focus", onFocus); };
-  }, [load]);
+    return () => { if (t) clearInterval(t); clearInterval(relabel); window.removeEventListener("focus", onFocus); };
+  }, [load, limit]);
 
   const moderate = async (e: Event, action: "approve" | "reject") => {
     if (!e.reviewId) return;
@@ -107,7 +110,7 @@ export function ActivityLog() {
         <h2 className="flex items-center gap-2 text-sm font-bold tracking-tight">
           <ActivityIcon className="size-4 text-brand" />
           Activity
-          <span className="text-xs font-medium text-muted-foreground">last 20 events</span>
+          <span className="text-xs font-medium text-muted-foreground">last {limit} events</span>
         </h2>
         <div className="flex items-center gap-2">
           <div className="flex rounded-lg border-2 border-ink/10 p-0.5 text-xs font-semibold">
@@ -172,6 +175,21 @@ export function ActivityLog() {
               );
             })}
           </ul>
+        )}
+        {events !== null && (
+          <div className="flex justify-center gap-2 px-3 pb-1 pt-2">
+            {limit < 200 && events.length >= limit && (
+              <button type="button" disabled={loading} onClick={() => setLimit((n) => (n < 50 ? 50 : n < 100 ? 100 : 200))}
+                className="rounded-lg border-2 border-ink/15 px-3 py-1.5 text-xs font-bold hover:border-ink/40 disabled:opacity-50">
+                {loading ? "Loading…" : `Show older events (${limit < 50 ? 50 : limit < 100 ? 100 : 200})`}
+              </button>
+            )}
+            {limit > 20 && (
+              <button type="button" onClick={() => setLimit(20)} className="rounded-lg px-3 py-1.5 text-xs font-semibold text-muted-foreground hover:text-ink">
+                Show fewer
+              </button>
+            )}
+          </div>
         )}
       </div>
     </section>

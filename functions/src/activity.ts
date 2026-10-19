@@ -47,13 +47,15 @@ async function newest(db: admin.firestore.Firestore, col: string, field: string,
 }
 
 export async function adminActivityEvents(db: admin.firestore.Firestore, limit = 20): Promise<Event[]> {
+  // Each source reads in proportion to how far back the log is asked to go ("Show more").
+  const x = Math.max(1, Math.ceil(limit / 20));
   const [orders, changed, models, reviews, stock, carts] = await Promise.all([
-    newest(db, "orders", "createdAt", 40),
-    newest(db, "orders", "statusChangedAt", 30),
-    newest(db, "modelRequests", "requestedAt", 20),
-    newest(db, "reviews", "createdAt", 20),
-    newest(db, "stockNotifications", "subscribedAt", 15),
-    newest(db, "cartSnapshots", "updatedAt", 40),
+    newest(db, "orders", "createdAt", 40 * x),
+    newest(db, "orders", "statusChangedAt", 30 * x),
+    newest(db, "modelRequests", "requestedAt", 20 * x),
+    newest(db, "reviews", "createdAt", 20 * x),
+    newest(db, "stockNotifications", "subscribedAt", 15 * x),
+    newest(db, "cartSnapshots", "updatedAt", 40 * x),
   ]);
   const out: Event[] = [];
   // When each phone last ordered, so a checkout that did end in an order
@@ -156,6 +158,6 @@ export const adminActivity = functionsV1
   .https.onCall(async (data, context) => {
     const { requireAdmin } = await import("./auth");
     await requireAdmin(context);
-    const limit = Math.max(5, Math.min(50, Number(data?.limit) || 20));
+    const limit = Math.max(5, Math.min(200, Number(data?.limit) || 20));
     return { events: await adminActivityEvents(admin.firestore(), limit), at: Date.now() };
   });
