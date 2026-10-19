@@ -108,7 +108,9 @@ export default function ClearancePage() {
     return [...m.values()]
       .map((ps) => {
         const open = ps.filter((x) => !x.sold);
-        return { ...(open[0] || ps[0]), pieces: open, soldOut: open.length === 0 };
+        // First put up within two days (restocks copy the piece, so the oldest piece dates the kind).
+        const listedAt = Math.min(...ps.map((x) => Number(x.createdAt) || Date.now()));
+        return { ...(open[0] || ps[0]), pieces: open, soldOut: open.length === 0, isNew: open.length > 0 && Date.now() - listedAt < 2 * 86400e3 };
       })
       .sort((a, b) => Number(a.soldOut) - Number(b.soldOut));
   }, [items]);
@@ -249,8 +251,11 @@ export default function ClearancePage() {
                     <img src={sizedImage(p.productImage, 480)} alt={device(p) ? `${p.productTitle} for ${device(p)}` : p.productTitle} loading="lazy"
                       className="size-full object-cover" />
                   )}
-                  {off > 0 && (
-                    <span className="absolute left-2 top-2 rounded-full border-2 border-ink bg-heart px-2 py-0.5 text-xs font-extrabold text-white">{off}% off</span>
+                  {(off > 0 || p.isNew) && (
+                    <span className="absolute left-2 top-2 flex flex-col items-start gap-1">
+                      {p.isNew && <span className="rounded-full border-2 border-ink bg-sunny px-2 py-0.5 text-xs font-extrabold text-ink">Just listed</span>}
+                      {off > 0 && <span className="rounded-full border-2 border-ink bg-heart px-2 py-0.5 text-xs font-extrabold text-white">{off}% off</span>}
+                    </span>
                   )}
                 </button>
                 <div className="flex flex-1 flex-col gap-1 p-3">
