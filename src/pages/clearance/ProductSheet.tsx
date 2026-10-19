@@ -130,7 +130,8 @@ export function ProductSheet({ p, device, coverageLabel, busy, added, soldOut = 
                 <span className="rounded-full bg-ink px-2 py-0.5 text-xs font-bold text-background">Sold out</span>
               ) : (
                 <span className={cn("rounded-full px-2 py-0.5 text-xs font-bold", left <= 1 ? "bg-heart/15 text-heart" : "bg-muted text-foreground")}>
-                  {left <= 1 ? "Only 1 left" : `${left} left`}
+                  {/* The real count when it is low; a deep pile just reads "In stock". */}
+                  {left <= 1 ? "Only 1 left" : left <= 5 ? `${left} left` : "In stock"}
                 </span>
               )}
             </div>
