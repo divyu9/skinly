@@ -123,7 +123,7 @@ export const addClearanceStock = onCall(async (data: any, context: any) => {
     if (!src) throw new HttpsError("not-found", "No such piece");
     const keep = [
       "productId", "productTitle", "productSlug", "productImage", "images", "variant", "sku", "phoneBrand", "phoneModel",
-      "coverage", "lensModel", "price", "originalPrice", "condition", "description", "amazonUrl", "note", "personal", "videoUrl", "pinned",
+      "coverage", "lensModel", "price", "originalPrice", "condition", "description", "amazonUrl", "note", "personal", "videoUrl", "pinned", "pinRank",
     ];
     const copy: Record<string, unknown> = {};
     for (const k of keep) if (src[k] !== undefined) copy[k] = src[k];
@@ -270,8 +270,9 @@ export const listClearance = onCall(async (data: any, context: any) => {
       // Amazon.in search for the same model with the owner's associate tag: "compare the price".
       amazonUrl: /^https:\/\/www\.amazon\.in\//.test(String(c.amazonUrl || "")) ? c.amazonUrl : "",
       videoUrl: VIDEO_URL.test(String(c.videoUrl || "")) ? c.videoUrl : "",
-      // Shown first on the clearance page (the Mystery Box).
-      pinned: c.pinned === true,
+      // Shown first on the clearance page, in pinRank order (1 = Mystery Box, 2 = Magneto X).
+      pinned: c.pinned === true || Number(c.pinRank) > 0,
+      pinRank: Number(c.pinRank) || (c.pinned === true ? 1 : 0),
       variant: c.variant, phoneBrand: c.phoneBrand, phoneModel: c.phoneModel,
       coverage: c.coverage || null, lensModel: c.lensModel || null, price: c.price, originalPrice: c.originalPrice,
       createdAt: c.createdAt,

@@ -20,7 +20,7 @@ type Piece = {
   id: string; productId: string; productTitle: string; productSlug?: string; productImage?: string;
   variant: string; phoneBrand: string; phoneModel: string; coverage?: string | null; lensModel?: string | null;
   price: number; originalPrice: number; createdAt: number;
-  images?: string[]; condition?: string; description?: string; amazonUrl?: string; personal?: boolean; sold?: boolean; videoUrl?: string; pinned?: boolean;
+  images?: string[]; condition?: string; description?: string; amazonUrl?: string; personal?: boolean; sold?: boolean; videoUrl?: string; pinned?: boolean; pinRank?: number;
 };
 
 /**
@@ -110,11 +110,15 @@ export default function ClearancePage() {
         const open = ps.filter((x) => !x.sold);
         // First put up within two days (restocks copy the piece, so the oldest piece dates the kind).
         const listedAt = Math.min(...ps.map((x) => Number(x.createdAt) || Date.now()));
-        return { ...(open[0] || ps[0]), pieces: open, soldOut: open.length === 0, listedAt, pinned: ps.some((x) => x.pinned), isNew: open.length > 0 && Date.now() - listedAt < 2 * 86400e3 };
+        return { ...(open[0] || ps[0]), pieces: open, soldOut: open.length === 0, listedAt, pinned: ps.some((x) => x.pinned),
+          pinRank: Math.min(...ps.map((x) => Number(x.pinRank) || (x.pinned ? 1 : 999))), isNew: open.length > 0 && Date.now() - listedAt < 2 * 86400e3 };
       })
-      // Pinned first (the Mystery Box), then newest listing first — by when the kind was first
+      // Pinned first, by pinRank (Mystery Box 1, Magneto X 2), then newest listing first — by when the kind was first
       // put up, so a restock doesn't jump the queue — and sold-out cards last.
-      .sort((a, b) => Number(a.soldOut) - Number(b.soldOut) || Number(b.pinned && !b.soldOut) - Number(a.pinned && !a.soldOut) || b.listedAt - a.listedAt)
+      .sort((a, b) => Number(a.soldOut) - Number(b.soldOut)
+        || Number(b.pinned && !b.soldOut) - Number(a.pinned && !a.soldOut)
+        || (a.pinned && b.pinned ? a.pinRank - b.pinRank : 0)
+        || b.listedAt - a.listedAt)
       // "Just listed" on the four newest only: a whole photo batch put up the day before had
       // every card tagged, which says nothing. Not on the pinned card, which is always first.
       .map((g, _i, all) => {
