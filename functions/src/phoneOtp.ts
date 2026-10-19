@@ -86,8 +86,16 @@ async function sendWhatsAppOtp(phone: string, otp: string, tpl: { templateName: 
 export const sendCartSaveOtp = onCall(async (data: any, context: any) => {
   const tpl = await settings();
   const phone = tenDigits(data?.phone);
-  await enforceDailyRateLimit({ key: `cartOtp_${phone}`, limit: 5 });
-  await enforceDailyRateLimit({ key: `cartOtpIp_${callerIp(context)}`, limit: 30 });
+  const keys = [`cartOtp_${phone}`, `cartOtpIp_${callerIp(context)}`];
+  try {
+    await enforceDailyRateLimit({ key: keys[0], limit: 5 });
+    await enforceDailyRateLimit({ key: keys[1], limit: 30 });
+  } catch (e: any) {
+    if (e?.code === "resource-exhausted") {
+      throw new HttpsError("resource-exhausted", "Too many codes asked for this number today. Try again tomorrow, or message us on WhatsApp and we'll help you order.");
+    }
+    throw e;
+  }
 
   const ref = admin.firestore().collection("phoneOtps").doc(phone);
   const prev = (await ref.get()).data() as any;
@@ -96,7 +104,15 @@ export const sendCartSaveOtp = onCall(async (data: any, context: any) => {
   }
   const otp = String(crypto.randomInt(100000, 1000000));
   await ref.set({ hash: hashOtp(otp, phone), sentAt: Date.now(), expiresAt: Date.now() + OTP_TTL_MS, attempts: 0, purpose: "cart_save" });
-  await sendWhatsAppOtp(phone, otp, tpl);
+  try {
+    await sendWhatsAppOtp(phone, otp, tpl);
+  } catch (e) {
+    // A code that never went out doesn't count against the day's five: on
+    // 19 Oct 2026 the Fast2SMS balance ran out, every try failed, and
+    // shoppers were then locked out for the day by "Rate limit exceeded".
+    await refundRateLimit(keys);
+    throw e;
+  }
   return { sent: true };
 });
 
@@ -163,3 +179,13 @@ export const verifyCartSaveOtp = onCall(async (data: any) => {
   const exp = now + TOKEN_TTL_MS;
   return { ok: true, token: `${phone}.${exp}.${sign(`${phone}.${exp}`)}` };
 });
+
+/** Takes back one count from each of today's limiter rows (rate-limit.ts names them `${key}_${YYYY-MM-DD}` in UTC). */
+async function refundRateLimit(keys: string[]) {
+  const day = new Date().toISOString().slice(0, 10);
+  const db = admin.firestore();
+  await Promise.all(keys.map((k) => {
+    const id = `${String(k).replace(/[^A-Za-z0-9@._-]+/g, "_").slice(0, 200)}_${day}`;
+    return db.collection("rateLimits").doc(id).update({ count: admin.firestore.FieldValue.increment(-1) }).catch(() => undefined);
+  }));
+}
