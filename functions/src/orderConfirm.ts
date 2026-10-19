@@ -151,7 +151,19 @@ export const onOrderConfirmed = functionsV1.firestore
       await markClearanceSold(admin.firestore(), context.params.id, after.items).catch((e) =>
         console.error("clearance sold mark failed", context.params.id, e?.message || e));
     }
-    // A manual order sends nothing by itself: the admin sends the WhatsApp
-    // and the email from the order page (sendOrderConfirmation), if they want to.
+    /*
+     * A website order confirmed by hand — a failed or pending payment marked
+     * Paid from the status menu after the money came in directly — never
+     * reached the PhonePe callback or the UPI panel, the only paths that sent
+     * "order received", so the customer heard nothing (CL-1032, CL-1034).
+     * notifyOrderPlaced sends at most once (orderNotifiedAt), so an order that
+     * already had it gets nothing twice. A manual order sends nothing by
+     * itself: the admin sends it from the order page (sendOrderConfirmation).
+     */
+    if (after.source !== "manual" && !after.orderNotifiedAt) {
+      const { notifyOrderPlaced } = await import("./orderNotifications");
+      await notifyOrderPlaced(admin.firestore(), context.params.id).catch((e: any) =>
+        console.error("order received on hand confirmation failed", context.params.id, e?.message || e));
+    }
     return null;
   });
