@@ -126,15 +126,15 @@ export const refundToWallet = onCall(async (data: any, context: any) => {
     if (order.refundedToWallet) {
       throw new HttpsError("already-exists", "This order has already been refunded");
     }
-    if (!order.userId) {
-      throw new HttpsError("failed-precondition", "Guest orders have no wallet to refund into");
-    }
     const total = num(order.total) || num(order.amountPayable);
     if (refundAmount > total) {
       throw new HttpsError("invalid-argument", `Refund exceeds the order total of ₹${total}`);
     }
 
-    if (!walletRef) throw new HttpsError("not-found", "Customer account not found");
+    // A guest order is refunded into the account with the order's email (walletUserRef).
+    if (!walletRef) {
+      throw new HttpsError("not-found", `No Skinly account uses ${order.email || "this order's email"} yet. Ask the customer to sign in once with it, then refund.`);
+    }
     const userRef = walletRef;
     const userSnap = await tx.get(userRef);
     if (!userSnap.exists) throw new HttpsError("not-found", "Customer account not found");

@@ -53,6 +53,7 @@ export default function AdminWallet() {
   const settings = useQuery(api.wallet.getWalletSettings, {});
   
   const [selectedUserId, setSelectedUserId] = useState<Id<"users"> | null>(null);
+  const [search, setSearch] = useState("");
   const [creditDialogOpen, setCreditDialogOpen] = useState(false);
   const [debitDialogOpen, setDebitDialogOpen] = useState(false);
   const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
@@ -73,6 +74,15 @@ export default function AdminWallet() {
       </AdminLayout>
     );
   }
+
+  // Search across name, email and phone; people with money in the wallet first.
+  const needle = search.trim().toLowerCase();
+  const digits = needle.replace(/\D/g, "");
+  const shownUsers = (users || [])
+    .filter((u: any) => !needle
+      || `${u.name} ${u.email}`.toLowerCase().includes(needle)
+      || (digits.length >= 4 && String(u.phone || "").replace(/\D/g, "").includes(digits)))
+    .sort((a: any, b: any) => (Number(b.walletBalance) || 0) - (Number(a.walletBalance) || 0));
 
   return (
     <AdminLayout>
@@ -142,7 +152,13 @@ export default function AdminWallet() {
             <CardTitle>All Users</CardTitle>
             <CardDescription>View and manage user wallet balances</CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-3">
+            <Input
+              placeholder="Search by name, email or phone"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="max-w-sm"
+            />
             <Table>
               <TableHeader>
                 <TableRow>
@@ -154,17 +170,20 @@ export default function AdminWallet() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {users.length === 0 ? (
+                {shownUsers.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={5} className="text-center text-muted-foreground">
-                      No users found
+                      {search.trim() ? `No user matches "${search.trim()}"` : "No users found"}
                     </TableCell>
                   </TableRow>
                 ) : (
-                  users.map((user) => (
+                  shownUsers.map((user) => (
                     <TableRow key={user._id}>
                       <TableCell className="font-medium">{user.name}</TableCell>
-                      <TableCell className="text-muted-foreground">{user.email}</TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {user.email}
+                        {(user as any).phone && <div className="text-xs">{(user as any).phone}</div>}
+                      </TableCell>
                       <TableCell className="text-right">
                         <span className={user.walletBalance > 0 ? "text-green-600 font-medium" : ""}>
                           ₹{Number(user.walletBalance || 0).toFixed(2)}

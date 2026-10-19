@@ -544,13 +544,19 @@ const h22 = async (c: QueryCtx) => {
   {
           const q = query(collection(db, 'users'));
           c.unsubscribe = onSnapshot(q, (snap) => {
-            const users = snap.docs.map(d => ({
-              _id: d.id,
-              name: d.data().name || 'Unknown',
-              email: d.data().email || '',
-              walletBalance: d.data().walletBalance || 0,
-              transactionCount: d.data().transactionCount || 0
-            }));
+            // The name lives under different keys depending on how the account was made.
+            const users = snap.docs.map(d => {
+              const u: any = d.data();
+              const name = String(u.name || u.fullName || u.displayName || [u.firstName, u.lastName].filter(Boolean).join(' ') || '').trim();
+              return {
+                _id: d.id,
+                name: name || 'Unknown',
+                email: u.email || '',
+                phone: String(u.phone || u.phoneNumber || ''),
+                walletBalance: u.walletBalance || 0,
+                transactionCount: u.transactionCount || 0
+              };
+            });
             setData(users);
           });
         }
