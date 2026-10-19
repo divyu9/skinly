@@ -144,7 +144,7 @@ export const createDelhiveryShipment = onCall(async (data: any, context: any) =>
     payment_mode: isCod ? "COD" : "Prepaid",
     cod_amount: isCod ? Number(payload.codValue) || money.total : 0,
     total_amount: money.total,
-    products_desc: dlvClean(lines.map((l) => `${l.itemName} x${l.units}`).join(", ")).slice(0, 250) || "Device skin",
+    products_desc: dlvClean(lines.map((l) => `${l.itemName} x${l.units}`).join(", ")).slice(0, 250) || "Accessories",
     hsn_code: "39269099",
     quantity: lines.reduce((n, l) => n + (Number(l.units) || 1), 0) || 1,
     weight: Number(pkg.packageWeight) || 100,

@@ -6,6 +6,9 @@ import { setOrderStatus } from "./orderStatus";
 import { cancelDelhiveryWaybill, delhiveryLabelLink } from "./delhiveryApi";
 import { isConfirmedOrder } from "./materials";
 
+/** What the shipping label calls every item (couriers print it). Generic on purpose. */
+const LABEL_ITEM_NAME = "Accessories";
+
 /**
  * RapidShyp shipment creation.
  *
@@ -332,7 +335,10 @@ export async function buildOrderPayload(orderId: string) {
       const price = num(item?.price) ?? 0;
       // Prices are GST-inclusive, so the tax component is price × 0.18/1.18.
       return {
-        itemName: item.productTitle,
+        // A plain name on the label: "Magneto X SSD Enclosure" or "Godox wireless mic" on a parcel
+        // invites theft on the way. SKU, price and HSN still say exactly what it is. Delhivery
+        // builds its products_desc from these lines too.
+        itemName: LABEL_ITEM_NAME,
         sku,
         units,
         unitPrice: price,
