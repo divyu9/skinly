@@ -43,6 +43,8 @@ export function cleanItems(raw: unknown) {
     ...(str(i?.phoneModel, 80) ? { phoneModel: str(i.phoneModel, 80) } : {}),
     ...(i?.coverage === "only_back" || i?.coverage === "full_body_wrap" ? { coverage: i.coverage } : {}),
     ...(str(i?.lensModel, 80) ? { lensModel: str(i.lensModel, 80) } : {}),
+    // The exact clearance piece, so an admin can turn a left cart into an order (cart-to-order.ts).
+    ...(/^[A-Za-z0-9]{10,40}$/.test(str(i?.clearanceItemId, 40)) ? { clearanceItemId: str(i.clearanceItemId, 40) } : {}),
   })).filter((i) => i.productId);
 }
 

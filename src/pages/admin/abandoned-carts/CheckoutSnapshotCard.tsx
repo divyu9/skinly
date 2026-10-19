@@ -5,6 +5,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card.t
 import { Button } from "@/components/ui/button.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
+import { toast } from "sonner";
+import { ManualOrderDialog, type ManualOrderPrefill } from "../orders/manual-order-dialog.tsx";
+import { cartToOrder } from "../orders/cart-to-order.ts";
 
 const COVERAGE: Record<string, string> = { only_back: "Back only", full_body_wrap: "Full body wrap" };
 
@@ -18,6 +21,8 @@ export function CheckoutSnapshotCard() {
   const id = params.get("checkout") || "";
   const [snap, setSnap] = useState<any>(null);
   const [error, setError] = useState("");
+  const [prefill, setPrefill] = useState<ManualOrderPrefill | null>(null);
+  const [building, setBuilding] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -98,6 +103,17 @@ export function CheckoutSnapshotCard() {
                   ? <p className="whitespace-pre-line">{addressLines.join("\n")}</p>
                   : <p className="text-muted-foreground">No address typed yet (or left before this was recorded)</p>}
               </div>
+              <Button size="sm" disabled={building} onClick={async () => {
+                setBuilding(true);
+                try {
+                  const r = await cartToOrder({ name: snap.name, phone: snap.phone, email: snap.email, address: snap.address, items: snap.items || [] });
+                  if (r.warnings.length) toast.warning(r.warnings.join(" · "));
+                  if (!r.prefill.items.length) { toast.error("Nothing in this cart can still be sold"); return; }
+                  setPrefill(r.prefill);
+                } catch (e: any) { toast.error(e?.message || "Could not build the order"); } finally { setBuilding(false); }
+              }}>
+                {building ? "Preparing…" : "Create order from this cart"}
+              </Button>
               {snap.phone && (
                 <Button asChild size="sm" variant="outline">
                   <a href={`https://wa.me/91${snap.phone}?text=${encodeURIComponent(waText)}`} target="_blank" rel="noopener noreferrer">
@@ -109,6 +125,7 @@ export function CheckoutSnapshotCard() {
           </div>
         )}
       </CardContent>
+      <ManualOrderDialog open={!!prefill} prefill={prefill} onOpenChange={(o) => { if (!o) setPrefill(null); }} />
     </Card>
   );
 }

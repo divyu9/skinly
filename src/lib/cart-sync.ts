@@ -9,6 +9,7 @@
 type Line = {
   productId: string; productTitle?: string; productImage?: string; variant?: string;
   price?: number; quantity?: number; phoneBrand?: string; phoneModel?: string; coverage?: string; lensModel?: string;
+  clearanceItemId?: string;
 };
 type Payload = {
   items: Line[];
@@ -48,6 +49,7 @@ async function send(p: Payload) {
     items: p.items.slice(0, 30).map((i) => ({
       productId: i.productId, productTitle: i.productTitle, productImage: i.productImage, variant: i.variant,
       price: i.price, quantity: i.quantity, phoneBrand: i.phoneBrand, phoneModel: i.phoneModel, coverage: i.coverage, lensModel: i.lensModel,
+      ...(i.clearanceItemId ? { clearanceItemId: i.clearanceItemId } : {}),
     })),
     ...(p.phone ? { phone: p.phone } : {}),
     ...(p.email ? { email: p.email } : {}),

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery, useConvex } from "@/lib/firebase-hooks";
 import { api } from "@/lib/firebase-api";
 import {
@@ -34,6 +34,18 @@ type OrderItem = {
   lensModel?: string;
   /** The listing's device kind (phone, camera, laptop…): which models the model search offers. */
   gadget?: string;
+  /** A clearance piece (clearance.ts): sold once, marked sold when the order is confirmed. */
+  clearanceItemId?: string;
+  /** That piece is the owner's personal stock: a cart of only these is a personal sale (CL-, no invoice). */
+  clearancePersonal?: boolean;
+  productImage?: string;
+};
+
+/** A customer's cart and details, to start the order from (an abandoned checkout). */
+export type ManualOrderPrefill = {
+  customerName?: string; customerPhone?: string; customerEmail?: string;
+  addressLine1?: string; addressLine2?: string; city?: string; state?: string; pincode?: string;
+  items: OrderItem[];
 };
 
 /**
@@ -64,6 +76,8 @@ function ModelPicker({ gadget, brand, model, onPick }: {
 interface ManualOrderDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** Fills the form when it opens (Abandoned carts › Create order from this cart). */
+  prefill?: ManualOrderPrefill | null;
 }
 
 const INDIAN_STATES = [
@@ -77,7 +91,7 @@ const INDIAN_STATES = [
   "Delhi", "Jammu and Kashmir", "Ladakh", "Lakshadweep", "Puducherry"
 ];
 
-export function ManualOrderDialog({ open, onOpenChange }: ManualOrderDialogProps) {
+export function ManualOrderDialog({ open, onOpenChange, prefill }: ManualOrderDialogProps) {
   const createManualOrder = useMutation(api.admin.orders.createManualOrder);
   const products = useQuery(api.products.getAllProducts);
   const convex = useConvex();
@@ -117,6 +131,26 @@ export function ManualOrderDialog({ open, onOpenChange }: ManualOrderDialogProps
   const [awbNumber, setAwbNumber] = useState("");
   const [trackingUrl, setTrackingUrl] = useState("");
   const [courierName, setCourierName] = useState("");
+
+  // Opened from a cart: its customer, address and lines. Payment defaults to
+  // received by UPI, the usual case ("pay us directly and place the order").
+  useEffect(() => {
+    if (!open || !prefill) return;
+    setCustomerName(prefill.customerName || "");
+    setCustomerPhone(prefill.customerPhone || "");
+    setCustomerEmail(prefill.customerEmail || "");
+    setAddressLine1(prefill.addressLine1 || "");
+    setAddressLine2(prefill.addressLine2 || "");
+    setCity(prefill.city || "");
+    const st = INDIAN_STATES.find((x) => x.toLowerCase() === String(prefill.state || "").trim().toLowerCase());
+    setState(st || "");
+    setPincode(prefill.pincode || "");
+    if (prefill.items.length) setItems(prefill.items);
+    setPaymentMethod("UPI");
+    setPaymentStatus("success");
+    setCoupon(null);
+    setCouponInput("");
+  }, [open, prefill]);
 
   const handleAddItem = () => {
     setItems([...items, { productId: "", productTitle: "", variant: "", sku: "", price: 0, quantity: 1 }]);
@@ -292,7 +326,7 @@ export function ManualOrderDialog({ open, onOpenChange }: ManualOrderDialogProps
           return {
             productId: item.productId,
             productTitle: item.productTitle,
-            productImage: String(product?.images?.find((i: any) => i?.url)?.url || ""),
+            productImage: String(product?.images?.find((i: any) => i?.url)?.url || item.productImage || ""),
             variant: item.variant,
             ...(v?._id ? { variantId: v._id } : {}),
             ...(item.sku ? { sku: item.sku } : {}),
@@ -301,8 +335,11 @@ export function ManualOrderDialog({ open, onOpenChange }: ManualOrderDialogProps
             ...(item.phoneModel ? { phoneModel: item.phoneModel } : {}),
             ...(item.phoneBrand ? { phoneBrand: item.phoneBrand } : {}),
             ...(item.lensModel ? { lensModel: item.lensModel } : {}),
+            ...(item.clearanceItemId ? { clearanceItemId: item.clearanceItemId, quantity: 1 } : {}),
           };
         }),
+        // Only the owner's personal clearance stock, as checkout's direct UPI does: CL- number, no invoice.
+        ...(items.length && items.every((i) => i.clearanceItemId && i.clearancePersonal) ? { personalSale: true } : {}),
         itemsTotal,
         shippingFee,
         codFee,
@@ -467,6 +504,18 @@ export function ManualOrderDialog({ open, onOpenChange }: ManualOrderDialogProps
                       </Button>
                     )}
                   </div>
+                  {item.clearanceItemId ? (
+                    <div className="flex items-center gap-3 rounded-md bg-sky-50 p-3 text-sm dark:bg-sky-950/30">
+                      {item.productImage && <img src={item.productImage} alt="" className="size-12 rounded object-cover" />}
+                      <div className="min-w-0 flex-1">
+                        <p className="font-semibold">{item.productTitle}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {["Clearance piece", item.clearancePersonal ? "personal stock (CL-, no invoice)" : "", item.variant && !/^default/i.test(item.variant) ? item.variant : "", [item.phoneBrand, item.phoneModel].filter(Boolean).join(" ")].filter(Boolean).join(" · ")}
+                        </p>
+                      </div>
+                      <p className="font-bold">₹{item.price}</p>
+                    </div>
+                  ) : (
                   <div className="grid grid-cols-2 gap-3">
                     <div className="col-span-2 space-y-2">
                       <Label>Product *</Label>
@@ -573,6 +622,7 @@ export function ManualOrderDialog({ open, onOpenChange }: ManualOrderDialogProps
                       />
                     </div>
                   </div>
+                  )}
                 </div>
               ))}
             </div>

@@ -46,6 +46,8 @@ import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyCont
 import { SignInButton } from "@/components/ui/signin.tsx";
 import { AbandonedCartSettings } from "./settings.tsx";
 import { CheckoutSnapshotCard } from "./CheckoutSnapshotCard.tsx";
+import { ManualOrderDialog, type ManualOrderPrefill } from "../orders/manual-order-dialog.tsx";
+import { cartToOrder } from "../orders/cart-to-order.ts";
 import {
   Dialog,
   DialogContent,
@@ -88,6 +90,18 @@ function AbandonedCartsPageInner() {
   const [processing, setProcessing] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [selectedCart, setSelectedCart] = useState<any>(null);
+  const [orderPrefill, setOrderPrefill] = useState<ManualOrderPrefill | null>(null);
+  const [building, setBuilding] = useState(false);
+  // The customer couldn't pay at checkout: their cart as a manual order (paid directly).
+  const orderFromCart = async (cart: any) => {
+    setBuilding(true);
+    try {
+      const r = await cartToOrder({ name: cart.userName, phone: cart.userPhone, email: cart.userEmail, items: cart.items || [] });
+      if (r.warnings.length) toast.warning(r.warnings.join(" · "));
+      if (!r.prefill.items.length) { toast.error("Nothing in this cart can still be sold"); return; }
+      setOrderPrefill(r.prefill);
+    } catch (e: any) { toast.error(e?.message || "Could not build the order"); } finally { setBuilding(false); }
+  };
 
   const stats = useQuery(api.abandonedCarts.getAbandonedCartStats);
   const settings = useQuery(api.abandonedCartSettings.getSettings);
@@ -175,6 +189,7 @@ function AbandonedCartsPageInner() {
       </div>
 
       <CheckoutSnapshotCard />
+      <ManualOrderDialog open={!!orderPrefill} prefill={orderPrefill} onOpenChange={(o) => { if (!o) setOrderPrefill(null); }} />
 
       {/* Automation Status Banner */}
       <Card className="border-green-500/30 bg-green-500/5">
@@ -442,6 +457,9 @@ function AbandonedCartsPageInner() {
                                   <span>Total</span>
                                   <span>{formatCurrency(selectedCart?.cartTotal || 0)}</span>
                                 </div>
+                                <Button className="w-full" disabled={building} onClick={() => orderFromCart(selectedCart)}>
+                                  {building ? "Preparing…" : "Create order from this cart"}
+                                </Button>
                               </div>
                             </DialogContent>
                           </Dialog>
