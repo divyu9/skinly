@@ -317,7 +317,8 @@ export async function swapTakenPieces(db: admin.firestore.Firestore, orderId: st
     const pid = String(c?.productId || it.productId || "");
     const same = (x: any) => String(x.variant || "") === String(c?.variant ?? it.variant ?? "")
       && String(x.phoneModel || "") === String(c?.phoneModel ?? it.phoneModel ?? "")
-      && Number(x.price) === Number(c?.price ?? x.price);
+      // The same price or less: never charge more than the piece the shopper saw.
+      && Number(x.price) <= Number(c?.price ?? x.price);
     const sib = pid ? (await db.collection("clearanceItems").where("productId", "==", pid).get()).docs
       .find((d) => !used.has(d.id) && same(d.data()) && isBuyable(d.data(), now)) : undefined;
     if (sib) {

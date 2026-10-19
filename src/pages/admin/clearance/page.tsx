@@ -36,7 +36,8 @@ const device = (p: { phoneBrand?: string; phoneModel?: string }) => {
   const b = (p.phoneBrand || "").trim(), m = (p.phoneModel || "").trim();
   return b && m.toLowerCase().startsWith(b.toLowerCase()) ? m : [b, m].filter(Boolean).join(" ");
 };
-const groupKey = (p: Piece) => [p.productId, p.variant, p.phoneBrand, p.phoneModel, p.coverage || "", p.lensModel || "", p.price].join("|");
+// Not by price: a kind repriced after one sold split into a "Sold out" row and a second row.
+const groupKey = (p: Piece) => [p.productId, p.variant, p.phoneBrand, p.phoneModel, p.coverage || "", p.lensModel || ""].join("|");
 
 /** One device-model picker for the add form, models of the chosen gadget kind. */
 function ModelSearch({ gadget, value, onPick }: { gadget: string; value: string; onPick: (b: string, m: string) => void }) {

@@ -94,12 +94,14 @@ export default function ClearancePage() {
     return [...m.entries()].sort((a, b) => b[1] - a[1]).map(([b]) => b);
   }, [items]);
 
-  // Alike pieces (same listing, variant, device, coverage, lens and price) are
+  // Alike pieces (same listing, variant, device, coverage and lens) are
   // one card with a count: ten pairs of the same glasses showed as ten cards.
   const groups = useMemo(() => {
     const m = new Map<string, Piece[]>();
     for (const p of items || []) {
-      const k = [p.productId, p.variant, p.phoneBrand, p.phoneModel, p.coverage || "", p.lensModel || "", p.price].join("|");
+      // Not by price: the Minion charger cover sold one at ₹99, was repriced to ₹89, and showed
+      // as a "Sold out" card beside the ₹89 one. The card shows the price of the pieces still for sale.
+      const k = [p.productId, p.variant, p.phoneBrand, p.phoneModel, p.coverage || "", p.lensModel || ""].join("|");
       m.set(k, [...(m.get(k) || []), p]);
     }
     // `pieces` are the ones still for sale; a kind with none left is a sold-out card, last.
