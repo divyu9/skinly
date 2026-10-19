@@ -57,7 +57,6 @@ function OrderDetailPageInner() {
   const createOrderOnly = useAction(api.rapidshyp.createRapidshypOrder);
   const cancelShipment = useAction(api.rapidshyp.cancelShipment);
   const restockInventory = useMutation(api.admin.orders.restockInventory);
-  const refundToWallet = useMutation(api.admin.orders.refundToWallet);
   const saveManualTracking = useMutation(api.admin.manualTracking.saveManualTracking);
   const recordRtoAction = useMutation(api.admin.orders.recordRtoAction);
 
@@ -392,11 +391,14 @@ function OrderDetailPageInner() {
     if (amount > order.total) { toast.error(`Refund amount cannot exceed order total (₹${order.total})`); return; }
     setIsRefunding(true);
     try {
-      const result = await refundToWallet({
-        orderId: orderId as Id<"orders">,
+      // Straight to the callable: the generic mutation router took "orders" from
+      // admin.orders.refundToWallet as the function name and reached nothing.
+      const { getFunctions, httpsCallable } = await import("firebase/functions");
+      const result: any = (await httpsCallable(getFunctions(), "refundToWallet")({
+        orderId: String(orderId),
         refundAmount: amount,
         refundReason: refundForm.reason || undefined,
-      });
+      })).data;
       if (result.success) {
         toast.success(`Successfully refunded ₹${amount} to customer's wallet`);
         setShowRefundDialog(false);
