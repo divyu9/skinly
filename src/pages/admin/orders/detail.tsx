@@ -171,8 +171,8 @@ function OrderDetailPageInner() {
         setSendWhatsApp(true);
         setShowEmailDialog(true);
       }
-    } catch {
-      toast.error("Failed to update payment status");
+    } catch (e: any) {
+      toast.error(e?.message || "Failed to update payment status");
     }
   };
 

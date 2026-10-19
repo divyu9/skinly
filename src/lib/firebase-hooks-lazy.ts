@@ -2781,10 +2781,24 @@ export async function runMutation(path: string, args?: any) {
           }
           
           if (docId) {
-            await updateDoc(doc(db, trueCollection, docId), { 
-              paymentStatus: args.status || args.paymentStatus,
-              updatedAt: Date.now()
-            });
+            const paymentStatus = args.status || args.paymentStatus;
+            const patch: Record<string, unknown> = { paymentStatus, updatedAt: Date.now() };
+            /*
+             * Paid by hand (the money came in directly): the order moves on too.
+             * This set only paymentStatus, so CL-1034 sat in pending_payment
+             * while the page showed "Processing", and shipping refused it as
+             * "not confirmed".
+             */
+            if (paymentStatus === 'success') {
+              const cur: any = (await getDoc(doc(db, trueCollection, docId))).data() || {};
+              if (cur.status === 'pending_payment' || cur.status === 'payment_verification') {
+                patch.status = 'processing';
+                patch.statusChangedAt = Date.now();
+              } else if (cur.status === 'cancelled' && (cur.items || []).some((i: any) => i?.clearanceItemId)) {
+                throw new Error('This order was cancelled and its clearance piece went back on sale — it may have been sold to someone else. Check Admin › Clearance first, then set the status by hand.');
+              }
+            }
+            await updateDoc(doc(db, trueCollection, docId), patch);
           }
           return docId;
         }
