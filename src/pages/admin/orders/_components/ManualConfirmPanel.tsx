@@ -5,15 +5,19 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card.t
 import { Button } from "@/components/ui/button.tsx";
 
 /**
- * "Order received" for a manual order, sent only when the admin presses a
- * button (functions: sendOrderConfirmation). A manual order sends nothing by
- * itself: it may be a call-in order, a repeat or a test. Each send shows in
- * the order's message history.
+ * "Order received", sent when the admin presses a button (functions:
+ * sendOrderConfirmation). A manual order sends nothing by itself: it may be a
+ * call-in order, a repeat or a test. Any other order gets the buttons too: one
+ * moved to Paid / Processing by hand (a failed payment settled directly, a UPI
+ * order confirmed from the status menu) never had its message sent, and
+ * there was no way to send it. Each send shows in the order's message history.
  */
 export function ManualConfirmPanel({ order }: { order: any }) {
   const [busy, setBusy] = useState<"" | "whatsapp" | "email">("");
   const [savingAuto, setSavingAuto] = useState(false);
-  if (order?.source !== "manual") return null;
+  const manual = order?.source === "manual";
+  // Sent automatically when the order was placed or paid (notifyOrderPlaced sets orderNotifiedAt).
+  const autoSent = !manual && !!order?.orderNotifiedAt;
   const sent = order?.confirmationSent || {};
   const phone = order?.shippingAddress?.phone || order?.phone || "";
   const email = order?.email || "";
@@ -57,7 +61,11 @@ export function ManualConfirmPanel({ order }: { order: any }) {
       </CardHeader>
       <CardContent className="space-y-3 text-sm">
         <p className="text-xs text-muted-foreground">
-          Manual orders send nothing by themselves. Send the customer their "order received" message if you want to.
+          {manual
+            ? "Manual orders send nothing by themselves. Send the customer their \"order received\" message if you want to."
+            : autoSent
+              ? `"Order received" went out automatically${order.orderNotifiedAt ? ` on ${when(order.orderNotifiedAt)}` : ""}. Send it again if the customer didn't get it.`
+              : "This order's \"order received\" message was not sent (it was confirmed by hand). Send it here."}
         </p>
         {!numbered && <p className="text-xs text-amber-700">Available once the order has its number (paid or COD).</p>}
         <div className="grid gap-2 sm:grid-cols-2">
@@ -76,6 +84,7 @@ export function ManualConfirmPanel({ order }: { order: any }) {
             <p className="text-xs text-muted-foreground">{email || "No email"}{sent.email ? ` · sent ${when(sent.email)}` : ""}</p>
           </div>
         </div>
+        {manual && (
         <label className="flex items-start gap-2 border-t pt-3">
           <input type="checkbox" className="mt-1" checked={autoOn} disabled={savingAuto} onChange={(e) => setAuto(e.target.checked)} />
           <span>
@@ -83,6 +92,7 @@ export function ManualConfirmPanel({ order }: { order: any }) {
             <span className="block text-xs text-muted-foreground">{autoOn ? "On: each next status sends its message." : "Off: nothing is sent unless you tick this."}</span>
           </span>
         </label>
+        )}
       </CardContent>
     </Card>
   );
