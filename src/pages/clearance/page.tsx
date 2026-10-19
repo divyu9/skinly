@@ -114,7 +114,13 @@ export default function ClearancePage() {
       })
       // Pinned first (the Mystery Box), then newest listing first — by when the kind was first
       // put up, so a restock doesn't jump the queue — and sold-out cards last.
-      .sort((a, b) => Number(a.soldOut) - Number(b.soldOut) || Number(b.pinned && !b.soldOut) - Number(a.pinned && !a.soldOut) || b.listedAt - a.listedAt);
+      .sort((a, b) => Number(a.soldOut) - Number(b.soldOut) || Number(b.pinned && !b.soldOut) - Number(a.pinned && !a.soldOut) || b.listedAt - a.listedAt)
+      // "Just listed" on the four newest only: a whole photo batch put up the day before had
+      // every card tagged, which says nothing. Not on the pinned card, which is always first.
+      .map((g, _i, all) => {
+        const newest = all.filter((x) => x.isNew && !x.pinned).slice(0, 4);
+        return { ...g, isNew: newest.includes(g) };
+      });
   }, [items]);
 
   const shown = useMemo(() => {
