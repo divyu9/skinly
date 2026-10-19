@@ -55,7 +55,9 @@ export async function adminActivityEvents(db: admin.firestore.Firestore, limit =
     newest(db, "modelRequests", "requestedAt", 20 * x),
     newest(db, "reviews", "createdAt", 20 * x),
     newest(db, "stockNotifications", "subscribedAt", 15 * x),
-    newest(db, "cartSnapshots", "updatedAt", 40 * x),
+    // By checkoutAt, which only a checkout (or a cart saved with a phone) sets: read by updatedAt,
+    // the plain carts of a busy morning pushed every checkout left before ~11am out of the log.
+    newest(db, "cartSnapshots", "checkoutAt", 40 * x),
   ]);
   const out: Event[] = [];
   // When each phone last ordered, so a checkout that did end in an order
