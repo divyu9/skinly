@@ -272,12 +272,20 @@ function AdminClearanceInner() {
 
   // Alike pieces together: one row per listing + variant + device + price.
   const groups = useMemo(() => {
-    const list = (pieces || []).filter((p) => (view === "sold" ? p.status === "sold" : p.status !== "sold"));
+    // Live keeps a kind whose pieces have all sold, as a "Sold out" row with
+    // Restock: without it the only way to sell more was Add stock, which made
+    // a second card (another listing id, no photos) next to the sold-out one.
+    const list = (pieces || []).filter((p) => (view === "sold" ? p.status === "sold" : true));
     const m = new Map<string, Piece[]>();
     for (const p of list) m.set(groupKey(p), [...(m.get(groupKey(p)) || []), p]);
-    let rows = [...m.values()].map((ps) => ({ key: groupKey(ps[0]), first: ps[0], pieces: ps }));
+    let rows = [...m.values()].map((ps) => {
+      if (view === "sold") return { key: groupKey(ps[0]), first: ps[0], pieces: ps, soldOut: false };
+      const open = ps.filter((p) => p.status !== "sold");
+      return { key: groupKey(ps[0]), first: open[0] || ps[0], pieces: open, soldOut: open.length === 0 };
+    });
     if (q.trim()) rows = searchRows(rows, q, (r) => device(r.first), (r) => `${device(r.first)} ${r.first.productTitle} ${r.first.sku || ""} ${r.first.sourceOrderNumber || ""}`);
-    return rows.sort((a, b) => Math.max(...b.pieces.map((p) => p.createdAt)) - Math.max(...a.pieces.map((p) => p.createdAt)));
+    const newest = (r: { first: Piece; pieces: Piece[] }) => Math.max(r.first.createdAt, ...r.pieces.map((p) => p.createdAt));
+    return rows.sort((a, b) => Number(a.soldOut) - Number(b.soldOut) || newest(b) - newest(a));
   }, [pieces, view, q]);
 
   const live = (pieces || []).filter((p) => p.status !== "sold");
@@ -394,7 +402,16 @@ function AdminClearanceInner() {
                       )}
                       <p className="text-xs text-muted-foreground">{view === "sold" ? `${g.pieces.length} sold` : `${free} on sale${g.pieces.length - free ? ` · ${g.pieces.length - free} held` : ""}`}</p>
                     </div>
-                    {view === "live" && (
+                    {view === "live" && g.soldOut && (
+                      <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
+                        <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-bold">Sold out</span>
+                        <Button type="button" size="sm" disabled={busy === g.key}
+                          onClick={() => { const n = Number(window.prompt("How many pieces to put back on this card?", "1")); if (n > 0) void addMore(g, Math.min(200, Math.floor(n))); }}>
+                          <PlusIcon className="mr-1 size-4" /> Restock
+                        </Button>
+                      </div>
+                    )}
+                    {view === "live" && !g.soldOut && (
                       <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
                         <div className="flex items-center gap-1">
                           <Input inputMode="numeric" placeholder="New ₹" value={priceEdit[g.key] || ""} onChange={(e) => setPriceEdit({ ...priceEdit, [g.key]: e.target.value.replace(/\D/g, "") })} className="h-8 w-20" />
