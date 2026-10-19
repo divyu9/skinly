@@ -20,7 +20,7 @@ type Piece = {
   id: string; productId: string; productTitle: string; productSlug?: string; productImage?: string;
   variant: string; phoneBrand: string; phoneModel: string; coverage?: string | null; lensModel?: string | null;
   price: number; originalPrice: number; createdAt: number;
-  images?: string[]; condition?: string; description?: string; amazonUrl?: string; personal?: boolean; sold?: boolean; videoUrl?: string;
+  images?: string[]; condition?: string; description?: string; amazonUrl?: string; personal?: boolean; sold?: boolean; videoUrl?: string; pinned?: boolean;
 };
 
 /**
@@ -110,9 +110,11 @@ export default function ClearancePage() {
         const open = ps.filter((x) => !x.sold);
         // First put up within two days (restocks copy the piece, so the oldest piece dates the kind).
         const listedAt = Math.min(...ps.map((x) => Number(x.createdAt) || Date.now()));
-        return { ...(open[0] || ps[0]), pieces: open, soldOut: open.length === 0, isNew: open.length > 0 && Date.now() - listedAt < 2 * 86400e3 };
+        return { ...(open[0] || ps[0]), pieces: open, soldOut: open.length === 0, listedAt, pinned: ps.some((x) => x.pinned), isNew: open.length > 0 && Date.now() - listedAt < 2 * 86400e3 };
       })
-      .sort((a, b) => Number(a.soldOut) - Number(b.soldOut));
+      // Pinned first (the Mystery Box), then newest listing first — by when the kind was first
+      // put up, so a restock doesn't jump the queue — and sold-out cards last.
+      .sort((a, b) => Number(a.soldOut) - Number(b.soldOut) || Number(b.pinned && !b.soldOut) - Number(a.pinned && !a.soldOut) || b.listedAt - a.listedAt);
   }, [items]);
 
   const shown = useMemo(() => {
