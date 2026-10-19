@@ -408,9 +408,12 @@ function CheckoutPageInner() {
   }, [clearanceIds]);
   const isPersonal = (i: any) => !!i.clearanceItemId && (i.clearancePersonal === true || personalIds.has(String(i.clearanceItemId)));
   // Personal-stock pieces (gadgets) are paid by direct UPI; shop clearance pieces (skins) check out as usual.
-  const clearanceCount = (cartItems || []).filter(isPersonal).length;
-  const clearanceOnly = clearanceUpiOn && clearanceCount > 0 && clearanceCount === (cartItems || []).length;
-  const clearanceMixed = clearanceUpiOn && clearanceCount > 0 && !clearanceOnly;
+  // Any clearance piece in the cart sends the whole order by direct UPI, the
+  // shop's skins in it too (placeOrder allows it); fresh stock alone goes
+  // through PhonePe. Only an all-personal cart is a personal sale with no GST invoice.
+  const hasClearance = (cartItems || []).some((i: any) => i.clearanceItemId);
+  const clearanceOnly = clearanceUpiOn && hasClearance;
+  const personalOnly = (cartItems || []).length > 0 && (cartItems || []).every(isPersonal);
   useEffect(() => {
     if (clearanceOnly && formData.paymentMethod !== "upi_direct") setFormData((prev) => ({ ...prev, paymentMethod: "upi_direct" }));
     if (!clearanceOnly && formData.paymentMethod === "upi_direct") setFormData((prev) => ({ ...prev, paymentMethod: "phonepe" }));
@@ -597,10 +600,6 @@ function CheckoutPageInner() {
     if (!/^[1-9]\d{5}$/.test(formData.pincode.trim())) {
       invalid("pincode", "Please enter a valid 6-digit pincode"); return;
     }
-    if (clearanceMixed) {
-      invalid("clearance_mixed", "Clearance gadgets are paid separately by UPI. Remove them from this cart and check them out on their own.");
-      return;
-    }
     // Only while Admin › COD › OTP is on; placeOrder checks the same switch.
     if (formData.paymentMethod === "cod" && codAvailability?.otpRequired && !otpVerified) { invalid("cod_otp", "Please verify your phone number with OTP before placing a COD order"); return; }
 
@@ -750,7 +749,7 @@ function CheckoutPageInner() {
     totalCashback,
     cashbackNeedsAccount: !isAuthenticated,
     // A personal sale (clearance gadgets by direct UPI) carries no GST.
-    gstBreakdown: clearanceOnly ? null : gstBreakdown,
+    gstBreakdown: clearanceOnly && personalOnly ? null : gstBreakdown,
     couponCode,
     appliedCoupon,
     isApplyingCoupon,
@@ -893,18 +892,13 @@ function CheckoutPageInner() {
 
               {clearanceOnly ? (
                 <div className="space-y-1 rounded-2xl border-2 border-ink bg-card p-4 text-sm">
-                  <p className="font-bold">Payment: UPI (clearance items)</p>
+                  <p className="font-bold">Payment: UPI{personalOnly ? " (clearance items)" : " — your cart has a clearance item"}</p>
                   <p className="text-muted-foreground">
                     After you place the order you'll get a UPI QR and an app button for the exact amount. You'll have 10 minutes to pay and enter the UTR; then we confirm your order.
                   </p>
                 </div>
               ) : (
                 <>
-                  {clearanceMixed && (
-                    <p className="rounded-xl border-2 border-heart/40 bg-heart/10 p-3 text-sm font-semibold text-heart">
-                      Clearance gadgets are paid separately by UPI. Remove them from this cart and check them out on their own.
-                    </p>
-                  )}
                   <PaymentMethodSelector
                     paymentMethod={formData.paymentMethod}
                     codAvailability={codAvailability}

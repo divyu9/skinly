@@ -242,16 +242,22 @@ export const placeOrder = functions
       orderItems = await swapTakenPieces(db, orderId, orderItems);
     }
     let upiDirect: { vpa: string; payeeName: string } | null = null;
+    // A personal sale (CL- number, no invoice) only when every line is the owner's personal clearance stock.
+    let personalOnly = false;
     if (paymentMethod === "upi_direct") {
-      if (!orderItems.length || orderItems.some((it) => !it?.clearanceItemId)) {
-        throw new HttpsError("failed-precondition", "Direct UPI is only for clearance items — check them out on their own");
+      /*
+       * Any cart with a clearance piece is paid by direct UPI, the shop's
+       * skins in it too: a buyer adding a ₹49 skin to a clearance gadget was
+       * told to check them out separately and pay shipping twice (19 Oct
+       * 2026: 7 of 23 carts with a sale skin). A cart of fresh stock only
+       * still goes through PhonePe.
+       */
+      if (!orderItems.some((it) => it?.clearanceItemId)) {
+        throw new HttpsError("failed-precondition", "Direct UPI is only for carts with a clearance item");
       }
       const { clearanceUpiSettings } = await import("./clearance");
-      // Only the owner's personal stock is sold this way; a shop item (a ready-cut skin) is invoiced as usual.
-      const pieces = await Promise.all(orderItems.map((it) => db.collection("clearanceItems").doc(String(it.clearanceItemId)).get()));
-      if (pieces.some((p) => (p.data() as any)?.personal !== true)) {
-        throw new HttpsError("failed-precondition", "These items are paid at the usual checkout, not by direct UPI");
-      }
+      const pieces = await Promise.all(orderItems.filter((it) => it?.clearanceItemId).map((it) => db.collection("clearanceItems").doc(String(it.clearanceItemId)).get()));
+      personalOnly = orderItems.every((it) => it?.clearanceItemId) && pieces.every((p) => (p.data() as any)?.personal === true);
       const st = await clearanceUpiSettings(db);
       if (!st.enabled) throw new HttpsError("failed-precondition", "UPI payment is not available right now");
       upiDirect = { vpa: st.vpa, payeeName: st.payeeName };
@@ -562,9 +568,10 @@ export const placeOrder = functions
        */
       status: paymentMethod === "cod" && !(prepaidAmount > 0) ? "processing" : "pending_payment",
       paymentStatus: "pending",
-      // Paid straight to the owner's UPI: a personal sale, CL- numbered, no invoice (clearance.ts).
+      // Paid straight to the owner's UPI. All personal stock: a personal sale, CL- numbered, no
+      // invoice (clearance.ts). With shop items in it: a normal order number and GST invoice.
       ...(upiDirect ? {
-        personalSale: true,
+        ...(personalOnly ? { personalSale: true } : {}),
         upiPay: { vpa: upiDirect.vpa, payeeName: upiDirect.payeeName, amount: amountPayable, note: checkoutRef, holdUntil: Date.now() + 10 * 60_000 },
       } : {}),
       itemsTotal,
