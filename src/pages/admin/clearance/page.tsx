@@ -240,7 +240,7 @@ function UpiSettings() {
       <CardHeader><CardTitle className="text-base">Payment for clearance orders (direct UPI)</CardTitle></CardHeader>
       <CardContent className="space-y-3 text-sm">
         <p className="text-xs text-muted-foreground">
-          When on, any cart with a clearance item is paid straight to this UPI ID (QR + app button on the order page). Change the ID here any time: new orders use it at once. A cart of personal clearance stock only is a personal sale (CL-1001 onwards, no GST invoice); with shop items in it, the order gets a normal number and invoice. You confirm each payment on the order page.
+          When on, any cart with a clearance item is paid straight to this UPI ID (QR + app button on the order page). Change the ID here any time: new orders use it at once. Every order paid this way is a personal sale: numbered CL-1001 onwards, no GST invoice — shop items in the cart included. You confirm each payment on the order page.
         </p>
         <div className="grid gap-3 sm:grid-cols-3">
           <div className="space-y-1.5"><Label>UPI ID</Label><Input value={vpa} onChange={(e) => setVpa(e.target.value)} placeholder="name@ybl" disabled={!loaded} /></div>

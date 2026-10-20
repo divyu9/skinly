@@ -242,8 +242,6 @@ export const placeOrder = functions
       orderItems = await swapTakenPieces(db, orderId, orderItems);
     }
     let upiDirect: { vpa: string; payeeName: string } | null = null;
-    // A personal sale (CL- number, no invoice) only when every line is the owner's personal clearance stock.
-    let personalOnly = false;
     if (paymentMethod === "upi_direct") {
       /*
        * Any cart with a clearance piece is paid by direct UPI, the shop's
@@ -256,8 +254,6 @@ export const placeOrder = functions
         throw new HttpsError("failed-precondition", "Direct UPI is only for carts with a clearance item");
       }
       const { clearanceUpiSettings } = await import("./clearance");
-      const pieces = await Promise.all(orderItems.filter((it) => it?.clearanceItemId).map((it) => db.collection("clearanceItems").doc(String(it.clearanceItemId)).get()));
-      personalOnly = orderItems.every((it) => it?.clearanceItemId) && pieces.every((p) => (p.data() as any)?.personal === true);
       const st = await clearanceUpiSettings(db);
       if (!st.enabled) throw new HttpsError("failed-precondition", "UPI payment is not available right now");
       upiDirect = { vpa: st.vpa, payeeName: st.payeeName };
@@ -568,10 +564,10 @@ export const placeOrder = functions
        */
       status: paymentMethod === "cod" && !(prepaidAmount > 0) ? "processing" : "pending_payment",
       paymentStatus: "pending",
-      // Paid straight to the owner's UPI. All personal stock: a personal sale, CL- numbered, no
-      // invoice (clearance.ts). With shop items in it: a normal order number and GST invoice.
+      // Paid straight to the owner's UPI: always a personal sale, CL- numbered, no GST invoice
+      // (clearance.ts) — the owner's rule (20 Oct 2026), shop items in the cart included.
       ...(upiDirect ? {
-        ...(personalOnly ? { personalSale: true } : {}),
+        personalSale: true,
         upiPay: { vpa: upiDirect.vpa, payeeName: upiDirect.payeeName, amount: amountPayable, note: checkoutRef, holdUntil: Date.now() + 10 * 60_000 },
       } : {}),
       itemsTotal,
