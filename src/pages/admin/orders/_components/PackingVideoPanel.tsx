@@ -116,7 +116,8 @@ export function PackingVideoPanel({ order }: { order: any }) {
         catch (e: any) { if (e?.name === "AbortError") { setState("idle"); return; } }
       }
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { width: { ideal: 1280 }, height: { ideal: 720 }, ...(cam ? { deviceId: { exact: cam } } : {}) },
+        // 720p is plenty to read a label; a 4K camera (DJI Osmo Pocket as a webcam) is asked for less.
+        video: { width: { ideal: 1280, max: 1920 }, height: { ideal: 720, max: 1080 }, frameRate: { ideal: 30, max: 30 }, ...(cam ? { deviceId: { exact: cam } } : {}) },
         audio: true,
       }).catch(() => navigator.mediaDevices.getUserMedia({ video: true, audio: true }));
       const devices = (await navigator.mediaDevices.enumerateDevices()).filter((d) => d.kind === "videoinput");
@@ -130,9 +131,13 @@ export function PackingVideoPanel({ order }: { order: any }) {
       const camW = Number(vs.width) || v.videoWidth || 1280;
       const camH = Number(vs.height) || v.videoHeight || 720;
       const portrait = shape !== "landscape";
-      if (shape === "landscape") { c.width = camW; c.height = camH; }
-      else if (shape === "rotated") { c.width = camH; c.height = camW; }
-      else { c.height = camH; c.width = Math.round(camH * 9 / 16); }
+      // The recorded frame's long side stays at 1280 px whatever the camera sends: a 4K canvas
+      // redrawn 30 times a second would load the computer for no gain (the bitrate sets the size).
+      const k = Math.min(1, 1280 / Math.max(camW, camH));
+      const sw = Math.round(camW * k), sh = Math.round(camH * k);
+      if (shape === "landscape") { c.width = sw; c.height = sh; }
+      else if (shape === "rotated") { c.width = sh; c.height = sw; }
+      else { c.height = sh; c.width = Math.round(sh * 9 / 16); }
       const ctx = c.getContext("2d")!;
       const frame = () => {
         if (shape === "rotated") {
@@ -140,12 +145,12 @@ export function PackingVideoPanel({ order }: { order: any }) {
           ctx.save();
           ctx.translate(c.width, 0);
           ctx.rotate(Math.PI / 2);
-          ctx.drawImage(v, 0, 0, camW, camH);
+          ctx.drawImage(v, 0, 0, camW, camH, 0, 0, sw, sh);
           ctx.restore();
         } else if (shape === "portrait") {
           // The upright middle strip of the camera's picture.
-          const sw = Math.round(camH * 9 / 16);
-          ctx.drawImage(v, Math.round((camW - sw) / 2), 0, sw, camH, 0, 0, c.width, c.height);
+          const cropW = Math.round(camH * 9 / 16);
+          ctx.drawImage(v, Math.round((camW - cropW) / 2), 0, cropW, camH, 0, 0, c.width, c.height);
         } else {
           ctx.drawImage(v, 0, 0, c.width, c.height);
         }
