@@ -7,8 +7,8 @@ import { Button } from "@/components/ui/button.tsx";
 /**
  * A packing video for the order, recorded from the webcam, as proof of what
  * went into the parcel when a customer claims it was lost or the wrong thing
- * arrived. The order number, customer and a running clock are drawn onto
- * every frame, so the video speaks for itself.
+ * arrived. A CCTV-style date and time (top right), and the order number and
+ * customer (bottom bar), are drawn onto every frame, so the video speaks for itself.
  *
  * The file stays on this computer: Chrome's folder access saves it into a
  * "Packing Videos" folder inside the folder picked once (Downloads), named
@@ -125,15 +125,39 @@ export function PackingVideoPanel({ order }: { order: any }) {
       const draw = window.setInterval(() => {
         ctx.drawImage(v, 0, 0, c.width, c.height);
         const h = Math.round(c.height * 0.09);
+        const m = Math.round(h * 0.3);
+        // CCTV-style stamp, top corners: white monospace with a black outline, readable on any background.
+        const d = new Date();
+        const cctv = `${pad(d.getDate())}-${pad(d.getMonth() + 1)}-${d.getFullYear()}  ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+        ctx.textBaseline = "top";
+        ctx.lineJoin = "round";
+        ctx.font = `bold ${Math.round(h * 0.5)}px ui-monospace, Menlo, Consolas, monospace`;
+        ctx.lineWidth = Math.max(3, Math.round(h * 0.08));
+        ctx.strokeStyle = "#000";
+        ctx.fillStyle = "#fff";
+        const tw = ctx.measureText(cctv).width;
+        ctx.strokeText(cctv, c.width - tw - m, m);
+        ctx.fillText(cctv, c.width - tw - m, m);
+        // "● REC" blinks once a second, as on a recorder.
+        ctx.font = `bold ${Math.round(h * 0.38)}px ui-monospace, Menlo, Consolas, monospace`;
+        const label = "REC  SKINLY PACKING";
+        const dot = Math.round(h * 0.16);
+        if (d.getSeconds() % 2 === 0) {
+          ctx.fillStyle = "#e11";
+          ctx.beginPath();
+          ctx.arc(m + dot, m + Math.round(h * 0.2), dot, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.fillStyle = "#fff";
+        ctx.strokeText(label, m + dot * 3, m);
+        ctx.fillText(label, m + dot * 3, m);
+        // Bottom bar: which order this is.
         ctx.fillStyle = "rgba(0,0,0,0.6)";
         ctx.fillRect(0, c.height - h, c.width, h);
         ctx.fillStyle = "#fff";
         ctx.font = `bold ${Math.round(h * 0.42)}px system-ui, sans-serif`;
         ctx.textBaseline = "middle";
-        ctx.fillText(`${orderNo} · ${customer}`, Math.round(h * 0.3), c.height - h / 2);
-        const now = new Date().toLocaleString("en-IN", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", second: "2-digit" });
-        const w = ctx.measureText(now).width;
-        ctx.fillText(now, c.width - w - Math.round(h * 0.3), c.height - h / 2);
+        ctx.fillText(`${orderNo} · ${customer}`, m, c.height - h / 2);
       }, 1000 / 30);
 
       const out = c.captureStream(30);
