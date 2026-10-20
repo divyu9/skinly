@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { CameraIcon, FolderOpenIcon, SquareIcon, Trash2Icon, VideoIcon } from "lucide-react";
+import { CameraIcon, FolderOpenIcon, SendIcon, SquareIcon, Trash2Icon, VideoIcon } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card.tsx";
 import { Button } from "@/components/ui/button.tsx";
 
@@ -275,6 +275,8 @@ export function PackingVideoPanel({ order }: { order: any }) {
         packingVideos: arrayUnion({ fileName, recordedAt: l.started, seconds, bytes: blob.size, savedTo, ...(url ? { url } : {}) }),
       });
     } catch { /* the file is saved; only the note failed */ }
+    // The first video online tells the customer (WhatsApp + email, with the unboxing rules).
+    if (url && !order?.packingVideoNotice) await notify(true);
     setState("idle");
   };
 
@@ -302,6 +304,22 @@ export function PackingVideoPanel({ order }: { order: any }) {
       toast.error(e?.message || "Could not delete the video");
     } finally {
       setDeleting("");
+    }
+  };
+
+  const [notifying, setNotifying] = useState(false);
+  const notify = async (auto = false) => {
+    setNotifying(true);
+    try {
+      const [{ functions }, { httpsCallable }] = await Promise.all([import("@/lib/firebase"), import("firebase/functions")]);
+      const r: any = (await httpsCallable(functions, "sendPackingVideoNotice")({ orderId: String(order._id) })).data;
+      const went = [r?.whatsapp && "WhatsApp", r?.email && "email"].filter(Boolean).join(" and ");
+      if (went) toast.success(`Customer told on ${went}`);
+      else if (!auto) toast.warning("Nothing sent: switch on the packing_video WhatsApp / email usecase once its template is approved");
+    } catch (e: any) {
+      if (!auto) toast.error(e?.message || "Could not send");
+    } finally {
+      setNotifying(false);
     }
   };
 
@@ -376,6 +394,18 @@ export function PackingVideoPanel({ order }: { order: any }) {
           )}
         </div>
 
+        {videos.some((v) => v.url) && (
+          <div className="flex flex-wrap items-center gap-2 border-t pt-2 text-xs">
+            <span className="text-muted-foreground">
+              {order?.packingVideoNotice
+                ? `Customer told on ${[order.packingVideoNotice.whatsapp && "WhatsApp", order.packingVideoNotice.email && "email"].filter(Boolean).join(" + ")} · ${new Date(order.packingVideoNotice.at).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })}`
+                : "Customer not told yet"}
+            </span>
+            <Button type="button" size="sm" variant="outline" disabled={notifying || recording} onClick={() => notify(false)}>
+              <SendIcon className="mr-1 size-3.5" /> {notifying ? "Sending…" : order?.packingVideoNotice ? "Send again" : "Send to customer"}
+            </Button>
+          </div>
+        )}
         {videos.length > 0 && (
           <ul className="space-y-1 border-t pt-2 text-xs">
             {videos.map((v, i) => (

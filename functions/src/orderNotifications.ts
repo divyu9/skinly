@@ -314,3 +314,43 @@ export const sendOrderConfirmation = onCall(async (data: any, context: any) => {
     await ref.update({ [`confirmationSent.${channel}`]: Date.now() });
     return { ok: true };
 });
+
+/**
+ * Tells the customer their packing video is up (Admin › order › Packing video
+ * uploads it to R2), with the rules for receiving the parcel, on WhatsApp and
+ * email — usecase "packing_video" on both. The order link opens the full
+ * order page, where the video plays with those rules beside it.
+ *
+ * Called by the packing panel after the first video goes online, and by its
+ * "Send to customer" button. Nothing is sent until the usecase is switched on
+ * with an approved template (WhatsApp: Admin › WhatsApp; email: MSG91), so
+ * the answer says which channel actually went.
+ */
+export const sendPackingVideoNotice = onCall(async (data: any, context: any) => {
+  await requireAdmin(context);
+  const orderId = String(data?.orderId || "");
+  if (!orderId) throw new HttpsError("invalid-argument", "orderId is required");
+  const db = admin.firestore();
+  const ref = db.collection("orders").doc(orderId);
+  const order = (await ref.get()).data() as any;
+  if (!order) throw new HttpsError("not-found", "No such order");
+  const videos = (Array.isArray(order.packingVideos) ? order.packingVideos : []).filter((v: any) => v?.url);
+  if (!videos.length) throw new HttpsError("failed-precondition", "This order has no packing video online yet");
+
+  const name = String(order.shippingAddress?.fullName || order.customerName || "Customer");
+  const phone = String(order.shippingAddress?.phone || order.phone || "");
+  const [whatsapp, email] = await Promise.all([
+    queueWhatsApp(db, "packing_video", phone, {
+      customer_name: name,
+      first_name: name.trim().split(/\s+/)[0] || "there",
+      order_number: String(order.orderNumber || order.checkoutRef || "your order"),
+      order_link: orderLinkFor(orderId),
+      awb_number: String(order.awbNumber || order.parentAwbNumber || "on your label"),
+    }, orderId).catch(() => false),
+    sendUsecaseEmail(db, order, orderId, "packing_video").catch(() => false),
+  ]);
+  if (whatsapp || email) {
+    await ref.update({ packingVideoNotice: { at: Date.now(), whatsapp: !!whatsapp, email: !!email } });
+  }
+  return { whatsapp: !!whatsapp, email: !!email };
+});
