@@ -54,24 +54,28 @@ export function PackingVideo({ order }: { order: any }) {
           <video key={i} src={v.url} controls playsInline preload="metadata" className="w-full max-h-[70vh] rounded-lg bg-black"
             onPlay={() => report(i, 0)} onTimeUpdate={(e) => onTime(i, e.currentTarget)} onEnded={() => report(i, 100)} />
         ))}
-        <div className="space-y-2 rounded-xl border-2 border-heart/40 bg-heart/10 p-3">
-          <p className="flex items-center gap-1.5 font-extrabold text-heart">
-            <AlertTriangleIcon className="h-4 w-4" /> Read this before you accept the parcel
+        <div className="space-y-3 rounded-xl border-2 border-heart bg-heart/10 p-4">
+          <p className="flex items-center gap-2 text-lg font-extrabold leading-tight text-heart">
+            <AlertTriangleIcon className="h-5 w-5 shrink-0" /> Protect yourself from courier scams
           </p>
-          <ul className="list-disc space-y-1.5 pl-5">
-            <li>
-              If the parcel arrives in <b>different packing</b>, or looks <b>opened, torn or tampered with</b>, <b>DO NOT ACCEPT it</b> from the courier.
-            </li>
-            <li>
-              Record <b>one complete, uncut unboxing video</b>: show the sealed parcel from <b>all sides</b>, with the <b>shipping label clearly visible — your name and the AWB number</b>. Then open it on the same video and check every item.
-            </li>
-            <li>
-              Couriers reject claims made with a cut or edited video. With an uncut video, if anything is missing or different, we can fight the claim with the courier for you.
-            </li>
-            <li>
-              <b>Without this uncut unboxing video, no claim for a missing, wrong or damaged item can be accepted, in any situation.</b>
-            </li>
-          </ul>
+          <p>
+            Parcels can be opened, swapped or emptied on the way. These steps are <b>for your safety</b> — they are the only way a courier will accept a claim, and the only way we can get your money or item back for you.
+          </p>
+          <div>
+            <p className="text-base font-extrabold">1. DO NOT ACCEPT a different or opened parcel</p>
+            <p>Check it at the door. If the packing looks different from the video, or the parcel looks opened, torn or tampered with, <b>refuse it</b> and hand it back to the courier.</p>
+          </div>
+          <div>
+            <p className="text-base font-extrabold">2. Record ONE complete, UNCUT unboxing video</p>
+            <p>Start recording <b>before</b> you open it. Show the sealed parcel <b>from all sides</b>, with the <b>shipping label clearly visible — your name and the AWB number</b>. Then open it on the same video and check every item.</p>
+          </div>
+          <div>
+            <p className="text-base font-extrabold">3. Never cut, pause or edit the video</p>
+            <p>Couriers reject claims made with a cut or edited video. With one uncut video, if anything is missing or different, <b>we fight the claim with the courier for you.</b></p>
+          </div>
+          <p className="rounded-lg bg-heart px-3 py-2.5 font-extrabold text-white">
+            Without this uncut unboxing video, NO claim for a missing, wrong or damaged item can be accepted — in any situation.
+          </p>
         </div>
       </CardContent>
     </Card>
