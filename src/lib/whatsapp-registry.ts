@@ -32,6 +32,12 @@ export const WHATSAPP_MESSAGES: WhatsAppMessageSpec[] = [
     sample: { first_name: "Priya", order_number: "#4102", courier_name: "Delhivery", awb_number: "38291045561", tracking_url: "https://www.delhivery.com/track-v2/package/38291045561", order_link: `${SITE}/orders/test-order` },
   },
   {
+    key: "packing_video", label: "Packing video ready", group: "Orders", photo: false,
+    when: "When an order's first packing video is online (or Send to customer is pressed): link to the video and the unboxing-video rules for claims.",
+    vars: ["first_name", "order_number", "order_link"],
+    sample: { first_name: "Priya", order_number: "CL-1036", order_link: `${SITE}/orders/test-order` },
+  },
+  {
     key: "out_for_delivery", label: "Out for delivery", group: "Orders", photo: false,
     when: "The day it's out for delivery; reminds COD customers of the amount.",
     vars: ["first_name", "order_number", "cod_line"],
