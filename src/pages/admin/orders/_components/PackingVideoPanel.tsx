@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { CameraIcon, FolderOpenIcon, SendIcon, SquareIcon, Trash2Icon, VideoIcon } from "lucide-react";
+import { CameraIcon, FolderOpenIcon, SendIcon, SquareIcon, Trash2Icon, UploadIcon, VideoIcon } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card.tsx";
 import { Button } from "@/components/ui/button.tsx";
 
@@ -224,6 +224,55 @@ export function PackingVideoPanel({ order }: { order: any }) {
     if (rec && rec.state !== "inactive") { setState("saving"); rec.stop(); }
   };
 
+  /*
+   * A copy online, for the customer's order page: proof of what was packed and how the
+   * parcel looked. Behind a random name; shown only to whoever can see the full order.
+   * Then a note on the order, and the first video online tells the customer.
+   */
+  const publish = async (blob: Blob, ext: string, entry: Record<string, unknown>) => {
+    let url = "";
+    try {
+      const [{ functions }, { httpsCallable }] = await Promise.all([import("@/lib/firebase"), import("firebase/functions")]);
+      const rnd = Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
+      const key = `packing/${String(order._id)}/${rnd}.${ext}`;
+      const type = (blob.type || "").split(";")[0] || (ext === "mp4" ? "video/mp4" : ext === "mov" ? "video/quicktime" : "video/webm");
+      const r: any = await httpsCallable(functions, "generateUploadUrl")({ fileName: key, contentType: type });
+      const put = await fetch(r.data.uploadUrl, { method: "PUT", body: blob, headers: { "Content-Type": type } });
+      if (!put.ok) throw new Error(`upload ${put.status}`);
+      url = String(r.data.publicUrl || "");
+      toast.success("Uploaded — the customer can watch it on their order page");
+    } catch (e: any) {
+      toast.warning(`The online copy failed (${e?.message || e}). Try again to share it with the customer.`);
+    }
+    try {
+      const { db, doc, updateDoc, arrayUnion } = await (await import("@/lib/fs")).loadFs();
+      await updateDoc(doc(db, "orders", String(order._id)), { packingVideos: arrayUnion({ ...entry, ...(url ? { url } : {}) }) });
+    } catch { /* the file is saved; only the note failed */ }
+    if (url && !order?.packingVideoNotice) await notify(true);
+  };
+
+  // A video recorded on a phone (compressed first), attached to this order.
+  const fileInput = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+  const uploadFile = async (file: File) => {
+    const mb = file.size / 1048576;
+    if (mb > 300) { toast.error(`${Math.round(mb)} MB is too big — compress it first (720p).`); return; }
+    if (mb > 80 && !window.confirm(`This video is ${Math.round(mb)} MB. Customers on mobile data may struggle to play it — compress it to 720p first?\n\nOK = upload anyway, Cancel = stop.`)) return;
+    setUploading(true);
+    const seconds = await new Promise<number>((resolve) => {
+      const v = document.createElement("video");
+      v.preload = "metadata";
+      v.onloadedmetadata = () => { resolve(Math.round(v.duration) || 0); URL.revokeObjectURL(v.src); };
+      v.onerror = () => resolve(0);
+      v.src = URL.createObjectURL(file);
+    });
+    const ext = (file.name.split(".").pop() || "mp4").toLowerCase().replace(/[^a-z0-9]/g, "") || "mp4";
+    await publish(file, ext, {
+      fileName: file.name, recordedAt: file.lastModified || Date.now(), seconds, bytes: file.size, savedTo: "Uploaded file",
+    });
+    setUploading(false);
+  };
+
   const save = async () => {
     const l = live.current;
     teardown();
@@ -252,31 +301,7 @@ export function PackingVideoPanel({ order }: { order: any }) {
       setState("idle");
       return;
     }
-    // A copy online, for the customer's order page: proof of what was packed and how the
-    // parcel looked. Behind a random name; shown only to whoever can see the full order.
-    let url = "";
-    try {
-      const [{ functions }, { httpsCallable }] = await Promise.all([import("@/lib/firebase"), import("firebase/functions")]);
-      const rnd = Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
-      const key = `packing/${String(order._id)}/${rnd}.${ext}`;
-      const type = (blob.type || "").split(";")[0] || (ext === "mp4" ? "video/mp4" : "video/webm");
-      const r: any = await httpsCallable(functions, "generateUploadUrl")({ fileName: key, contentType: type });
-      const put = await fetch(r.data.uploadUrl, { method: "PUT", body: blob, headers: { "Content-Type": type } });
-      if (!put.ok) throw new Error(`upload ${put.status}`);
-      url = String(r.data.publicUrl || "");
-      toast.success("Uploaded — the customer can watch it on their order page");
-    } catch (e: any) {
-      toast.warning(`Saved on this computer, but the online copy failed (${e?.message || e}). Record again to share it with the customer.`);
-    }
-    // A note on the order: the file's name and time, and the online copy if it went up.
-    try {
-      const { db, doc, updateDoc, arrayUnion } = await (await import("@/lib/fs")).loadFs();
-      await updateDoc(doc(db, "orders", String(order._id)), {
-        packingVideos: arrayUnion({ fileName, recordedAt: l.started, seconds, bytes: blob.size, savedTo, ...(url ? { url } : {}) }),
-      });
-    } catch { /* the file is saved; only the note failed */ }
-    // The first video online tells the customer (WhatsApp + email, with the unboxing rules).
-    if (url && !order?.packingVideoNotice) await notify(true);
+    await publish(blob, ext, { fileName, recordedAt: l.started, seconds, bytes: blob.size, savedTo });
     setState("idle");
   };
 
@@ -382,6 +407,15 @@ export function PackingVideoPanel({ order }: { order: any }) {
               <option value="portrait">Portrait</option>
               <option value="rotated">Portrait (camera turned on its side)</option>
             </select>
+          )}
+          {!recording && state !== "saving" && (
+            <>
+              <input ref={fileInput} type="file" accept="video/*" className="hidden"
+                onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) void uploadFile(f); }} />
+              <Button type="button" variant="outline" disabled={state === "starting" || uploading} onClick={() => fileInput.current?.click()}>
+                <UploadIcon className="mr-2 size-4" /> {uploading ? "Uploading…" : "Upload video file"}
+              </Button>
+            </>
           )}
           {cams.length > 1 && !recording && (
             <select value={cam} onChange={(e) => chooseCam(e.target.value)} className="h-9 rounded-md border px-2 text-xs">
