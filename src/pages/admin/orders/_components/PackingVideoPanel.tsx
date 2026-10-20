@@ -76,6 +76,11 @@ export function PackingVideoPanel({ order }: { order: any }) {
   const [cam, setCam] = useState<string>(() => { try { return localStorage.getItem("packingCam") || ""; } catch { return ""; } });
   const [elapsed, setElapsed] = useState(0);
   const [folderName, setFolderName] = useState("");
+  // landscape: as the camera sees it; portrait: the middle of the frame, upright;
+  // rotated: a webcam mounted on its side, turned upright.
+  const [shape, setShape] = useState<"landscape" | "portrait" | "rotated">(() => {
+    try { const v = localStorage.getItem("packingShape"); return v === "portrait" || v === "rotated" ? v : "landscape"; } catch { return "landscape"; }
+  });
 
   const preview = useRef<HTMLVideoElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
@@ -117,14 +122,35 @@ export function PackingVideoPanel({ order }: { order: any }) {
       v.muted = true;
       await v.play();
       const vs = stream.getVideoTracks()[0]?.getSettings() || {};
-      c.width = Number(vs.width) || 1280;
-      c.height = Number(vs.height) || 720;
+      const camW = Number(vs.width) || v.videoWidth || 1280;
+      const camH = Number(vs.height) || v.videoHeight || 720;
+      const portrait = shape !== "landscape";
+      if (shape === "landscape") { c.width = camW; c.height = camH; }
+      else if (shape === "rotated") { c.width = camH; c.height = camW; }
+      else { c.height = camH; c.width = Math.round(camH * 9 / 16); }
       const ctx = c.getContext("2d")!;
+      const frame = () => {
+        if (shape === "rotated") {
+          // The camera lies on its side: turn its picture a quarter turn to stand up.
+          ctx.save();
+          ctx.translate(c.width, 0);
+          ctx.rotate(Math.PI / 2);
+          ctx.drawImage(v, 0, 0, camW, camH);
+          ctx.restore();
+        } else if (shape === "portrait") {
+          // The upright middle strip of the camera's picture.
+          const sw = Math.round(camH * 9 / 16);
+          ctx.drawImage(v, Math.round((camW - sw) / 2), 0, sw, camH, 0, 0, c.width, c.height);
+        } else {
+          ctx.drawImage(v, 0, 0, c.width, c.height);
+        }
+      };
       const started = Date.now();
       // A timer rather than requestAnimationFrame, which stops when the tab is in the background.
       const draw = window.setInterval(() => {
-        ctx.drawImage(v, 0, 0, c.width, c.height);
-        const h = Math.round(c.height * 0.09);
+        frame();
+        // Sized from the short side, so the stamp fits a portrait frame too.
+        const h = Math.round(Math.min(c.width, c.height) * 0.09);
         const m = Math.round(h * 0.3);
         // CCTV-style stamp, top corners: white monospace with a black outline, readable on any background.
         const d = new Date();
@@ -142,22 +168,26 @@ export function PackingVideoPanel({ order }: { order: any }) {
         ctx.font = `bold ${Math.round(h * 0.38)}px ui-monospace, Menlo, Consolas, monospace`;
         const label = "REC  SKINLY PACKING";
         const dot = Math.round(h * 0.16);
+        // Portrait has no room beside the clock: the label goes on the line below it.
+        const ly = portrait ? m + Math.round(h * 0.7) : m;
         if (d.getSeconds() % 2 === 0) {
           ctx.fillStyle = "#e11";
           ctx.beginPath();
-          ctx.arc(m + dot, m + Math.round(h * 0.2), dot, 0, Math.PI * 2);
+          ctx.arc(m + dot, ly + Math.round(h * 0.2), dot, 0, Math.PI * 2);
           ctx.fill();
         }
         ctx.fillStyle = "#fff";
-        ctx.strokeText(label, m + dot * 3, m);
-        ctx.fillText(label, m + dot * 3, m);
+        ctx.strokeText(label, m + dot * 3, ly);
+        ctx.fillText(label, m + dot * 3, ly);
         // Bottom bar: which order this is.
         ctx.fillStyle = "rgba(0,0,0,0.6)";
         ctx.fillRect(0, c.height - h, c.width, h);
         ctx.fillStyle = "#fff";
         ctx.font = `bold ${Math.round(h * 0.42)}px system-ui, sans-serif`;
         ctx.textBaseline = "middle";
-        ctx.fillText(`${orderNo} · ${customer}`, m, c.height - h / 2);
+        let line = `${orderNo} · ${customer}`;
+        while (line.length > 8 && ctx.measureText(line).width > c.width - m * 2) line = line.slice(0, -2) + "…";
+        ctx.fillText(line, m, c.height - h / 2);
       }, 1000 / 30);
 
       const out = c.captureStream(30);
@@ -255,7 +285,7 @@ export function PackingVideoPanel({ order }: { order: any }) {
 
         <div className={state === "idle" ? "hidden" : "relative overflow-hidden rounded-lg bg-black"}>
           <video ref={preview} playsInline className="hidden" />
-          <canvas ref={canvas} className="block w-full" />
+          <canvas ref={canvas} className={shape === "landscape" ? "block w-full" : "mx-auto block max-h-[70vh] w-auto"} />
           {recording && (
             <span className="absolute left-2 top-2 flex items-center gap-1.5 rounded-full bg-red-600 px-2 py-0.5 text-xs font-bold text-white">
               <span className="size-2 animate-pulse rounded-full bg-white" /> REC {mmss}
@@ -272,6 +302,15 @@ export function PackingVideoPanel({ order }: { order: any }) {
             <Button type="button" onClick={start} disabled={state === "starting"}>
               <CameraIcon className="mr-2 size-4" /> {state === "starting" ? "Starting camera…" : videos.length ? "Record another" : "Record packing video"}
             </Button>
+          )}
+          {!recording && state !== "saving" && (
+            <select value={shape} disabled={state === "starting"}
+              onChange={(e) => { const v = e.target.value as typeof shape; setShape(v); try { localStorage.setItem("packingShape", v); } catch { /* fine */ } }}
+              className="h-9 rounded-md border px-2 text-xs" aria-label="Video shape">
+              <option value="landscape">Landscape</option>
+              <option value="portrait">Portrait</option>
+              <option value="rotated">Portrait (camera turned on its side)</option>
+            </select>
           )}
           {cams.length > 1 && !recording && (
             <select value={cam} onChange={(e) => chooseCam(e.target.value)} className="h-9 rounded-md border px-2 text-xs">
