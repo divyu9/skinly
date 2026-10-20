@@ -28,6 +28,7 @@ import { PackageCard } from "./_components/PackageCard.tsx";
 import { OrderNavigator } from "./_components/OrderNavigator.tsx";
 import { OrderTimeline } from "./_components/OrderTimeline.tsx";
 import { ReshipPanel } from "./_components/ReshipPanel.tsx";
+import { PackingVideoPanel } from "./_components/PackingVideoPanel.tsx";
 import { RtoActionsPanel, type RtoActionFormData } from "./_components/RtoActionsPanel.tsx";
 import { WhatsAppPanel, type EmailType } from "./_components/WhatsAppPanel.tsx";
 
@@ -586,6 +587,8 @@ function OrderDetailPageInner() {
             onSaveItems={handleUpdateOrderItems}
             savingItems={savingItems}
           />
+
+          <PackingVideoPanel order={order} />
 
           {orderId && <ReshipPanel order={order} orderId={orderId} />}
 
