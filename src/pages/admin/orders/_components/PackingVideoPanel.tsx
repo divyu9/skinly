@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { CameraIcon, FolderOpenIcon, SquareIcon, VideoIcon } from "lucide-react";
+import { CameraIcon, FolderOpenIcon, SquareIcon, Trash2Icon, VideoIcon } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card.tsx";
 import { Button } from "@/components/ui/button.tsx";
 
@@ -278,6 +278,33 @@ export function PackingVideoPanel({ order }: { order: any }) {
     setState("idle");
   };
 
+  // A wrong take: off the order, its online copy deleted (so the customer never sees it),
+  // and the file removed from the Packing Videos folder when this browser can reach it.
+  const [deleting, setDeleting] = useState("");
+  const remove = async (v: any) => {
+    if (!window.confirm(`Delete this packing video?\n\n${v.fileName}\n\nThe customer will no longer see it.`)) return;
+    setDeleting(v.fileName);
+    try {
+      const [{ functions }, { httpsCallable }] = await Promise.all([import("@/lib/firebase"), import("firebase/functions")]);
+      if (v.url) {
+        const key = decodeURIComponent(new URL(v.url).pathname.replace(/^\//, ""));
+        if (key.startsWith(`packing/${String(order._id)}/`)) await httpsCallable(functions, "deleteR2Object")({ key });
+      }
+      const { db, doc, updateDoc, arrayRemove } = await (await import("@/lib/fs")).loadFs();
+      await updateDoc(doc(db, "orders", String(order._id)), { packingVideos: arrayRemove(v) });
+      let local = false;
+      try {
+        const dir = await packingFolder(false);
+        if (dir) { await dir.removeEntry(v.fileName); local = true; }
+      } catch { /* not in the folder, or no access: leave it */ }
+      toast.success(local ? "Video deleted (online and from the Packing Videos folder)" : "Video deleted online — delete the file from Downloads yourself if you want");
+    } catch (e: any) {
+      toast.error(e?.message || "Could not delete the video");
+    } finally {
+      setDeleting("");
+    }
+  };
+
   const chooseCam = (id: string) => {
     setCam(id);
     try { localStorage.setItem("packingCam", id); } catch { /* fine */ }
@@ -354,8 +381,12 @@ export function PackingVideoPanel({ order }: { order: any }) {
             {videos.map((v, i) => (
               <li key={i} className="flex flex-wrap justify-between gap-2">
                 <span className="font-mono">{v.fileName}{v.url ? <a href={v.url} target="_blank" rel="noopener noreferrer" className="ml-2 font-sans text-primary underline">online ↗</a> : <span className="ml-2 font-sans text-amber-700">not online</span>}</span>
-                <span className="text-muted-foreground">
+                <span className="flex items-center gap-2 text-muted-foreground">
                   {new Date(v.recordedAt).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })} · {Math.floor((v.seconds || 0) / 60)}:{pad((v.seconds || 0) % 60)} · {v.savedTo}
+                  <button type="button" onClick={() => remove(v)} disabled={!!deleting || recording} aria-label={`Delete ${v.fileName}`}
+                    className="rounded p-1 text-red-600 hover:bg-red-50 disabled:opacity-40">
+                    <Trash2Icon className="size-3.5" />
+                  </button>
                 </span>
               </li>
             ))}
