@@ -401,6 +401,15 @@ export function PackingVideoPanel({ order }: { order: any }) {
                 ? `Customer told on ${[order.packingVideoNotice.whatsapp && "WhatsApp", order.packingVideoNotice.email && "email"].filter(Boolean).join(" + ")} · ${new Date(order.packingVideoNotice.at).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })}`
                 : "Customer not told yet"}
             </span>
+            {/* Whether the customer watched it (logPackingVideoView, from their order page). */}
+            {order?.packingVideoViews?.firstAt ? (
+              <span className="rounded-full bg-green-100 px-2 py-0.5 font-semibold text-green-800">
+                Watched{order.packingVideoViews.maxPct >= 100 ? " to the end" : order.packingVideoViews.maxPct > 0 ? ` ${order.packingVideoViews.maxPct}%` : " (started)"}
+                {` · ${order.packingVideoViews.plays || 1}× · last ${new Date(order.packingVideoViews.lastAt).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })}`}
+              </span>
+            ) : (
+              <span className="rounded-full bg-muted px-2 py-0.5 font-semibold">Not watched yet</span>
+            )}
             <Button type="button" size="sm" variant="outline" disabled={notifying || recording} onClick={() => notify(false)}>
               <SendIcon className="mr-1 size-3.5" /> {notifying ? "Sending…" : order?.packingVideoNotice ? "Send again" : "Send to customer"}
             </Button>

@@ -80,3 +80,39 @@ export const viewOrder = onCall(async (data: any, context: any) => {
   });
   return limited;
 });
+
+/**
+ * The customer played their packing video (customer order page): when first,
+ * how often and how far (25 / 50 / 75 / 100 %), on the order as
+ * packingVideoViews — evidence beside the unboxing rules if a claim comes.
+ * Only a caller who can see the full order counts (their signed link or
+ * account), and an admin's own viewing is not counted.
+ */
+export const logPackingVideoView = onCall(async (data: any, context: any) => {
+  const orderId = String(data?.orderId || "").trim();
+  if (!orderId || orderId.length > 64 || orderId.includes("/")) throw new HttpsError("invalid-argument", "Missing orderId");
+  const pct = [0, 25, 50, 75, 100].includes(Number(data?.pct)) ? Number(data.pct) : 0;
+  const ref = admin.firestore().collection("orders").doc(orderId);
+  const order = (await ref.get()).data() as any;
+  if (!order || !(Array.isArray(order.packingVideos) && order.packingVideos.some((v: any) => v?.url))) return { ok: false };
+  if (await isAdminCaller(context)) return { ok: false, admin: true };
+  let viaLink = false;
+  try { viaLink = linkTokenValid("view", orderId, data?.k) || payLinkValid(orderId, data?.t) || linkTokenValid("review", orderId, data?.t); } catch { viaLink = false; }
+  if (!viaLink && !ownsOrder(context, order)) return { ok: false };
+
+  const now = Date.now();
+  await admin.firestore().runTransaction(async (tx) => {
+    const cur = ((await tx.get(ref)).data() as any)?.packingVideoViews || {};
+    tx.update(ref, {
+      packingVideoViews: {
+        firstAt: cur.firstAt || now,
+        lastAt: now,
+        // A play is counted at its start (pct 0); the furthest point reached is kept.
+        plays: (Number(cur.plays) || 0) + (pct === 0 ? 1 : 0),
+        maxPct: Math.max(Number(cur.maxPct) || 0, pct),
+        ...(pct === 100 && !cur.completedAt ? { completedAt: now } : cur.completedAt ? { completedAt: cur.completedAt } : {}),
+      },
+    });
+  });
+  return { ok: true };
+});
