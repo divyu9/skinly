@@ -10,11 +10,14 @@ import { Button } from "@/components/ui/button.tsx";
  * arrived. A CCTV-style date and time (top right), and the order number and
  * customer (bottom bar), are drawn onto every frame, so the video speaks for itself.
  *
- * The file stays on this computer: Chrome's folder access saves it into a
+ * A copy also goes up to R2 (packing/<orderId>/<random>) so the customer can
+ * watch it on their order page, with the rules for receiving the parcel.
+ *
+ * The file is saved on this computer too: Chrome's folder access saves it into a
  * "Packing Videos" folder inside the folder picked once (Downloads), named
  * "<order> - <customer> - <date time>". Browsers without it (Safari, Firefox)
- * download it to Downloads instead. Only the file's name and time are kept
- * on the order (packingVideos), never the video.
+ * download it to Downloads instead. Recorded as MP4 where the browser can (plays on every phone), else WebM. The order keeps each file's name, time
+ * and the online copy's url (packingVideos).
  */
 
 const MAX_MS = 10 * 60_000;
@@ -58,7 +61,9 @@ async function packingFolder(ask: boolean): Promise<any | null> {
 }
 
 const pickMime = () => {
-  const options = ["video/webm;codecs=vp9,opus", "video/webm;codecs=vp8,opus", "video/webm", "video/mp4"];
+  // MP4 first: it plays on every phone (older iPhones can't play WebM) and in QuickTime.
+  // Chrome records MP4 since 2024; older browsers fall back to WebM.
+  const options = ["video/mp4;codecs=avc1.42E01E,mp4a.40.2", "video/mp4;codecs=avc1,mp4a", "video/mp4", "video/webm;codecs=vp9,opus", "video/webm;codecs=vp8,opus", "video/webm"];
   return options.find((m) => typeof MediaRecorder !== "undefined" && MediaRecorder.isTypeSupported(m)) || "";
 };
 
@@ -193,7 +198,7 @@ export function PackingVideoPanel({ order }: { order: any }) {
       const out = c.captureStream(30);
       stream.getAudioTracks().forEach((t) => out.addTrack(t));
       const mime = pickMime();
-      const rec = new MediaRecorder(out, { ...(mime ? { mimeType: mime } : {}), videoBitsPerSecond: 2_500_000 });
+      const rec = new MediaRecorder(out, { ...(mime ? { mimeType: mime } : {}), videoBitsPerSecond: 1_200_000 });
       live.current = { stream, rec, draw, chunks: [], started, dir, mime: rec.mimeType || mime };
       rec.ondataavailable = (e) => { if (e.data.size) live.current.chunks.push(e.data); };
       rec.onstop = () => void save();
@@ -242,11 +247,27 @@ export function PackingVideoPanel({ order }: { order: any }) {
       setState("idle");
       return;
     }
-    // A note on the order that the video exists (the file itself stays on this computer).
+    // A copy online, for the customer's order page: proof of what was packed and how the
+    // parcel looked. Behind a random name; shown only to whoever can see the full order.
+    let url = "";
+    try {
+      const [{ functions }, { httpsCallable }] = await Promise.all([import("@/lib/firebase"), import("firebase/functions")]);
+      const rnd = Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
+      const key = `packing/${String(order._id)}/${rnd}.${ext}`;
+      const type = (blob.type || "").split(";")[0] || (ext === "mp4" ? "video/mp4" : "video/webm");
+      const r: any = await httpsCallable(functions, "generateUploadUrl")({ fileName: key, contentType: type });
+      const put = await fetch(r.data.uploadUrl, { method: "PUT", body: blob, headers: { "Content-Type": type } });
+      if (!put.ok) throw new Error(`upload ${put.status}`);
+      url = String(r.data.publicUrl || "");
+      toast.success("Uploaded — the customer can watch it on their order page");
+    } catch (e: any) {
+      toast.warning(`Saved on this computer, but the online copy failed (${e?.message || e}). Record again to share it with the customer.`);
+    }
+    // A note on the order: the file's name and time, and the online copy if it went up.
     try {
       const { db, doc, updateDoc, arrayUnion } = await (await import("@/lib/fs")).loadFs();
       await updateDoc(doc(db, "orders", String(order._id)), {
-        packingVideos: arrayUnion({ fileName, recordedAt: l.started, seconds, bytes: blob.size, savedTo }),
+        packingVideos: arrayUnion({ fileName, recordedAt: l.started, seconds, bytes: blob.size, savedTo, ...(url ? { url } : {}) }),
       });
     } catch { /* the file is saved; only the note failed */ }
     setState("idle");
@@ -277,7 +298,7 @@ export function PackingVideoPanel({ order }: { order: any }) {
       </CardHeader>
       <CardContent className="space-y-3 text-sm">
         <p className="text-xs text-muted-foreground">
-          Record the parcel being packed: proof for a lost or "wrong item" claim. The order number, customer and time are stamped on the video.
+          Record the parcel being packed: proof for a lost or "wrong item" claim. The order number, customer and time are stamped on the video, and the customer can watch it on their order page.
           {canPickFolder()
             ? ` Saved on this computer in Downloads › Packing Videos${folderName ? "" : " (you'll pick the Downloads folder once)"}.`
             : " This browser saves it to Downloads (use Chrome to save into a Packing Videos folder)."}
@@ -327,7 +348,7 @@ export function PackingVideoPanel({ order }: { order: any }) {
           <ul className="space-y-1 border-t pt-2 text-xs">
             {videos.map((v, i) => (
               <li key={i} className="flex flex-wrap justify-between gap-2">
-                <span className="font-mono">{v.fileName}</span>
+                <span className="font-mono">{v.fileName}{v.url ? <a href={v.url} target="_blank" rel="noopener noreferrer" className="ml-2 font-sans text-primary underline">online ↗</a> : <span className="ml-2 font-sans text-amber-700">not online</span>}</span>
                 <span className="text-muted-foreground">
                   {new Date(v.recordedAt).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })} · {Math.floor((v.seconds || 0) / 60)}:{pad((v.seconds || 0) % 60)} · {v.savedTo}
                 </span>

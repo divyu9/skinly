@@ -14,6 +14,7 @@ import { BrandLogo } from "@/components/brand-logo.tsx";
 import { PackedForYou } from "@/components/packed-for-you.tsx";
 import { OrderItemImage } from "@/components/order-item-image.tsx";
 import { OrderTrackingHistory } from "@/components/order-tracking-history.tsx";
+import { PackingVideo } from "@/components/packing-video.tsx";
 import { ReviewRewardCta } from "@/components/review-reward-cta.tsx";
 import { AddToParcel, AddOnOfBanner } from "@/components/add-to-parcel.tsx";
 import { OrderProgress } from "@/components/order-progress.tsx";
@@ -413,6 +414,9 @@ function OrderDetailPageInner() {
                 ))}
               </CardContent>
             </Card>
+
+            {/* The packing video and the rules for receiving the parcel (full view only). */}
+            <PackingVideo order={order} />
 
             {/* Tracking Information */}
             {(order.awbNumber || order.trackingUrl || order.manualTrackingNumber) && (
