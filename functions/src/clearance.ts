@@ -527,3 +527,47 @@ export const upiOrderSweep = functionsV1.pubsub.schedule("every 5 minutes").onRu
   if (cancelled) console.log("upiOrderSweep cancelled", cancelled);
   return null;
 });
+
+
+/** Puts back on sale the pieces still held for this order (failed / cancelled / timed out). */
+export async function releaseClearanceFor(db: admin.firestore.Firestore, orderId: string, items: any[]): Promise<number> {
+  let n = 0;
+  for (const it of items || []) {
+    if (!it?.clearanceItemId) continue;
+    const cref = db.collection("clearanceItems").doc(String(it.clearanceItemId));
+    await db.runTransaction(async (tx) => {
+      const c = (await tx.get(cref)).data() as any;
+      if (c?.status === "reserved" && c.reservedOrderId === orderId) {
+        tx.update(cref, {
+          status: "available",
+          reservedOrderId: admin.firestore.FieldValue.delete(),
+          reservedAt: admin.firestore.FieldValue.delete(),
+          reservedUntil: admin.firestore.FieldValue.delete(),
+          releasedAt: Date.now(),
+        });
+        n++;
+      }
+    });
+  }
+  return n;
+}
+
+/*
+ * A clearance order that will not be paid lets its pieces go at once: its
+ * payment failed (PhonePe declined, UPI timed out) or it was cancelled, by
+ * whatever path. Pieces used to stay "reserved" until the hold ran out, and
+ * the admin could not take them off sale or count them down meanwhile.
+ * Only pieces still reserved for this very order are touched.
+ */
+export const onOrderReleaseClearance = functionsV1.firestore
+  .document("orders/{id}")
+  .onWrite(async (change, context) => {
+    const after = change.after.exists ? (change.after.data() as any) : null;
+    if (!after || !Array.isArray(after.items) || !after.items.some((i: any) => i?.clearanceItemId)) return null;
+    const before = change.before.exists ? (change.before.data() as any) : {};
+    const dead = (o: any) => o?.status === "cancelled" || (o?.paymentStatus === "failed" && o?.status !== "processing");
+    if (!dead(after) || dead(before)) return null;
+    const n = await releaseClearanceFor(admin.firestore(), context.params.id, after.items);
+    if (n) console.log("clearance released", { order: context.params.id, pieces: n, status: after.status, payment: after.paymentStatus });
+    return null;
+  });

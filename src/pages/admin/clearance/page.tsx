@@ -32,6 +32,9 @@ type Piece = {
   sourceOrderId?: string | null; sourceOrderNumber?: string; reservedOrderId?: string | null; soldOrderId?: string | null; soldAt?: number | null;
 };
 
+/** A piece the admin may take off sale: not held by an order that may still pay (an expired hold counts as free). */
+const isFree = (p: Piece) => p.status === "available" || p.status === "draft" || (p.status === "reserved" && p.buyable);
+
 const device = (p: { phoneBrand?: string; phoneModel?: string }) => {
   const b = (p.phoneBrand || "").trim(), m = (p.phoneModel || "").trim();
   return b && m.toLowerCase().startsWith(b.toLowerCase()) ? m : [b, m].filter(Boolean).join(" ");
@@ -331,8 +334,8 @@ function AdminClearanceInner() {
   };
 
   const removeOne = async (g: { key: string; pieces: Piece[] }) => {
-    const p = g.pieces.find((x) => x.status === "available" || x.status === "draft");
-    if (!p) { toast.error("No free piece to remove (the rest are held by an order)"); return; }
+    const p = g.pieces.find(isFree);
+    if (!p) { toast.error("No free piece to remove (the rest are held by an order still waiting for payment)"); return; }
     setBusy(g.key);
     try { await call("removeClearanceItem", { id: p.id }); toast.success("One piece removed"); await load(); }
     catch (e: any) { toast.error(e?.message || "Could not remove"); } finally { setBusy(""); }
@@ -426,7 +429,7 @@ function AdminClearanceInner() {
                           <VideoIcon className="mr-1 size-4" /> {f.videoUrl ? "Video" : "Add video"}
                         </Button>
                         <Button type="button" size="sm" variant="ghost" className="text-red-600" disabled={busy === g.key}
-                          onClick={async () => { for (const p of g.pieces.filter((x) => x.status === "available" || x.status === "draft")) { await call("removeClearanceItem", { id: p.id }).catch(() => {}); } toast.success("Removed from clearance"); void load(); }}>
+                          onClick={async () => { const free = g.pieces.filter(isFree); const held = g.pieces.length - free.length; for (const p of free) { await call("removeClearanceItem", { id: p.id }).catch(() => {}); } toast.success(held ? `Removed ${free.length}; ${held} still held by an unpaid order` : "Removed from clearance"); void load(); }}>
                           <TrashIcon className="size-4" />
                         </Button>
                       </div>

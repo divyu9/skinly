@@ -63,4 +63,4 @@ export * from "./orderItems";
 export * from "./modelRequestsAdmin";
 export * from "./activity";
 export * from "./stockHistory";
-export { addRtoToClearance, removeClearanceItem, listClearance, addClearanceStock, updateClearanceItem, getClearanceUpi, saveClearanceUpi, submitUpiPayment, confirmUpiPayment, upiOrderSweep, setClearanceVideo } from "./clearance";
+export { addRtoToClearance, removeClearanceItem, listClearance, addClearanceStock, updateClearanceItem, getClearanceUpi, saveClearanceUpi, submitUpiPayment, confirmUpiPayment, upiOrderSweep, setClearanceVideo, onOrderReleaseClearance } from "./clearance";
