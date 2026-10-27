@@ -140,7 +140,10 @@ export const createShipmozoShipment = onCall(async (data: any, context: any) => 
   const a = order.shippingAddress || {};
   // A re-booking after a cancel needs a fresh id: Shipmozo keeps the cancelled one.
   const attempt = Number(order.shipmozoAttempt) || 1;
-  const smzOrderId = `${String(order.orderNumber || orderDoc.id)}${attempt > 1 ? `-R${attempt}` : ""}`;
+  // Letters, digits and dashes only: "#4104" was pushed fine but then "not valid" for
+  // every later call (assign, detail), so the order could never get a courier.
+  const base = String(order.orderNumber || orderDoc.id).replace(/[^A-Za-z0-9-]/g, "") || orderDoc.id;
+  let smzOrderId = String(order.shipmozoOrderId || "") || `${base}${attempt > 1 ? `-R${attempt}` : ""}`;
   const lines = (payload.orderItems as any[]) || [];
 
   // 1. The order, once (a retry after a failed assign must not push it twice).
@@ -174,11 +177,20 @@ export const createShipmozoShipment = onCall(async (data: any, context: any) => 
       console.error("Shipmozo push-order refused", { order: smzOrderId, status: pushed.status, body: pushed.text.slice(0, 600) });
       throw new HttpsError("failed-precondition", `Shipmozo: ${why(pushed)}`);
     }
-    await orderRef.update({ shipmozoPushedAt: Date.now(), shipmozoOrderId: smzOrderId });
+    // Shipmozo answers with the id it filed the order under; every later call uses that.
+    const filed = String(pushed.data?.data?.order_id || pushed.data?.data?.reference_id || smzOrderId);
+    console.log("Shipmozo push-order", { sent: smzOrderId, filed, reference: pushed.data?.data?.reference_id });
+    smzOrderId = filed;
+    await orderRef.update({ shipmozoPushedAt: Date.now(), shipmozoOrderId: filed, shipmozoReferenceId: String(pushed.data?.data?.reference_id || "") });
   }
 
-  // 2. The courier.
-  const assigned = await smz("assign-courier", { body: { order_id: smzOrderId, courier_id: courier.id } });
+  // 2. The courier (by the filed id; by the reference id if Shipmozo doesn't know the first).
+  let assigned = await smz("assign-courier", { body: { order_id: smzOrderId, courier_id: courier.id } });
+  const ref2 = String((await orderRef.get()).data()?.shipmozoReferenceId || "");
+  if (!assigned.ok && ref2 && ref2 !== smzOrderId && /not valid|not found/i.test(why(assigned))) {
+    assigned = await smz("assign-courier", { body: { order_id: ref2, courier_id: courier.id } });
+    if (assigned.ok) { smzOrderId = ref2; await orderRef.update({ shipmozoOrderId: ref2 }); }
+  }
   if (!assigned.ok) {
     console.error("Shipmozo assign-courier refused", { order: smzOrderId, courier: courier.id, body: assigned.text.slice(0, 600) });
     throw new HttpsError("failed-precondition", `Shipmozo could not assign ${courier.name}: ${why(assigned)}`);
