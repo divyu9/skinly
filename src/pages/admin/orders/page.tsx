@@ -364,20 +364,20 @@ function AdminOrdersPageInner() {
       console.log(`Loading ${results.labels.length} labels for ST4 format`);
 
       // Load all label PDFs from base64 data (fetched by backend)
-      const labelPdfs: Array<{ orderNumber: string; pdf: PDFDocument }> = [];
+      // A label is either a PDF (RapidShyp, Delhivery) or an image (Shipmozo).
+      const labelPdfs: Array<{ orderNumber: string; pdf?: PDFDocument; image?: Uint8Array }> = [];
       const loadErrors: Array<{ orderNumber: string; error: string }> = [];
 
       for (const label of results.labels as any[]) {
         try {
-          // Shipmozo: a PNG, turned into a one-page PDF so it lays out like the others.
+          // Shipmozo: an image, embedded straight into the merged PDF below. (Wrapping it
+          // in a PDF of its own first came out blank: embedding that page lost the image.)
           if (label.pngBase64) {
             const bin = atob(label.pngBase64);
-            const png = new Uint8Array(bin.length);
-            for (let i = 0; i < bin.length; i++) png[i] = bin.charCodeAt(i);
-            const doc = await PDFDocument.create();
-            const img = await doc.embedPng(png);
-            doc.addPage([img.width, img.height]).drawImage(img, { x: 0, y: 0, width: img.width, height: img.height });
-            labelPdfs.push({ orderNumber: label.orderNumber, pdf: doc });
+            const image = new Uint8Array(bin.length);
+            for (let i = 0; i < bin.length; i++) image[i] = bin.charCodeAt(i);
+            if (!image.byteLength) throw new Error("Empty label image");
+            labelPdfs.push({ orderNumber: label.orderNumber, image });
             continue;
           }
           console.log(`Loading label for ${label.orderNumber}`);
@@ -431,17 +431,29 @@ function AdminOrdersPageInner() {
 
       const mergedPdf = await PDFDocument.create();
 
+      // Draws one label centred in a cell of the page, scaled to fit: a PDF's first page,
+      // or the image itself (PNG, or JPEG by its magic bytes).
+      const drawLabel = async (page: ReturnType<typeof mergedPdf.addPage>, entry: (typeof labelPdfs)[number], x: number, y: number, w: number, h: number) => {
+        if (entry.image) {
+          const isJpg = entry.image[0] === 0xff && entry.image[1] === 0xd8;
+          const img = isJpg ? await mergedPdf.embedJpg(entry.image) : await mergedPdf.embedPng(entry.image);
+          const sc = Math.min(w / img.width, h / img.height);
+          page.drawImage(img, { x: x + (w - img.width * sc) / 2, y: y + (h - img.height * sc) / 2, width: img.width * sc, height: img.height * sc });
+          return;
+        }
+        const [lp] = await mergedPdf.embedPages([entry.pdf!.getPages()[0]]);
+        const sc = Math.min(w / lp.width, h / lp.height);
+        page.drawPage(lp, { x: x + (w - lp.width * sc) / 2, y: y + (h - lp.height * sc) / 2, width: lp.width * sc, height: lp.height * sc });
+      };
+
       // 4×6 thermal: one label a page (288 × 432 pt), scaled to fit.
       if (labelFormat === "4x6") {
         const W = 288, H = 432;
-        for (const { orderNumber, pdf } of labelPdfs) {
+        for (const entry of labelPdfs) {
           try {
-            const [lp] = await mergedPdf.embedPages([pdf.getPages()[0]]);
-            const sc = Math.min(W / lp.width, H / lp.height);
-            const page = mergedPdf.addPage([W, H]);
-            page.drawPage(lp, { x: (W - lp.width * sc) / 2, y: (H - lp.height * sc) / 2, width: lp.width * sc, height: lp.height * sc });
+            await drawLabel(mergedPdf.addPage([W, H]), entry, 0, 0, W, H);
           } catch (error) {
-            loadErrors.push({ orderNumber, error: error instanceof Error ? error.message : "Failed to place label" });
+            loadErrors.push({ orderNumber: entry.orderNumber, error: error instanceof Error ? error.message : "Failed to place label" });
           }
         }
       }
@@ -473,35 +485,11 @@ function AdminOrdersPageInner() {
         ];
 
         for (let j = 0; j < batch.length; j++) {
-          const { orderNumber, pdf } = batch[j];
+          const { orderNumber } = batch[j];
           const position = positions[j];
           
           try {
-            // Get first page from the label PDF
-            const [labelPage] = await mergedPdf.embedPages([pdf.getPages()[0]]);
-            
-            // Get original dimensions
-            const { width: origWidth, height: origHeight } = labelPage;
-            
-            // Calculate scale to fit in cell while maintaining aspect ratio
-            const scaleX = LABEL_WIDTH / origWidth;
-            const scaleY = LABEL_HEIGHT / origHeight;
-            const scale = Math.min(scaleX, scaleY);
-            
-            const scaledWidth = origWidth * scale;
-            const scaledHeight = origHeight * scale;
-            
-            // Center label in its cell
-            const xOffset = (LABEL_WIDTH - scaledWidth) / 2;
-            const yOffset = (LABEL_HEIGHT - scaledHeight) / 2;
-            
-            // Draw the label on the A4 page
-            a4Page.drawPage(labelPage, {
-              x: position.x + xOffset,
-              y: position.y + yOffset,
-              width: scaledWidth,
-              height: scaledHeight,
-            });
+            await drawLabel(a4Page, batch[j], position.x, position.y, LABEL_WIDTH, LABEL_HEIGHT);
             
             console.log(`Placed label ${orderNumber} at position ${j + 1}/4 on page ${Math.floor(i / 4) + 1}`);
           } catch (error) {
