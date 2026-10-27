@@ -237,14 +237,20 @@ export async function cancelShipmozo(order: any, orderRef: admin.firestore.Docum
   });
 }
 
+/** A Shipmozo label as a PNG data URL (bulk printing in rapidshyp.ts uses it too). */
+export async function shipmozoLabelData(awb: string): Promise<string> {
+  const r = await smz(`get-order-label/${encodeURIComponent(awb)}`);
+  const label = Array.isArray(r.data?.data) ? String(r.data.data[0]?.label || "") : "";
+  if (!r.ok || !label.startsWith("data:image")) throw new Error(`Shipmozo did not return a label (${why(r)})`);
+  return label;
+}
+
 /** The label (Shipmozo returns a PNG data URL). */
 export const shipmozoLabel = onCall(async (data: any, context: any) => {
   await requireAdmin(context);
   const o = (await admin.firestore().collection("orders").doc(String(data?.orderId || "")).get()).data() as any;
   if (!o || o.shippingProvider !== "shipmozo" || !o.awbNumber) throw new HttpsError("failed-precondition", "This order has no Shipmozo shipment");
-  const r = await smz(`get-order-label/${encodeURIComponent(String(o.awbNumber))}`);
-  const label = Array.isArray(r.data?.data) ? String(r.data.data[0]?.label || "") : "";
-  if (!r.ok || !label.startsWith("data:image")) throw new HttpsError("unavailable", `Shipmozo did not return a label (${why(r)}) — download it from the Shipmozo panel`);
+  const label = await shipmozoLabelData(String(o.awbNumber)).catch((e) => { throw new HttpsError("unavailable", `${e?.message || e} — download it from the Shipmozo panel`); });
   return { label, awb: String(o.awbNumber) };
 });
 

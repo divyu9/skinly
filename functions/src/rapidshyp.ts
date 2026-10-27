@@ -667,6 +667,17 @@ export const bulkFetchLabels = onCall(async (data: any, context: any) => {
     const order: any = snap.exists ? snap.data() : null;
     const label = String(order?.orderNumber || order?.failedOrderNumber || "Pending");
     if (!order) { errors.push({ orderId: snap.id, orderNumber: label, error: "Order not found" }); continue; }
+    // Shipmozo sends its label as a PNG, not a PDF link; the page lays it out like the rest.
+    if (order.shippingProvider === "shipmozo" && order.awbNumber) {
+      try {
+        const { shipmozoLabelData } = await import("./shipmozo");
+        const dataUrl = await shipmozoLabelData(String(order.awbNumber));
+        labels.push({ orderId: snap.id, orderNumber: label, pngBase64: dataUrl.replace(/^data:image\/\w+;base64,/, "") });
+      } catch (e: any) {
+        errors.push({ orderId: snap.id, orderNumber: label, error: e?.message || "Shipmozo label failed" });
+      }
+      continue;
+    }
     // Delhivery's label links expire, so a Delhivery parcel's is asked for afresh.
     const labelUrl = order.shippingProvider === "delhivery" && order.awbNumber
       ? await delhiveryLabelLink(String(order.awbNumber)).catch(() => null) || order.labelUrl

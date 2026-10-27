@@ -286,14 +286,18 @@ function AdminOrdersPageInner() {
   };
 
   // Get valid orders for bulk labels (shipped status, has labelUrl)
+  // Orders whose label can be printed: booked with any courier (an AWB), not yet delivered.
+  // The ticked ones, or — with none ticked — every one in the tab.
+  const LABEL_STATUSES = new Set(["ready_to_ship", "shipped", "out_for_delivery", "processing"]);
   const getValidLabelOrders = () => {
     if (!displayOrders) return [];
-    return displayOrders.filter((o) => 
-      selectedOrders.has(o._id) && 
-      o.status === "shipped" && 
-      o.labelUrl
-    );
+    const pool = selectedOrders.size ? displayOrders.filter((o) => selectedOrders.has(o._id)) : displayOrders;
+    return pool.filter((o: any) => o.awbNumber && !o.isDeleted && LABEL_STATUSES.has(String(o.status)) && (o.labelUrl || o.shippingProvider === "delhivery" || o.shippingProvider === "shipmozo"));
   };
+  // 4×6 thermal (one label a page) or A4 (four a page), remembered.
+  const [labelFormat, setLabelFormat] = useState<"4x6" | "a4">(() => {
+    try { return localStorage.getItem("labelFormat") === "a4" ? "a4" : "4x6"; } catch { return "4x6"; }
+  });
 
   const handleBulkShip = async () => {
     const validOrders = getValidShipOrders();
@@ -363,8 +367,19 @@ function AdminOrdersPageInner() {
       const labelPdfs: Array<{ orderNumber: string; pdf: PDFDocument }> = [];
       const loadErrors: Array<{ orderNumber: string; error: string }> = [];
 
-      for (const label of results.labels) {
+      for (const label of results.labels as any[]) {
         try {
+          // Shipmozo: a PNG, turned into a one-page PDF so it lays out like the others.
+          if (label.pngBase64) {
+            const bin = atob(label.pngBase64);
+            const png = new Uint8Array(bin.length);
+            for (let i = 0; i < bin.length; i++) png[i] = bin.charCodeAt(i);
+            const doc = await PDFDocument.create();
+            const img = await doc.embedPng(png);
+            doc.addPage([img.width, img.height]).drawImage(img, { x: 0, y: 0, width: img.width, height: img.height });
+            labelPdfs.push({ orderNumber: label.orderNumber, pdf: doc });
+            continue;
+          }
           console.log(`Loading label for ${label.orderNumber}`);
           
           // Convert base64 to bytes
@@ -414,8 +429,25 @@ function AdminOrdersPageInner() {
 
       console.log(`Successfully loaded ${labelPdfs.length} labels, creating ST4 layout`);
 
-      // Create merged PDF with ST4 layout (2×2 grid on A4 pages)
       const mergedPdf = await PDFDocument.create();
+
+      // 4×6 thermal: one label a page (288 × 432 pt), scaled to fit.
+      if (labelFormat === "4x6") {
+        const W = 288, H = 432;
+        for (const { orderNumber, pdf } of labelPdfs) {
+          try {
+            const [lp] = await mergedPdf.embedPages([pdf.getPages()[0]]);
+            const sc = Math.min(W / lp.width, H / lp.height);
+            const page = mergedPdf.addPage([W, H]);
+            page.drawPage(lp, { x: (W - lp.width * sc) / 2, y: (H - lp.height * sc) / 2, width: lp.width * sc, height: lp.height * sc });
+          } catch (error) {
+            loadErrors.push({ orderNumber, error: error instanceof Error ? error.message : "Failed to place label" });
+          }
+        }
+      }
+
+      // A4: ST4 layout (2×2 grid on A4 pages)
+      if (labelFormat === "a4") {
       
       // A4 dimensions in points (72 points = 1 inch)
       const A4_WIDTH = 595.28;  // 210mm
@@ -481,6 +513,7 @@ function AdminOrdersPageInner() {
           }
         }
       }
+      }
 
       // Download merged PDF
       const mergedPdfBytes = await mergedPdf.save();
@@ -488,14 +521,15 @@ function AdminOrdersPageInner() {
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.download = `shipping-labels-st4-${new Date().toISOString().slice(0, 10)}.pdf`;
+      link.download = `shipping-labels-${labelFormat === "4x6" ? "4x6" : "a4"}-${new Date().toISOString().slice(0, 10)}.pdf`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
 
-      const totalPages = Math.ceil(labelPdfs.length / 4);
-      toast.success(`Downloaded ${labelPdfs.length} labels in ST4 format (${totalPages} A4 pages)`);
+      toast.success(labelFormat === "4x6"
+        ? `Downloaded ${labelPdfs.length} labels (4×6, one a page)`
+        : `Downloaded ${labelPdfs.length} labels (${Math.ceil(labelPdfs.length / 4)} A4 pages, four a page)`);
 
       if (loadErrors.length > 0 || results.errors.length > 0) {
         setBulkResults({
@@ -980,8 +1014,8 @@ function AdminOrdersPageInner() {
               Compare & ship ({selectedOrders.size})
             </Button>
             
-            {/* Bulk Fetch Labels - Shipped tab only */}
-            {statusFilter === "shipped" && (
+            {/* Print labels: Ready to ship and Shipped — the ticked orders, or all in the tab. */}
+            {(statusFilter === "ready_to_ship" || statusFilter === "shipped") && (
               <Button
                 onClick={() => setShowBulkLabelsDialog(true)}
                 disabled={isProcessingBulk || getValidLabelOrders().length === 0}
@@ -992,7 +1026,7 @@ function AdminOrdersPageInner() {
                 ) : (
                   <FileDownIcon className="size-4 mr-2" />
                 )}
-                Bulk Fetch Labels ({getValidLabelOrders().length})
+                Print labels ({selectedOrders.size ? getValidLabelOrders().length : `all ${getValidLabelOrders().length}`})
               </Button>
             )}
             
@@ -1277,17 +1311,25 @@ function AdminOrdersPageInner() {
       <Dialog open={showBulkLabelsDialog} onOpenChange={setShowBulkLabelsDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Bulk Fetch Labels</DialogTitle>
+            <DialogTitle>Print labels</DialogTitle>
             <DialogDescription>
-              Download combined PDF with labels for {getValidLabelOrders().length} selected orders?
+              One PDF with the labels of {getValidLabelOrders().length} {selectedOrders.size ? "selected" : "(all in this tab)"} orders — RapidShyp, Delhivery and Shipmozo together.
             </DialogDescription>
           </DialogHeader>
+          <div className="flex gap-2 pt-2">
+            {([["4x6", "4×6 thermal (1 a page)"], ["a4", "A4 (4 a page)"]] as const).map(([v, label]) => (
+              <Button key={v} type="button" size="sm" variant={labelFormat === v ? "default" : "outline"}
+                onClick={() => { setLabelFormat(v); try { localStorage.setItem("labelFormat", v); } catch { /* fine */ } }}>
+                {label}
+              </Button>
+            ))}
+          </div>
           <div className="py-4">
-            <p className="text-sm text-muted-foreground mb-2">Orders to fetch labels for:</p>
+            <p className="text-sm text-muted-foreground mb-2">Orders:</p>
             <div className="max-h-48 overflow-y-auto space-y-1">
               {getValidLabelOrders().map((order) => (
                 <div key={order._id} className="text-sm font-mono">
-                  {order.orderNumber} - AWB: {order.awbNumber}
+                  {order.orderNumber} - AWB: {order.awbNumber}{(order as any).courierName ? ` · ${(order as any).courierName}` : ""}
                 </div>
               ))}
             </div>
@@ -1296,8 +1338,8 @@ function AdminOrdersPageInner() {
             <Button variant="outline" onClick={() => setShowBulkLabelsDialog(false)}>
               Cancel
             </Button>
-            <Button onClick={handleBulkFetchLabels}>
-              Fetch Labels
+            <Button onClick={handleBulkFetchLabels} disabled={getValidLabelOrders().length === 0}>
+              Download labels PDF
             </Button>
           </DialogFooter>
         </DialogContent>
