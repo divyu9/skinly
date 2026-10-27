@@ -6,7 +6,8 @@ import { Button } from "@/components/ui/button.tsx";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog.tsx";
 
 /**
- * Compare & ship: every selected order priced both ways, then booked.
+ * Compare & ship: every selected order priced three ways (Delhivery Direct,
+ * RapidShyp, Shipmozo — whose courier can be picked), then booked.
  *
  * Opening it asks compareShipping, order by order, for Delhivery Direct's
  * serviceability and estimate and for RapidShyp's couriers on that lane —
@@ -19,16 +20,18 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
  */
 
 type Courier = { code: string; name: string; freight: number; mode: string; edd: string | null };
+type SmzCourier = { id: number; name: string; freight: number; edd: string; auto: boolean };
 type Compare = {
   pin: string; grams: number; codNeeded: boolean;
   delhivery: { serviceable: boolean; cod: boolean; charge: number | null; note: string; ready: boolean };
   rapidshyp: { couriers: Courier[]; error?: string };
+  shipmozo?: { couriers: SmzCourier[]; error?: string; ready?: boolean };
   missing: string[];
 };
-type Route = "delhivery" | "rapidshyp" | "skip";
+type Route = "delhivery" | "rapidshyp" | "shipmozo" | "skip";
 type Row = {
   id: string; orderNumber: string; city: string; pin: string;
-  cmp?: Compare; cmpError?: string; route: Route;
+  cmp?: Compare; cmpError?: string; route: Route; smzCourier?: number;
   state?: "booking" | "done" | "failed"; awb?: string; error?: string;
 };
 
@@ -38,12 +41,19 @@ const dlvOk = (c?: Compare) => !!c && c.delhivery.ready && c.delhivery.serviceab
 const rsOk = (c?: Compare) => !!c && c.rapidshyp.couriers.length > 0;
 const dlvCost = (c?: Compare) => (dlvOk(c) ? c!.delhivery.charge ?? Infinity : Infinity);
 const rsCost = (c?: Compare) => (rsOk(c) ? c!.rapidshyp.couriers[0].freight : Infinity);
-const best = (c?: Compare): Route => {
-  const d = dlvCost(c), r = rsCost(c);
-  if (d === Infinity && r === Infinity) return "skip";
-  return d <= r ? "delhivery" : "rapidshyp";
+const smOk = (c?: Compare) => !!c?.shipmozo?.ready && (c?.shipmozo?.couriers.length || 0) > 0;
+const smCost = (c?: Compare, id?: number) => {
+  if (!smOk(c)) return Infinity;
+  const list = c!.shipmozo!.couriers;
+  return (list.find((x) => x.id === id) || list[0]).freight;
 };
-const costOf = (r: Row) => (r.route === "delhivery" ? dlvCost(r.cmp) : r.route === "rapidshyp" ? rsCost(r.cmp) : 0);
+const best = (c?: Compare): Route => {
+  const d = dlvCost(c), r = rsCost(c), m = smCost(c);
+  const low = Math.min(d, r, m);
+  if (low === Infinity) return "skip";
+  return low === m ? "shipmozo" : low === d ? "delhivery" : "rapidshyp";
+};
+const costOf = (r: Row) => (r.route === "delhivery" ? dlvCost(r.cmp) : r.route === "rapidshyp" ? rsCost(r.cmp) : r.route === "shipmozo" ? smCost(r.cmp, r.smzCourier) : 0);
 
 export function DelhiveryBulkDialog({ open, onOpenChange, orders }: { open: boolean; onOpenChange: (o: boolean) => void; orders: any[] }) {
   const [rows, setRows] = useState<Row[]>([]);
@@ -65,7 +75,7 @@ export function DelhiveryBulkDialog({ open, onOpenChange, orders }: { open: bool
         if (cancelled.current) return;
         try {
           const cmp = await call<Compare>("compareShipping", { orderId: r.id });
-          patch(r.id, { cmp, route: best(cmp) });
+          patch(r.id, { cmp, route: best(cmp), smzCourier: cmp.shipmozo?.couriers[0]?.id });
         } catch (e: any) {
           patch(r.id, { cmpError: e?.message || "Could not check" });
         }
@@ -78,18 +88,20 @@ export function DelhiveryBulkDialog({ open, onOpenChange, orders }: { open: bool
 
   const toBook = rows.filter((r) => r.route !== "skip" && r.state !== "done");
   const total = useMemo(() => toBook.reduce((s, r) => s + (Number.isFinite(costOf(r)) ? costOf(r) : 0), 0), [toBook]);
-  const counts = { delhivery: toBook.filter((r) => r.route === "delhivery").length, rapidshyp: toBook.filter((r) => r.route === "rapidshyp").length };
+  const counts = { delhivery: toBook.filter((r) => r.route === "delhivery").length, rapidshyp: toBook.filter((r) => r.route === "rapidshyp").length, shipmozo: toBook.filter((r) => r.route === "shipmozo").length };
   const missing = rows.find((r) => r.cmp?.missing?.length)?.cmp?.missing || [];
 
   const book = async () => {
     if (!toBook.length) return;
-    if (!confirm(`Book ${toBook.length} order(s): ${counts.delhivery} with Delhivery Direct, ${counts.rapidshyp} with RapidShyp (about ₹${total.toFixed(0)})?`)) return;
+    if (!confirm(`Book ${toBook.length} order(s): ${counts.delhivery} with Delhivery Direct, ${counts.rapidshyp} with RapidShyp, ${counts.shipmozo} with Shipmozo (about ₹${total.toFixed(0)})?`)) return;
     setPhase("booking");
     let ok = 0;
     for (const r of toBook) {
       patch(r.id, { state: "booking" });
       try {
-        const res = await call<{ awbNumber: string }>(r.route === "delhivery" ? "createDelhiveryShipment" : "createShipment", { orderId: r.id });
+        const res = r.route === "shipmozo"
+          ? await call<{ awbNumber: string }>("createShipmozoShipment", { orderId: r.id, courierId: r.smzCourier })
+          : await call<{ awbNumber: string }>(r.route === "delhivery" ? "createDelhiveryShipment" : "createShipment", { orderId: r.id });
         patch(r.id, { state: "done", awb: res.awbNumber });
         ok++;
       } catch (e: any) {
@@ -106,7 +118,7 @@ export function DelhiveryBulkDialog({ open, onOpenChange, orders }: { open: bool
         <DialogHeader>
           <DialogTitle>Compare & ship</DialogTitle>
           <DialogDescription>
-            {phase === "quoting" ? "Pricing each order with Delhivery Direct and RapidShyp…" : "Each order starts on its cheaper route. Change any, then confirm."}
+            {phase === "quoting" ? "Pricing each order with Delhivery Direct, RapidShyp and Shipmozo…" : "Each order starts on its cheapest route. Change any, then confirm."}
             <span className="block text-xs">RapidShyp books the courier its own priority rule picks — set it to “cheapest first” in the RapidShyp panel so that is the one shown here.</span>
             {missing.length > 0 && <span className="block text-amber-700">Missing in Admin › Shipping: {missing.join(", ")}.</span>}
           </DialogDescription>
@@ -119,6 +131,7 @@ export function DelhiveryBulkDialog({ open, onOpenChange, orders }: { open: bool
                 <th className="px-3 py-2">Order</th>
                 <th className="px-3 py-2">Delhivery Direct</th>
                 <th className="px-3 py-2">RapidShyp (cheapest)</th>
+                <th className="px-3 py-2">Shipmozo</th>
                 <th className="px-3 py-2">Ship with</th>
                 <th className="px-3 py-2">Result</th>
               </tr>
@@ -157,11 +170,30 @@ export function DelhiveryBulkDialog({ open, onOpenChange, orders }: { open: bool
                         )}
                     </td>
                     <td className="px-3 py-2">
+                      {!c ? null : !c.shipmozo ? <span className="text-muted-foreground">—</span>
+                        : c.shipmozo.error ? <span className="text-destructive">{c.shipmozo.error}</span>
+                        : !c.shipmozo.ready ? <span className="text-amber-700">Pickup warehouse not set</span>
+                        : !c.shipmozo.couriers.length ? <span className="text-destructive">✗ No courier</span>
+                        : (
+                          <div className="space-y-1">
+                            <p className={cheaper === "shipmozo" ? "font-bold text-emerald-700" : ""}>₹{smCost(c, r.smzCourier).toFixed(2)}</p>
+                            <select value={r.smzCourier} disabled={phase === "booking" || r.state === "done"}
+                              onChange={(e) => patch(r.id, { smzCourier: Number(e.target.value), route: "shipmozo" })}
+                              className="h-7 max-w-[11rem] rounded-md border border-input bg-background px-1 text-xs">
+                              {c.shipmozo.couriers.map((x) => (
+                                <option key={x.id} value={x.id}>{x.name} · ₹{Math.round(x.freight)}{x.edd ? ` · ${x.edd}` : ""}</option>
+                              ))}
+                            </select>
+                          </div>
+                        )}
+                    </td>
+                    <td className="px-3 py-2">
                       <select value={r.route} disabled={!c || phase === "booking" || r.state === "done"}
                         onChange={(e) => patch(r.id, { route: e.target.value as Route })}
                         className="h-8 rounded-md border border-input bg-background px-2 text-sm">
                         <option value="delhivery" disabled={!dlvOk(c)}>Delhivery Direct</option>
                         <option value="rapidshyp" disabled={!rsOk(c)}>RapidShyp</option>
+                        <option value="shipmozo" disabled={!smOk(c)}>Shipmozo</option>
                         <option value="skip">Skip</option>
                       </select>
                     </td>
@@ -174,7 +206,7 @@ export function DelhiveryBulkDialog({ open, onOpenChange, orders }: { open: bool
                 );
               })}
               {rows.length === 0 && (
-                <tr><td colSpan={5} className="px-3 py-6 text-center text-muted-foreground">All selected orders already have a shipment.</td></tr>
+                <tr><td colSpan={6} className="px-3 py-6 text-center text-muted-foreground">All selected orders already have a shipment.</td></tr>
               )}
             </tbody>
           </table>
@@ -182,7 +214,7 @@ export function DelhiveryBulkDialog({ open, onOpenChange, orders }: { open: bool
 
         <DialogFooter className="items-center gap-3 sm:justify-between">
           <p className="text-sm text-muted-foreground">
-            {counts.delhivery} Delhivery Direct · {counts.rapidshyp} RapidShyp · about <b className="text-foreground">₹{total.toFixed(0)}</b>
+            {counts.delhivery} Delhivery Direct · {counts.rapidshyp} RapidShyp · {counts.shipmozo} Shipmozo · about <b className="text-foreground">₹{total.toFixed(0)}</b>
           </p>
           <div className="flex gap-2">
             <Button variant="outline" onClick={() => onOpenChange(false)} disabled={phase === "booking"}>

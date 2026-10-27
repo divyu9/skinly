@@ -24,6 +24,7 @@ import { UpiPaymentPanel } from "./_components/UpiPaymentPanel.tsx";
 import { PaymentTestPanel } from "./_components/PaymentTestPanel.tsx";
 import { ShippingTrackingPanel, type ShippingFormData, type ManualTrackingFormData } from "./_components/ShippingTrackingPanel.tsx";
 import { DelhiveryShipPanel } from "./_components/DelhiveryShipPanel.tsx";
+import { ShipmozoPanel } from "./_components/ShipmozoPanel.tsx";
 import { PackageCard } from "./_components/PackageCard.tsx";
 import { OrderNavigator } from "./_components/OrderNavigator.tsx";
 import { OrderTimeline } from "./_components/OrderTimeline.tsx";
@@ -595,6 +596,8 @@ function OrderDetailPageInner() {
           {orderId && (
             <PackageCard orderId={orderId} override={(order as any).packageOverride} locked={!!order.awbNumber} />
           )}
+
+          <ShipmozoPanel order={order} />
 
           {orderId && (
             <DelhiveryShipPanel

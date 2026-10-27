@@ -53,15 +53,18 @@ export const compareShipping = onCall(async (data: any, context: any) => {
   const value = orderMoney(order, Array.isArray(order.items) ? order.items : []).total;
   const codValue = Number(payload.codValue) || 0;
 
-  const [svc, dlvCharge, rs] = await Promise.all([
+  const { shipmozoQuoteFor } = await import("./shipmozo");
+  const [svc, dlvCharge, rs, smz] = await Promise.all([
     serviceability(pin).catch((e) => ({ serviceable: false, cod: false, prepaid: false, note: String(e?.message || e) })),
     estimate(cfg.originPin, pin, grams, isCod, codValue, cfg.mode).catch(() => null),
     rapidshypCouriers(cfg.originPin, pin, isCod, value, grams).catch((e) => ({ error: String(e?.message || e) })),
+    shipmozoQuoteFor(db, orderId).catch((e) => ({ couriers: [], error: String(e?.message || e), ready: false })),
   ]);
   return {
     pin, grams, codNeeded: isCod, value,
     delhivery: { ...svc, charge: dlvCharge, mode: cfg.mode, ready: !!cfg.pickup },
     rapidshyp: Array.isArray(rs) ? { couriers: rs.slice(0, 6) } : { couriers: [], error: rs.error },
+    shipmozo: smz,
     missing: [!cfg.pickup && "Delhivery pickup name", !cfg.originPin && "warehouse pincode", !cfg.gstin && "GSTIN"].filter(Boolean),
   };
 });

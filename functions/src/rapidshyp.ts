@@ -596,6 +596,9 @@ export const cancelShipment = onCall(async (data: any, context: any) => {
   // A parcel booked directly with Delhivery is cancelled there (delhivery.ts).
   if (order.shippingProvider === "delhivery") {
     await cancelDelhiveryWaybill(String(order.awbNumber));
+  } else if (order.shippingProvider === "shipmozo") {
+    const { cancelShipmozo } = await import("./shipmozo");
+    await cancelShipmozo(order, orderRef);
   } else {
     const config = getRapidShypConfig();
     const base = config.apiUrl.replace(/\/rapidshyp\/apis\/v1\/wrapper\/?$/, "");
