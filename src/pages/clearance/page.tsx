@@ -327,12 +327,26 @@ export default function ClearancePage() {
                   <button type="button" onClick={() => setView({ p, i: 0 })} className="text-left">
                     <p className="line-clamp-2 text-sm font-bold leading-snug">{p.productTitle}</p>
                   </button>
-                  {reviewsOf.get(p.productId) && (
-                    <button type="button" onClick={() => setView({ p, i: 0 })} className="text-left text-xs font-semibold">
-                      <span className="text-amber-500">★</span> {reviewsOf.get(p.productId)!.avg.toFixed(1)}
-                      <span className="font-normal text-muted-foreground"> · {reviewsOf.get(p.productId)!.count} review{reviewsOf.get(p.productId)!.count === 1 ? "" : "s"}</span>
-                    </button>
-                  )}
+                  {reviewsOf.get(p.productId) && (() => {
+                    const rv = reviewsOf.get(p.productId)!;
+                    // The best-written review, readable on the card itself; the sheet has them all.
+                    const top = [...rv.list].filter((r) => r.comment.trim()).sort((a, b) => b.rating - a.rating || b.comment.length - a.comment.length)[0];
+                    return (
+                      <button type="button" onClick={() => setView({ p, i: 0 })}
+                        className="rounded-xl border border-amber-200 bg-amber-50 px-2.5 py-2 text-left dark:border-amber-900 dark:bg-amber-950/30">
+                        <span className="text-xs font-bold">
+                          <span className="text-amber-500">{"★".repeat(Math.round(rv.avg))}</span> {rv.avg.toFixed(1)}
+                          <span className="font-semibold text-muted-foreground"> · {rv.count} review{rv.count === 1 ? "" : "s"}</span>
+                        </span>
+                        {top && (
+                          <>
+                            <span className="mt-1 line-clamp-3 block text-[13px] leading-snug text-foreground">“{top.comment}”</span>
+                            <span className="mt-0.5 block text-[11px] font-semibold text-muted-foreground">— {top.userName}{top.city ? `, ${top.city}` : ""}{rv.count > 1 ? ` · read all ${rv.count}` : ""}</span>
+                          </>
+                        )}
+                      </button>
+                    );
+                  })()}
                   {device(p) && <p className="text-xs font-semibold text-brand">Cut for {device(p)}</p>}
                   <div className="flex flex-wrap items-center gap-1.5">
                     {p.condition && <span className="rounded-full bg-sunny px-2 py-0.5 text-[11px] font-bold text-ink">{p.condition}</span>}
