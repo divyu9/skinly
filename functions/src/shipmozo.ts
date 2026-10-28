@@ -256,15 +256,20 @@ export const shipmozoLabel = onCall(async (data: any, context: any) => {
 
 // ── tracking ─────────────────────────────────────────────────────────────────
 
-/** Shipmozo's status text, read into ours; anything unknown is recorded as text only. */
-function ourStatus(s: string): OrderStatus | null {
-  const t = s.toLowerCase();
-  if (/rto|return(ed)? to origin|returned/.test(t)) return "rto";
-  if (/^delivered|\bdelivered\b/.test(t) && !/undelivered|not delivered/.test(t)) return "delivered";
-  if (/out for delivery/.test(t)) return "out_for_delivery";
-  if (/undelivered|not delivered|ndr|delivery attempted|failed attempt/.test(t)) return "undelivered";
-  if (/in transit|picked|shipped|dispatched|reached|arrived/.test(t)) return "shipped";
-  if (/pickup pending|pending pickup|manifest|booked|pickup scheduled|not picked/.test(t)) return "ready_to_ship";
+/**
+ * Shipmozo's status text, read into ours; anything unknown is recorded as text only.
+ * Read with punctuation flattened: Shipmozo writes "In-Transit", and matching only
+ * "in transit" left a picked-up parcel sitting in Ready to Ship (#4104).
+ */
+export function ourStatus(s: string): OrderStatus | null {
+  const t = ` ${s.toLowerCase().replace(/[^a-z]+/g, " ").trim()} `;
+  if (/ rto | return(ed)? to origin | returned | return in transit /.test(t)) return "rto";
+  if (/ undelivered | not delivered | ndr | delivery attempted | failed attempt | delivery failed /.test(t)) return "undelivered";
+  if (/ out for delivery /.test(t)) return "out_for_delivery";
+  if (/ delivered /.test(t)) return "delivered";
+  // Before "picked": "not picked" / "pickup pending" are still waiting for the courier.
+  if (/ pickup pending | pending pickup | not picked | manifest(ed)? | booked | pickup scheduled | ready to ship /.test(t)) return "ready_to_ship";
+  if (/ in transit | intransit | picked( up)? | shipped | dispatched | reached | arrived | at hub | connected /.test(t)) return "shipped";
   return null;
 }
 
