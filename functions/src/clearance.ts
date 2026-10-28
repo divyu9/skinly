@@ -292,7 +292,24 @@ export const listClearance = onCall(async (data: any, context: any) => {
       image: String((p.images || []).find((i: any) => i?.url)?.url || ""), code: String(p.designSale?.code || ""),
     })).filter((p) => p.slug);
   } catch (e: any) { console.warn("listClearance designs:", e?.message || e); }
-  return { items, designs };
+  // Approved reviews of the clearance kinds on sale, newest first: the cards show a
+  // rating, the product sheet the reviews, the page a "what buyers say" strip.
+  let reviews: any[] = [];
+  try {
+    const pids = new Set(items.map((i: any) => String(i.productId)));
+    const rs = await db.collection("reviews").where("status", "==", "approved").get();
+    reviews = rs.docs.map((d) => d.data() as any)
+      .filter((r) => pids.has(String(r.productId)) && Number(r.rating) > 0)
+      .sort((a, b) => Number(b.createdAt || b._creationTime || 0) - Number(a.createdAt || a._creationTime || 0))
+      .slice(0, 100)
+      .map((r) => ({
+        productId: String(r.productId), rating: Number(r.rating), title: String(r.title || ""), comment: String(r.comment || "").slice(0, 600),
+        userName: String(r.userName || "Customer"), city: String(r.city || ""), verified: r.verified !== false,
+        imageUrls: (Array.isArray(r.imageUrls) ? r.imageUrls : []).filter((u: any) => /^https:\/\//.test(String(u))).slice(0, 4),
+        createdAt: Number(r.createdAt || r._creationTime || 0),
+      }));
+  } catch (e: any) { console.warn("listClearance reviews:", e?.message || e); }
+  return { items, designs, reviews };
 });
 
 /**

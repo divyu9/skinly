@@ -47,6 +47,11 @@ function CardVideo({ src, poster }: { src: string; poster?: string }) {
   );
 }
 
+export type ClearanceReview = {
+  productId: string; rating: number; title: string; comment: string; userName: string; city: string;
+  verified: boolean; imageUrls: string[]; createdAt: number;
+};
+
 const coverageLabel = (c?: string | null) => (c === "only_back" ? "Back only" : c === "full_body_wrap" ? "Full body wrap" : "");
 const device = (p: Piece) => {
   const b = (p.phoneBrand || "").trim(), m = (p.phoneModel || "").trim();
@@ -64,6 +69,8 @@ export default function ClearancePage() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [items, setItems] = useState<Piece[] | null>(null);
   const [designs, setDesigns] = useState<{ title: string; slug: string; price: number; image: string }[]>([]);
+  // Approved reviews of the clearance kinds (listClearance), newest first.
+  const [reviews, setReviews] = useState<ClearanceReview[]>([]);
   const [error, setError] = useState("");
   const [brand, setBrand] = useState("all");
   const [q, setQ] = useState("");
@@ -80,7 +87,7 @@ export default function ClearancePage() {
       try {
         const [{ functions }, { httpsCallable }] = await Promise.all([import("@/lib/firebase"), import("firebase/functions")]);
         const res: any = await httpsCallable(functions, "listClearance")({});
-        if (live) { setItems(res.data?.items || []); setDesigns(res.data?.designs || []); }
+        if (live) { setItems(res.data?.items || []); setDesigns(res.data?.designs || []); setReviews(res.data?.reviews || []); }
       } catch (e: any) {
         if (live) setError(e?.message || "Could not load the clearance sale");
       }
@@ -126,6 +133,22 @@ export default function ClearancePage() {
         return { ...g, isNew: newest.includes(g) };
       });
   }, [items]);
+
+  // Per listing: its reviews, average and count (cards and the product sheet).
+  const reviewsOf = useMemo(() => {
+    const m = new Map<string, { avg: number; count: number; list: ClearanceReview[] }>();
+    for (const r of reviews) {
+      const e = m.get(r.productId) || { avg: 0, count: 0, list: [] };
+      e.list.push(r); e.count++; e.avg = e.list.reduce((s, x) => s + x.rating, 0) / e.count;
+      m.set(r.productId, e);
+    }
+    return m;
+  }, [reviews]);
+  // The strip: the best-written reviews first (rating, then length of the comment), at most 8.
+  const praise = useMemo(() => [...reviews]
+    .filter((r) => r.rating >= 4 && r.comment.trim().length >= 6)
+    .sort((a, b) => b.rating - a.rating || b.comment.length - a.comment.length)
+    .slice(0, 8), [reviews]);
 
   const shown = useMemo(() => {
     let list = groups.filter((p) => brand === "all" || p.phoneBrand === brand);
@@ -191,6 +214,36 @@ export default function ClearancePage() {
             Skins already printed and cut for one exact device. If yours is listed, it's ready to ship — at a clearance price.
           </p>
         </div>
+
+        {praise.length > 0 && (
+          <section className="mt-8" aria-label="What clearance buyers say">
+            <div className="flex items-baseline justify-between gap-2">
+              <h2 className="text-lg font-extrabold">What clearance buyers say</h2>
+              <span className="text-xs text-muted-foreground">
+                ★ {(reviews.reduce((s, r) => s + r.rating, 0) / reviews.length).toFixed(1)} from {reviews.length} review{reviews.length === 1 ? "" : "s"}
+              </span>
+            </div>
+            <div className="no-scrollbar -mx-4 mt-3 flex snap-x gap-3 overflow-x-auto px-4 pb-2">
+              {praise.map((r, i) => {
+                const kind = groups.find((g) => g.productId === r.productId && !g.soldOut) || groups.find((g) => g.productId === r.productId);
+                return (
+                  <figure key={i} className="tile flex w-72 shrink-0 snap-start flex-col gap-2 rounded-2xl p-4">
+                    <p className="text-sm text-amber-500" aria-label={`${r.rating} out of 5`}>{"★".repeat(r.rating)}<span className="text-ink/20">{"★".repeat(5 - r.rating)}</span></p>
+                    <blockquote className="line-clamp-4 text-sm leading-snug">“{r.comment}”</blockquote>
+                    <figcaption className="mt-auto text-xs text-muted-foreground">
+                      <span className="font-semibold text-foreground">{r.userName}</span>{r.city ? `, ${r.city}` : ""}{r.verified ? " · Verified buyer" : ""}
+                      {kind && (
+                        <button type="button" onClick={() => setView({ p: kind, i: 0 })} className="mt-1 block truncate text-left font-semibold text-brand underline-offset-2 hover:underline">
+                          on {kind.productTitle}
+                        </button>
+                      )}
+                    </figcaption>
+                  </figure>
+                );
+              })}
+            </div>
+          </section>
+        )}
 
         {designs.length > 0 && (
           <section className="mt-8">
@@ -274,6 +327,12 @@ export default function ClearancePage() {
                   <button type="button" onClick={() => setView({ p, i: 0 })} className="text-left">
                     <p className="line-clamp-2 text-sm font-bold leading-snug">{p.productTitle}</p>
                   </button>
+                  {reviewsOf.get(p.productId) && (
+                    <button type="button" onClick={() => setView({ p, i: 0 })} className="text-left text-xs font-semibold">
+                      <span className="text-amber-500">★</span> {reviewsOf.get(p.productId)!.avg.toFixed(1)}
+                      <span className="font-normal text-muted-foreground"> · {reviewsOf.get(p.productId)!.count} review{reviewsOf.get(p.productId)!.count === 1 ? "" : "s"}</span>
+                    </button>
+                  )}
                   {device(p) && <p className="text-xs font-semibold text-brand">Cut for {device(p)}</p>}
                   <div className="flex flex-wrap items-center gap-1.5">
                     {p.condition && <span className="rounded-full bg-sunny px-2 py-0.5 text-[11px] font-bold text-ink">{p.condition}</span>}
@@ -328,6 +387,7 @@ export default function ClearancePage() {
             busy={busy === view.p.id}
             added={!freePiece(view.p)}
             soldOut={(view.p as any).soldOut === true}
+            reviews={reviewsOf.get(view.p.productId)?.list || []}
             onBuy={() => add(view.p, true)}
             onAdd={() => add(view.p, false)}
             onClose={() => setView(null)}

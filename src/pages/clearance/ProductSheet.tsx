@@ -17,13 +17,15 @@ export type SheetPiece = {
  * phone, a centred panel on a wider screen. The card showed only the first
  * photo and nothing said there were more.
  */
-export function ProductSheet({ p, device, coverageLabel, busy, added, soldOut = false, onBuy, onAdd, onClose }: {
+export function ProductSheet({ p, device, coverageLabel, busy, added, soldOut = false, reviews = [], onBuy, onAdd, onClose }: {
   p: SheetPiece;
   device: string;
   coverageLabel: string;
   busy: boolean;
   added: boolean;
   soldOut?: boolean;
+  /** Approved reviews of this listing (listClearance). */
+  reviews?: { rating: number; title: string; comment: string; userName: string; city: string; verified: boolean; imageUrls: string[]; createdAt: number }[];
   onBuy: () => void;
   onAdd: () => void;
   onClose: () => void;
@@ -141,6 +143,27 @@ export function ProductSheet({ p, device, coverageLabel, busy, added, soldOut = 
               </p>
             )}
             {p.description && <p className="whitespace-pre-line text-sm leading-relaxed text-muted-foreground">{p.description}</p>}
+            {reviews.length > 0 && (
+              <section className="space-y-2 border-t pt-3" aria-label="Reviews">
+                <p className="text-sm font-extrabold">
+                  <span className="text-amber-500">★</span> {(reviews.reduce((s, r) => s + r.rating, 0) / reviews.length).toFixed(1)}
+                  <span className="font-semibold text-muted-foreground"> · {reviews.length} review{reviews.length === 1 ? "" : "s"}</span>
+                </p>
+                {reviews.slice(0, 6).map((r, i) => (
+                  <div key={i} className="rounded-xl bg-muted/60 p-3 text-sm">
+                    <p className="text-xs text-amber-500">{"★".repeat(r.rating)}<span className="text-ink/20">{"★".repeat(5 - r.rating)}</span></p>
+                    {r.title && <p className="font-semibold">{r.title}</p>}
+                    {r.comment && <p className="leading-snug">{r.comment}</p>}
+                    {r.imageUrls.length > 0 && (
+                      <div className="mt-2 flex gap-1.5">
+                        {r.imageUrls.map((u) => <img key={u} src={sizedImage(u, 160)} alt="Customer photo" className="size-14 rounded-lg object-cover" loading="lazy" />)}
+                      </div>
+                    )}
+                    <p className="mt-1 text-xs text-muted-foreground">{r.userName}{r.city ? `, ${r.city}` : ""}{r.verified ? " · Verified buyer" : ""}</p>
+                  </div>
+                ))}
+              </section>
+            )}
             {p.amazonUrl && (
               <a href={p.amazonUrl} target="_blank" rel="nofollow sponsored noopener noreferrer" className="inline-block text-xs font-semibold text-primary underline underline-offset-2">
                 Compare price on Amazon ↗
