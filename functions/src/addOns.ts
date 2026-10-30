@@ -151,3 +151,27 @@ export const mirrorParentShipping = functionsV1.firestore
     }
     return null;
   });
+
+/*
+ * The parent's list of add-ons that were paid for (paidAddOnIds), so "+ add-on"
+ * on the orders list means there really is something extra to pack. addOnOrderIds
+ * is written the moment an add-on checkout starts: #4105 showed the badge for a
+ * ₹99 add-on nobody paid, and its page (paid add-ons only) showed nothing.
+ * A paid add-on joins the list; one cancelled or returned leaves it.
+ */
+export const syncPaidAddOns = functionsV1.firestore
+  .document("orders/{orderId}")
+  .onWrite(async (change, context) => {
+    const after = change.after.exists ? (change.after.data() as any) : null;
+    const before = change.before.exists ? (change.before.data() as any) : null;
+    const parentId = String(after?.addOnTo || before?.addOnTo || "");
+    if (!parentId) return null;
+    const live = (o: any) => !!o && isConfirmedOrder(o) && !["cancelled", "rto"].includes(String(o.status)) && !o.isDeleted;
+    const was = live(before), is = live(after);
+    if (was === is) return null;
+    await admin.firestore().collection("orders").doc(parentId).update({
+      paidAddOnIds: is ? admin.firestore.FieldValue.arrayUnion(context.params.orderId) : admin.firestore.FieldValue.arrayRemove(context.params.orderId),
+      updatedAt: Date.now(),
+    }).catch((e) => console.warn("syncPaidAddOns", { parentId, child: context.params.orderId, e: e?.message || e }));
+    return null;
+  });

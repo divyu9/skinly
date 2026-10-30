@@ -1145,8 +1145,9 @@ function AdminOrdersPageInner() {
                               Add-on to {(order as any).parentOrderNumber || "order"}
                             </span>
                           )}
-                          {((order as any).addOnOrderIds?.length || 0) > 0 && (
-                            <span className="ml-1.5 rounded-full bg-amber-100 px-1.5 py-0.5 font-sans text-[10px] font-semibold text-amber-900" title="The customer added items after ordering: pack them in this parcel">
+                          {/* Paid add-ons only (syncPaidAddOns): an unpaid add-on checkout is nothing to pack. */}
+                          {((order as any).paidAddOnIds?.length || 0) > 0 && (
+                            <span className="ml-1.5 rounded-full bg-amber-100 px-1.5 py-0.5 font-sans text-[10px] font-semibold text-amber-900" title="The customer added items after ordering and paid for them: pack them in this parcel (see the order)">
                               + add-on
                             </span>
                           )}
