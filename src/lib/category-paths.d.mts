@@ -13,3 +13,5 @@ export function homeMeta(stats: CatalogueStats | null | undefined): { title: str
 export const PRODUCTS_META: { title: string; description: string };
 export const BUSINESS: { name: string; legalName: string; city: string; region: string; postalCode: string; country: string; phone: string; email: string };
 export const ORGANIZATION_LD: Record<string, unknown>;
+export const HOME_FAQS: { question: string; answer: string }[];
+export const HOME_FAQ_LD: Record<string, unknown>;

@@ -29,7 +29,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { offerShippingAndReturns, productMaterial } from "../src/lib/merchant-schema.mjs";
 import { resolveSeoTarget, selectSeoProducts, seoCopy, brandGadgetLabel, gadgetLabel, oneRowPerDesign, slugify, productSeoTitle } from "../src/lib/seo-pages.mjs";
-import { CATEGORY_PAGES, GADGET_PAGES, homeMeta, PRODUCTS_META, CATALOGUE_CLAIMS, ORGANIZATION_LD } from "../src/lib/category-paths.mjs";
+import { CATEGORY_PAGES, GADGET_PAGES, homeMeta, PRODUCTS_META, CATALOGUE_CLAIMS, ORGANIZATION_LD, HOME_FAQS, HOME_FAQ_LD } from "../src/lib/category-paths.mjs";
 
 const SITE = "https://goskinly.com";
 const DIST = path.resolve("dist");
@@ -721,6 +721,8 @@ function staticPages(hub, home = null, stats = null) {
             "query-input": "required name=search_term_string",
           },
         },
+        // The homepage FAQ (shown on the page from the same list, Index.tsx).
+        HOME_FAQ_LD,
       ],
       body:
         `<h1>${esc(HOME_META.heading)}</h1><p>${esc(homeDescription)}</p>` +
@@ -738,7 +740,9 @@ function staticPages(hub, home = null, stats = null) {
                 ? `<li><a href="${SITE}${esc(b.href)}">${esc(b.brand)} skins</a> <span>(${b.models} models)</span></li>`
                 : `<li>${esc(b.brand)} <span>(${b.models} models)</span></li>`))
           : "") +
-        `<p><a href="${SITE}/products">Shop all skins</a> · <a href="${SITE}/devices">Supported devices</a></p>`,
+        `<p><a href="${SITE}/products">Shop all skins</a> · <a href="${SITE}/devices">Supported devices</a></p>` +
+        `<h2>Questions people ask</h2>` +
+        HOME_FAQS.map((f) => `<h3>${esc(f.question)}</h3><p>${esc(f.answer)}</p>`).join(""),
     },
     {
       route: "/products",
@@ -870,7 +874,7 @@ function staticPages(hub, home = null, stats = null) {
         `<h2>What a skin does — and doesn't</h2>` +
         `<p>A skin changes how your device looks and protects the surface from scratches and scuffs. It is a thin wrap, so it does not protect against drops. It peels off cleanly without residue.</p>` +
         `<h2>Finishes</h2><p>Matte, 3D textured, embossed and transparent (Tranzy) finishes; full body wraps for phones cover the back and sides.</p>` +
-        `<h2>Buying from us</h2><ul><li>Free shipping above ₹499 within India.</li><li>Returns within 48 hours of delivery for a wrong, missing or damaged item.</li><li>Every review on the site comes from a delivered order.</li></ul>` +
+        `<h2>Buying from us</h2><ul><li>Free shipping above ₹499 within India.</li><li>Claims for a wrong, missing or damaged item within 48 hours of delivery, with one uncut unboxing video showing the label — every parcel is packed on camera.</li><li>Every review on the site comes from a delivered order.</li></ul>` +
         `<h2>Contact</h2><p>WhatsApp +91 97610 11121 · prgoskinly@gmail.com · Agra, Uttar Pradesh 282003, India.</p>` +
         `<p><a href="${SITE}/how-to-apply">How to apply a skin</a> · <a href="${SITE}/real-photos">Real photos</a> · <a href="${SITE}/reviews">Customer reviews</a> · <a href="${SITE}/products">Shop</a></p>`,
     },
@@ -899,20 +903,56 @@ function staticPages(hub, home = null, stats = null) {
 
 function magnetoPage(products, variantsByProduct) {
   const p = products.find((x) => x.slug === "magneto-x-type-c-ssd-enclosure-with-m-2-nvme-support");
-  const prices = p ? (variantsByProduct.get(p._id) || []).map((v) => Number(v.price)).filter((n) => n > 0) : [];
+  const variants = p ? (variantsByProduct.get(p._id) || []) : [];
+  const prices = variants.map((v) => Number(v.price)).filter((n) => n > 0);
   const from = prices.length ? Math.min(...prices) : null;
+  const inStock = variants.some((v) => Number(v.inventoryQuantity ?? v.stock ?? 1) > 0);
+  const image = p ? (p.images || []).map((i) => i?.url).find(liveImage) : undefined;
   const description =
     `Magneto X — a Type-C SSD enclosure that takes M.2 NVMe drives up to 4TB.` +
     (from ? ` From ₹${from}.` : "") +
     " Free shipping above ₹499.";
+  // The page's own facts (src/pages/magneto-x/page.tsx: hero, specs, features, in the box),
+  // in the HTML before JavaScript runs — it held one sentence, too thin for search or AI answers.
+  const facts = [
+    "69.5 × 69 × 11.4mm aluminium disc that snaps to the back of the phone (MagSafe, or the adhesive magnet ring included for any phone).",
+    "Takes any M.2 NVMe SSD in 2230 or 2242 size, up to 4TB (M key or B+M key). Ships empty: you fit your own SSD.",
+    "USB 3.1 Gen 2, 10Gbps over Type-C, backward compatible with USB 3.0.",
+    "100W PD passthrough: charges the phone while the drive is connected.",
+    "Plug and play on Android, Windows, Mac and Linux; no drivers, hot-swappable.",
+    "The aluminium body is the heatsink, so it does not throttle mid-transfer.",
+  ];
+  const box = ["Magneto X enclosure", "Adhesive magnet ring", "Type-C braided cable", "USB-A adapter", "Screwdriver + screws", "Thermal pad"];
   return {
     route: "/magneto-x",
     title: "Magneto X Type-C SSD Enclosure (M.2 NVMe, up to 4TB) | GoSkinly",
     description,
     canonical: `${SITE}/magneto-x`,
-    image: p ? (p.images || []).map((i) => i?.url).find(liveImage) : undefined,
+    image,
     priority: "0.8",
-    body: `<h1>Magneto X</h1><p>${esc(description)}</p>${p ? `<p><a href="${SITE}/products/${esc(p.slug)}">Buy Magneto X</a></p>` : ""}`,
+    ...(p && from ? {
+      jsonLd: [{
+        "@context": "https://schema.org",
+        "@type": "Product",
+        name: "Magneto X Type-C SSD Enclosure (M.2 NVMe, up to 4TB)",
+        description: `${description} ${facts.join(" ")}`,
+        ...(image ? { image } : {}),
+        ...(variants[0]?.sku ? { sku: variants[0].sku } : {}),
+        brand: { "@type": "Brand", name: "Magneto" },
+        offers: {
+          "@type": "Offer", price: from, priceCurrency: "INR",
+          availability: inStock ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",
+          url: `${SITE}/products/${p.slug}`, seller: { "@type": "Organization", name: "GoSkinly" },
+        },
+      }],
+    } : {}),
+    body:
+      `<h1>Magneto X — your phone just grew a hard drive</h1><p>${esc(description)}</p>` +
+      `<p>A 69mm aluminium disc that snaps to the back of your phone and turns it into up to 4TB of NVMe storage, at 10Gbps, while it charges.</p>` +
+      `<h2>Specifications</h2><ul>${facts.map((f) => `<li>${esc(f)}</li>`).join("")}</ul>` +
+      `<h2>In the box</h2><ul>${box.map((b) => `<li>${esc(b)}</li>`).join("")}</ul>` +
+      `<p>First use on Android: turn on USB file transfer once and it is remembered.</p>` +
+      (p ? `<p><a href="${SITE}/products/${esc(p.slug)}">Buy Magneto X${from ? ` from ₹${from}` : ""}</a></p>` : ""),
   };
 }
 
@@ -1694,7 +1734,7 @@ async function writeLlmsTxt({ statics, categories, seo, seoDocs, seoInfo, stats 
     "- What a skin is: a thin printed vinyl wrap for the back (and optionally sides) of a device — it changes the look and guards against scratches, not drops.",
     "- Fit: cut for one exact model from its own template, with openings for cameras, ports and buttons.",
     "- Shipping: India only; free above ₹499, otherwise a flat fee; dispatched in 2–3 business days, 4–6 days in transit.",
-    "- Returns: within 48 hours of delivery for a wrong, missing or damaged item.",
+    "- Claims: a wrong, missing or damaged item is claimed within 48 hours of delivery, with one complete, uncut unboxing video that shows the sealed parcel and its label (name and AWB). Every parcel is packed on camera; a parcel that looks opened or tampered with should be refused at the door. No claim is accepted without the uncut video.",
     "- Payment: online (UPI, cards) and cash on delivery where available.",
     "- Support: WhatsApp +91 97610 11121, email prgoskinly@gmail.com.",
     "",

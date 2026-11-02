@@ -181,3 +181,53 @@ export function canonicalListingPath(productType, gadget) {
   if (productType && CATEGORY_PAGES[productType]) return CATEGORY_PAGES[productType].path;
   return "/products";
 }
+
+/**
+ * The homepage FAQ: shown on the page (Index.tsx) and written as FAQPage
+ * markup (Index.tsx's Helmet and scripts/prerender.mjs) from this one list, so
+ * the markup always says what the page shows. Answer engines (ChatGPT search,
+ * Perplexity, AI Overviews) lift these answers as they are — keep them true to
+ * the policies pages.
+ */
+export const HOME_FAQS = [
+  {
+    question: "Will a skin fit my exact phone or laptop?",
+    // No count here: CATALOGUE_CLAIMS is a deliberately low floor, and the title and
+    // llms.txt carry the live figures — two different numbers would confuse answer engines.
+    answer: "Yes. Every skin is printed and cut to order from the template of your exact model, with openings for the cameras, ports and buttons. We cut for thousands of phone, laptop, tablet, console and camera models — find yours on the Supported Devices page.",
+  },
+  {
+    question: "Does a skin protect my device?",
+    answer: "A skin guards the back (and sides, with full body wrap) against scratches, scuffs and daily wear. It is a thin vinyl wrap, so it does not protect against drops.",
+  },
+  {
+    question: "Will it leave residue when I remove it?",
+    answer: "No. The vinyl peels off clean, without sticky residue, when you want a new look.",
+  },
+  {
+    question: "How long does delivery take?",
+    answer: "Orders are dispatched in 2–3 business days and take about 4–6 days in transit across India. Shipping is free above ₹499; below that a flat fee applies.",
+  },
+  {
+    question: "Is cash on delivery available?",
+    answer: "Yes, where the courier offers it. You can also pay online by UPI or card.",
+  },
+  {
+    question: "How do I apply the skin?",
+    answer: "Each order comes with an install kit. Clean the device with the wipes, lift the dust, line the skin up from the bottom ports and press it down with the squeegee. The step-by-step guide and video are at goskinly.com/how-to-apply.",
+  },
+  {
+    question: "What if my parcel arrives damaged, opened or with a wrong item?",
+    answer: "Every parcel is packed on camera. If the parcel looks opened or tampered with, do not accept it. When you open it, record one complete, uncut unboxing video showing the sealed parcel and its label (your name and AWB number). Claims for a missing, wrong or damaged item are accepted within 48 hours of delivery with that video — couriers reject cut or edited videos.",
+  },
+  {
+    question: "My device model isn't listed. What can I do?",
+    answer: "Request it from the site and we add the template — you are told on WhatsApp when it is ready to order.",
+  },
+];
+
+export const HOME_FAQ_LD = {
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  mainEntity: HOME_FAQS.map((f) => ({ "@type": "Question", name: f.question, acceptedAnswer: { "@type": "Answer", text: f.answer } })),
+};

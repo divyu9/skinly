@@ -1,6 +1,6 @@
 import { Fragment, useState, useEffect, useRef, Suspense } from "react";
 import { lazyWithReload } from "@/lib/lazy-with-reload";
-import { homeMeta, ORGANIZATION_LD, type CatalogueStats } from "@/lib/category-paths.mjs";
+import { homeMeta, ORGANIZATION_LD, HOME_FAQS, HOME_FAQ_LD, type CatalogueStats } from "@/lib/category-paths.mjs";
 import { homeSeedValue } from "@/lib/firebase-hooks";
 import { Helmet } from "react-helmet-async";
 import { AnnouncementBar } from "@/components/announcement-bar.tsx";
@@ -308,6 +308,7 @@ export default function Index() {
             not repeated here disappears from the page Google renders. */}
         <script type="application/ld+json">{JSON.stringify(HOME_ORGANIZATION_LD)}</script>
         <script type="application/ld+json">{JSON.stringify(HOME_WEBSITE_LD)}</script>
+        <script type="application/ld+json">{JSON.stringify(HOME_FAQ_LD)}</script>
       </Helmet>
 
       {/* Announcement Bar */}
@@ -334,6 +335,23 @@ export default function Index() {
       <main className="halftone min-h-screen">
         {/* Dynamically render sections based on layout manager order */}
         {sortedActiveSections.map((section) => renderSection(section))}
+
+        {/* The same questions as the FAQPage markup above (HOME_FAQS): answer
+            engines quote these, and the markup must match what is shown. */}
+        <section className="container mx-auto max-w-3xl px-4 py-12" aria-labelledby="home-faq">
+          <h2 id="home-faq" className="text-2xl font-extrabold tracking-tight">Questions people ask</h2>
+          <div className="mt-4 divide-y-2 divide-ink/10 rounded-2xl border-2 border-ink bg-card">
+            {HOME_FAQS.map((f) => (
+              <details key={f.question} className="group px-4 py-3">
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-3 font-bold">
+                  {f.question}
+                  <span className="text-xl leading-none text-brand transition-transform group-open:rotate-45">+</span>
+                </summary>
+                <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{f.answer}</p>
+              </details>
+            ))}
+          </div>
+        </section>
       </main>
 
       {/* Footer */}
