@@ -30,7 +30,7 @@ import { StyleStrip } from "@/components/products/StyleStrip.tsx";
 import { useProductsData } from "@/hooks/useProductsData";
 import { writeActiveDevice } from "@/lib/active-device";
 import { CATEGORY_PAGES, canonicalListingPath } from "@/lib/category-paths.mjs";
-import { ANNOUNCEMENT_DISMISSED_EVENT, isAnnouncementDismissed } from "@/lib/announcement-dismissed.ts";
+import { ANNOUNCEMENT_DISMISSED_EVENT, isAnnouncementDismissed, announcementLikelyShown, announcementLive } from "@/lib/announcement-dismissed.ts";
 import { BrandPicker } from "./_components/brand-picker.tsx";
 
 export default function ProductsPage() {
@@ -54,7 +54,12 @@ export default function ProductsPage() {
     window.addEventListener(ANNOUNCEMENT_DISMISSED_EVENT, sync);
     return () => window.removeEventListener(ANNOUNCEMENT_DISMISSED_EVENT, sync);
   }, []);
-  const showAnnouncement = (homepageSettings?.announcementEnabled ?? false) && !barDismissed;
+  // Until the settings answer, assume what the header assumes (last visit, or
+  // on): guessing "off" put the header at 64 and moved this strip and the
+  // whole grid 28px down when Firestore answered (0.04 of CLS on a phone).
+  const showAnnouncement = (homepageSettings !== undefined
+    ? announcementLive(homepageSettings)
+    : announcementLikelyShown()) && !barDismissed;
   const announcementHeight = showAnnouncement ? 28 : 0;
   const headerHeight = 64;
   const categoryHeaderTop = announcementHeight + headerHeight;
@@ -480,7 +485,7 @@ export default function ProductsPage() {
 
           {/* Shop by Brand — above the device box, because brand comes first
               in the sequence a shopper works through: brand, then model. */}
-          {showBrandPicker && <BrandPicker brands={availableBrands} />}
+          {showBrandPicker && <BrandPicker brands={availableBrands} loading={!!isInitialLoading} />}
 
           {/* Device Selection CTA */}
           {showDeviceCTA && (

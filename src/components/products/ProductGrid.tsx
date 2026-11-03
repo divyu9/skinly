@@ -68,13 +68,11 @@ export const ProductGrid = memo(function ProductGrid({
   if (isLoading) {
     return (
       <>
-        {/* Loading indicator */}
-        <div className="flex items-center justify-center gap-3 py-8 mb-4 bg-muted/30 rounded-lg">
-          <Loader2Icon className="size-6 animate-spin text-primary" />
-          <p className="text-sm font-medium text-muted-foreground">
-            {loadingMessage}
-          </p>
-        </div>
+        {/* Announced, not drawn. An 88px "Loading…" row stood above the
+            skeletons and vanished when the products came, while the style
+            and brand rows above it appeared: the grid jumped 104px on every
+            skins listing (field CLS). The skeleton cards say loading already. */}
+        <p className="sr-only" role="status">{loadingMessage}</p>
         
         {/* Skeleton grid */}
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-4">

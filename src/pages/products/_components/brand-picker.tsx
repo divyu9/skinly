@@ -52,7 +52,7 @@ const pretty = (name: string) =>
  * by the catch-all Android listings, a Lenovo laptop by the catch-all laptop
  * ones, and a row that named neither read as "we don't do your phone".
  */
-export function BrandPicker({ brands }: { brands: BrandOption[] }) {
+export function BrandPicker({ brands, loading = false }: { brands: BrandOption[]; loading?: boolean }) {
   const [searchParams, setSearchParams] = useSearchParams();
   const [logos, setLogos] = useState<Record<string, BrandLogo>>({});
 
@@ -89,6 +89,20 @@ export function BrandPicker({ brands }: { brands: BrandOption[] }) {
     );
   }, [brands, logos]);
 
+  // While the listing loads there are no brands yet: hold the row with blank
+  // chips of the same size, or the grid moves down 89px when they arrive.
+  if (chips.length < 2 && loading) {
+    return (
+      <div aria-hidden="true" className="-mx-4 mb-1 flex gap-3.5 overflow-hidden px-4 pb-1 pt-1.5 sm:mx-0 sm:gap-4 sm:px-0 sm:pb-2 sm:pt-2">
+        {Array.from({ length: 7 }).map((_, i) => (
+          <span key={i} className="flex shrink-0 flex-col items-center gap-1.5">
+            <span className="size-14 animate-pulse rounded-full bg-muted sm:size-16" />
+            <span className="text-[11px] sm:text-xs">&nbsp;</span>
+          </span>
+        ))}
+      </div>
+    );
+  }
   if (chips.length < 2) return null;
 
   const active = BRAND_ALIASES[brandKey(searchParams.get("brand"))] || brandKey(searchParams.get("brand"));

@@ -16,11 +16,16 @@ import { loadCatalogue, type ThemePage } from "@/lib/catalogue";
  */
 export function StyleStrip({ gadget }: { gadget?: string | null }) {
   const [themes, setThemes] = useState<ThemePage[]>([]);
+  const [known, setKnown] = useState(false);
   useEffect(() => {
     let live = true;
-    void loadCatalogue().then((c) => { if (live && c?.themes?.length) setThemes(c.themes); });
+    void loadCatalogue().then((c) => { if (!live) return; if (c?.themes?.length) setThemes(c.themes); setKnown(true); });
     return () => { live = false; };
   }, []);
+
+  // Hold the row's height until the catalogue answers, so the grid under it
+  // does not move down 84px when it arrives.
+  if (!known) return <div className="mb-4 h-[68px]" aria-hidden="true" />;
 
   const shown = gadget
     ? [...themes.filter((t) => t.gadget === gadget), ...themes.filter((t) => !t.gadget)]

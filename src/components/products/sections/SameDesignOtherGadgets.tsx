@@ -29,6 +29,8 @@ export function SameDesignOtherGadgets({ productId, brand }: { productId: string
 
   useEffect(() => {
     let live = true;
+    // The previous product's row would otherwise stay up, linking to its gadgets, until the catalogue answers.
+    setRows(null);
     loadCatalogue().then((c) => {
       if (!live || !c) return;
       const self = c.products.find((p) => p._id === productId);

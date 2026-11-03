@@ -1,7 +1,7 @@
-import { Suspense, useEffect } from "react";
+import { Suspense, useEffect, useLayoutEffect } from "react";
 import { usePageLoaded } from "./hooks/use-page-loaded";
 import { useGlobalDragScroll } from "./hooks/use-drag-scroll";
-import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes, useLocation, useNavigationType } from "react-router-dom";
 import { HelmetProvider } from "react-helmet-async";
 import { DefaultProviders } from "./components/providers/default.tsx";
 import { AdminPageWrapper } from "./components/admin-page-wrapper.tsx";
@@ -121,6 +121,28 @@ function PageSkeleton() {
  * quiet, so the shopper's tap on the cart opens it without a download — and
  * without those chunks competing with the page's own pictures on arrival.
  */
+/**
+ * A link to another page opens at its top. Nothing did this, so a tap on a
+ * card at the bottom of a listing opened the product page scrolled 3,000px
+ * down, where its rows ("… for your other gadgets", suggestions) were still
+ * swapping skeletons for content in view: CLS 1.6 on a phone for that one
+ * tap, and Search Console put every URL in "Poor" (CLS over 0.25) from
+ * 19 Oct 2026. Before paint, so the old scroll position is never drawn.
+ *
+ * Back/forward (POP) keeps the browser's own restoration, and a change of
+ * query alone (filters, the model picker writing ?model=) or a #hash link
+ * stays where it is.
+ */
+function ScrollToTopOnNavigate() {
+  const { pathname, hash } = useLocation();
+  const navType = useNavigationType();
+  useLayoutEffect(() => {
+    if (navType === "POP" || hash) return;
+    window.scrollTo(0, 0);
+  }, [pathname]); // eslint-disable-line react-hooks/exhaustive-deps
+  return null;
+}
+
 /** Press-and-drag for every sideways row marked data-drag-scroll (hooks/use-drag-scroll.ts). */
 function DragScrollRows() {
   useGlobalDragScroll();
@@ -191,6 +213,7 @@ export default function App() {
           <ReferralTracker />
           <PrefetchCheckoutChunks />
           <WarmProductLinks />
+          <ScrollToTopOnNavigate />
           <DragScrollRows />
           <StorefrontErrorBoundary>
           <Routes>
