@@ -12,9 +12,11 @@ const REASONS = ["Lost in transit", "Delivered damaged", "Wrong item delivered",
 
 /**
  * Reship a lost or damaged parcel: a replacement order (#4079-R1) with the
- * chosen lines, its material taken like any order, booked on RapidShyp
- * straight away (functions/src/orderItems.ts reshipOrder). On a replacement,
- * this shows which order it replaces instead.
+ * chosen lines (functions/src/orderItems.ts reshipOrder). Its material is
+ * taken like any order's unless "a new piece goes out" is unticked — the
+ * returned parcel sent again is stock already counted. It opens on its own
+ * page with Compare & ship (CourierPanel), so any courier can take it. On a
+ * replacement, this shows which order it replaces instead.
  */
 export function ReshipPanel({ order, orderId }: { order: any; orderId: string }) {
   const navigate = useNavigate();
@@ -22,6 +24,7 @@ export function ReshipPanel({ order, orderId }: { order: any; orderId: string })
   const [picked, setPicked] = useState<Set<number>>(new Set());
   const [why, setWhy] = useState(REASONS[0]);
   const [note, setNote] = useState("");
+  const [takeStock, setTakeStock] = useState(true);
   const [busy, setBusy] = useState(false);
   const items: any[] = Array.isArray(order?.items) ? order.items : [];
   const reships: any[] = Array.isArray(order?.reships) ? order.reships : [];
@@ -40,22 +43,15 @@ export function ReshipPanel({ order, orderId }: { order: any; orderId: string })
   const confirmed = order?.orderNumber && order?.status !== "pending_payment" && order?.paymentStatus !== "failed" && !order?.isDeleted;
   if (!confirmed || !items.length) return null;
 
-  const start = () => { setPicked(new Set(items.map((_, i) => i))); setWhy(REASONS[0]); setNote(""); setOpen(true); };
+  const start = () => { setPicked(new Set(items.map((_, i) => i))); setWhy(REASONS[0]); setNote(""); setTakeStock(true); setOpen(true); };
   const go = async () => {
     const reason = [why, note.trim()].filter(Boolean).join(": ");
     setBusy(true);
     try {
-      const fns = getFunctions();
-      const r: any = (await httpsCallable(fns, "reshipOrder")({ orderId, reason, lineIndexes: [...picked] })).data;
-      toast.success(`Replacement ${r.orderNumber} created — booking RapidShyp…`);
-      try {
-        await httpsCallable(fns, "createRapidshypOrder")({ orderId: r.orderId });
-        toast.success(`${r.orderNumber} booked on RapidShyp`);
-      } catch (e: any) {
-        toast.error(`${r.orderNumber} created, but RapidShyp said: ${e?.message || "booking failed"} — book it from its page`);
-      }
+      const r: any = (await httpsCallable(getFunctions(), "reshipOrder")({ orderId, reason, lineIndexes: [...picked], takeStock })).data;
+      toast.success(`Replacement ${r.orderNumber} created — pick its courier`);
       setOpen(false);
-      navigate(`/backend-skinly/orders/${r.orderId}`);
+      navigate(`/backend-skinly/orders/${r.orderId}?ship=1`);
     } catch (e: any) {
       toast.error(e?.message || "Could not create the replacement");
     } finally { setBusy(false); }
@@ -68,7 +64,7 @@ export function ReshipPanel({ order, orderId }: { order: any; orderId: string })
           <CardTitle className="flex items-center gap-2 text-base"><RotateCcwIcon className="size-4" /> Reship</CardTitle>
         </CardHeader>
         <CardContent className="space-y-2 text-sm">
-          <p className="text-muted-foreground">Lost or arrived damaged? Send it again as a replacement order — stock is taken and RapidShyp is booked.</p>
+          <p className="text-muted-foreground">Lost or arrived damaged? Send it again as a replacement order, then pick its courier. Same parcel not picked up? Use Change courier above instead.</p>
           {reships.map((r) => (
             <p key={r.orderId} className="text-xs">
               <Link to={`/backend-skinly/orders/${r.orderId}`} className="font-bold underline">{r.orderNumber}</Link>
@@ -82,7 +78,7 @@ export function ReshipPanel({ order, orderId }: { order: any; orderId: string })
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>Reship {order.orderNumber}</DialogTitle>
-            <DialogDescription>Creates {order.orderNumber}-R{reships.length + 1} at ₹0 to the same address, takes the material, and books it on RapidShyp.</DialogDescription>
+            <DialogDescription>Creates {order.orderNumber}-R{reships.length + 1} at ₹0 to the same address and opens it with Compare & ship (Delhivery, RapidShyp, Shipmozo).</DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
             <div className="space-y-1.5">
@@ -99,11 +95,15 @@ export function ReshipPanel({ order, orderId }: { order: any; orderId: string })
               {REASONS.map((r) => <option key={r}>{r}</option>)}
             </select>
             <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Details (courier ticket, photo received…)" />
+            <label className="flex items-start gap-2 text-sm">
+              <input type="checkbox" className="mt-1" checked={takeStock} onChange={(e) => setTakeStock(e.target.checked)} />
+              <span>A new piece goes out — take it from stock <span className="text-muted-foreground">(untick when sending the same piece again, e.g. the returned parcel)</span></span>
+            </label>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
             <Button onClick={go} disabled={busy || !picked.size || (why === "Other" && !note.trim())}>
-              {busy && <LoaderIcon className="mr-1.5 size-4 animate-spin" />}Create replacement & book
+              {busy && <LoaderIcon className="mr-1.5 size-4 animate-spin" />}Create replacement
             </Button>
           </DialogFooter>
         </DialogContent>

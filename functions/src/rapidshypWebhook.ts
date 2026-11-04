@@ -122,7 +122,8 @@ export async function applyShipment(
   shipment: any
 ): Promise<Record<string, unknown>> {
   const awbNumber = String(shipment?.awb || "");
-  const orderNumber = record?.seller_order_id ? String(record.seller_order_id) : "";
+  // A re-booking after a cancel goes in as "#4104-S2" (rapidshyp.ts buildOrderPayload).
+  const orderNumber = record?.seller_order_id ? String(record.seller_order_id).replace(/-S\d+$/, "") : "";
   const shipmentStatus = String(shipment?.shipment_status || "");
   const statusCode = String(shipment?.current_tracking_status_code || "");
   const statusDesc = String(shipment?.current_tracking_status_desc || "");

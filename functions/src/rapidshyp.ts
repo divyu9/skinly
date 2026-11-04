@@ -2,7 +2,7 @@ import { onCall, HttpsError } from "firebase-functions/v1/https";
 import * as admin from "firebase-admin";
 import { requireAdmin } from "./auth";
 import { enforceDailyRateLimit } from "./rate-limit";
-import { setOrderStatus } from "./orderStatus";
+import { normalizeOrderStatus, setOrderStatus } from "./orderStatus";
 import { cancelDelhiveryWaybill, delhiveryLabelLink } from "./delhiveryApi";
 import { isConfirmedOrder } from "./materials";
 
@@ -324,7 +324,8 @@ export async function buildOrderPayload(orderId: string) {
   const names = await pickupNames(db);
 
   const payload: Record<string, unknown> = {
-    orderId: order.orderNumber || orderDoc.id,
+    // After a cancelled RapidShyp booking, a fresh id: RapidShyp keeps the old one.
+    orderId: `${order.orderNumber || orderDoc.id}${Number(order.rapidshypAttempt) > 0 ? `-S${Number(order.rapidshypAttempt) + 1}` : ""}`,
     orderDate: new Date(orderedAt).toISOString().split("T")[0],
     pickupAddressName: names.pickup,
     storeName: names.store,
@@ -580,20 +581,13 @@ export const createRapidshypOrder = onCall(async (data: any, context: any) => {
   };
 });
 
-export const cancelShipment = onCall(async (data: any, context: any) => {
-  const { uid } = await requireAdmin(context);
-  const orderId = String(data?.orderId || "");
-  if (!orderId) throw new HttpsError("invalid-argument", "Missing orderId");
-
-  const db = admin.firestore();
-  const orderRef = db.collection("orders").doc(orderId);
-  const orderDoc = await orderRef.get();
-  if (!orderDoc.exists) throw new HttpsError("not-found", "Order not found");
-
-  const order = orderDoc.data()!;
-  if (!order.awbNumber) throw new HttpsError("failed-precondition", "Order has no shipment to cancel");
-
-  // A parcel booked directly with Delhivery is cancelled there (delhivery.ts).
+/**
+ * Cancels the courier booking behind an order's AWB, wherever it was made:
+ * Delhivery Direct, Shipmozo, or RapidShyp. A RapidShyp cancel bumps
+ * rapidshypAttempt, so the next booking goes in under a fresh order id
+ * (#4104-S2) instead of the one RapidShyp still holds.
+ */
+async function cancelCourierBooking(order: any, orderRef: admin.firestore.DocumentReference) {
   if (order.shippingProvider === "delhivery") {
     await cancelDelhiveryWaybill(String(order.awbNumber));
   } else if (order.shippingProvider === "shipmozo") {
@@ -612,7 +606,27 @@ export const cancelShipment = onCall(async (data: any, context: any) => {
       console.error("RapidShyp cancelShipment failed", { status: response.status, body });
       throw new HttpsError("unavailable", describeError(response.status, body));
     }
+    await orderRef.update({
+      rapidshypAttempt: admin.firestore.FieldValue.increment(1),
+      rapidshypOrderId: admin.firestore.FieldValue.delete(),
+    });
   }
+}
+
+export const cancelShipment = onCall(async (data: any, context: any) => {
+  const { uid } = await requireAdmin(context);
+  const orderId = String(data?.orderId || "");
+  if (!orderId) throw new HttpsError("invalid-argument", "Missing orderId");
+
+  const db = admin.firestore();
+  const orderRef = db.collection("orders").doc(orderId);
+  const orderDoc = await orderRef.get();
+  if (!orderDoc.exists) throw new HttpsError("not-found", "Order not found");
+
+  const order = orderDoc.data()!;
+  if (!order.awbNumber) throw new HttpsError("failed-precondition", "Order has no shipment to cancel");
+
+  await cancelCourierBooking(order, orderRef);
 
   await orderRef.update({
     awbNumber: admin.firestore.FieldValue.delete(),
@@ -643,6 +657,78 @@ export const cancelShipment = onCall(async (data: any, context: any) => {
       : "Shipment cancelled successfully",
     orderNumber: order.orderNumber,
   };
+});
+
+/**
+ * Admin › Order › Change courier: the same parcel goes out with another
+ * courier. The case it was written for: an Amazon order given a manual
+ * tracking ID that Amazon's courier never picked up, so it has to leave with
+ * Delhivery, RapidShyp or Shipmozo instead.
+ *
+ * Not a reship (orderItems.ts reshipOrder): no new order and no stock taken,
+ * because the piece on the shelf is the one already deducted. The old
+ * shipment is cancelled where it was booked through an API (or only dropped,
+ * when skipCancel says the courier will never act on it), kept in
+ * shipmentHistory with its cost, and the order goes back to processing so
+ * Compare & ship can book it. "shipped" is taken off statusNotified so the
+ * customer is sent the new tracking when the new booking lands, unless
+ * notifyCustomer is false.
+ */
+export const rebookShipment = onCall(async (data: any, context: any) => {
+  const { uid } = await requireAdmin(context);
+  const orderId = String(data?.orderId || "");
+  const reason = String(data?.reason || "").trim().slice(0, 300);
+  const notify = data?.notifyCustomer !== false;
+  const skipCancel = data?.skipCancel === true;
+  if (!orderId) throw new HttpsError("invalid-argument", "Missing orderId");
+  if (!reason) throw new HttpsError("invalid-argument", "Say why the courier is being changed");
+
+  const db = admin.firestore();
+  const orderRef = db.collection("orders").doc(orderId);
+  const order = (await orderRef.get()).data() as any;
+  if (!order) throw new HttpsError("not-found", "Order not found");
+  const awb = String(order.awbNumber || "");
+  const manual = String(order.manualTrackingNumber || "");
+  if (!awb && !manual) throw new HttpsError("failed-precondition", "This order has no shipment to replace — book it with Compare & ship");
+  const status = normalizeOrderStatus(order.status, order.paymentStatus, order);
+  if (["delivered", "cancelled", "rto", "out_for_delivery"].includes(String(status))) {
+    throw new HttpsError("failed-precondition", `The order is ${status} — the courier can't be changed now`);
+  }
+
+  const provider = String(order.shippingProvider || (awb ? "rapidshyp" : "manual"));
+  const viaApi = !!awb && provider !== "manual";
+  if (viaApi && !skipCancel) await cancelCourierBooking(order, orderRef);
+
+  const now = Date.now();
+  const del = admin.firestore.FieldValue.delete();
+  await orderRef.update({
+    shipmentHistory: admin.firestore.FieldValue.arrayUnion({
+      at: now, by: uid, reason, provider,
+      awb: awb || manual,
+      courier: String(order.courierName || order.manualCourierCompany || ""),
+      trackingUrl: String(order.trackingUrl || ""),
+      ...(order.shippingCost != null ? { shippingCost: order.shippingCost } : {}),
+      cancelledWithCourier: viaApi && !skipCancel,
+    }),
+    awbNumber: del, trackingUrl: del, courierName: del, labelUrl: del, shipmentId: del, shippingProvider: del,
+    manualTrackingNumber: del, manualCourierCompany: del, manualTrackingUrl: del,
+    shipmozoOrderId: del,
+    // The new booking records its own cost (shippingCompare.ts onOrderAwbCost); the old one is in shipmentHistory.
+    shippingCost: del, shippingCostCourier: del, shippingCostSource: del, shippingCostAt: del,
+    shippingStatus: "",
+    ...(viaApi && skipCancel && provider === "rapidshyp" ? { rapidshypAttempt: admin.firestore.FieldValue.increment(1), rapidshypOrderId: del } : {}),
+    ...(notify ? { statusNotified: admin.firestore.FieldValue.arrayRemove("shipped", "out_for_delivery", "undelivered") } : {}),
+    updatedAt: now,
+  });
+
+  // Back a step on purpose (shipped → processing is not an edge in the graph).
+  await setOrderStatus(db, orderId, "processing", {
+    source: "rebook", actor: uid, force: true, notify: false,
+    reason: `Courier change from ${String(order.courierName || order.manualCourierCompany || provider)}: ${reason}`,
+  });
+
+  console.log("rebookShipment", { order: order.orderNumber, provider, awb: awb || manual, skipCancel, notify });
+  return { ok: true, orderNumber: order.orderNumber, cancelledWithCourier: viaApi && !skipCancel };
 });
 
 /**

@@ -125,6 +125,8 @@ export const reshipOrder = onCall(async (data: any, context: any) => {
   const orderId = String(data?.orderId || "");
   const reason = String(data?.reason || "").trim().slice(0, 300);
   const picks: number[] | null = Array.isArray(data?.lineIndexes) ? data.lineIndexes.map(Number) : null;
+  // false when the piece going out is one already counted (the returned parcel, sent again).
+  const takeStock = data?.takeStock !== false;
   if (!orderId) throw new HttpsError("invalid-argument", "orderId is required");
   if (!reason) throw new HttpsError("invalid-argument", "Say why it is being reshipped (lost, damaged…)");
 
@@ -169,6 +171,8 @@ export const reshipOrder = onCall(async (data: any, context: any) => {
     total: itemsTotal, amountPayable: 0, prepaidAmount: itemsTotal,
     items: lines,
     ...(parent.packageOverride ? { packageOverride: parent.packageOverride } : {}),
+    // An empty claim tells onOrderConfirmedStock there is nothing to take.
+    ...(takeStock ? {} : { materialConsumed: [], materialClaimedAt: now, stockNotTaken: true }),
     createdAt: now, confirmedAt: now, updatedAt: now,
   });
   await parentRef.update({
@@ -176,6 +180,6 @@ export const reshipOrder = onCall(async (data: any, context: any) => {
     reships: admin.firestore.FieldValue.arrayUnion({ at: now, by: uid, reason, orderId: ref.id, orderNumber }),
     updatedAt: now,
   });
-  console.log("reshipOrder", { parent: parent.orderNumber, replacement: orderNumber, lines: lines.length, reason });
+  console.log("reshipOrder", { parent: parent.orderNumber, replacement: orderNumber, lines: lines.length, reason, takeStock });
   return { orderId: ref.id, orderNumber };
 });
