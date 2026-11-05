@@ -64,6 +64,9 @@ function Send($vendor, $root, $sb, $count) {
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 $failed = $false
+# A folder left as the C:\PATH\TO\... placeholder was never set on this PC: skip it, don't fail.
+if ($MobicareModels -like "*PATH\TO*") { Write-Host "mobicare: skipped (folder not set in plt-sync.ps1)"; $MobicareModels = "" }
+if ($TiaRoot -like "*PATH\TO*") { Write-Host "tia: skipped (folder not set in plt-sync.ps1)"; $TiaRoot = "" }
 
 # ── Mobicare ─────────────────────────────────────────────────────────────────
 if ($MobicareModels) {

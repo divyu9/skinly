@@ -25,7 +25,13 @@ import { Loader2, RefreshCw, Sparkles, Wand2, FileWarning, Clock3 } from "lucide
  * page's Refresh is pressed.
  */
 
-type Queue = Array<{ slug: string; name: string; kind: string; gadget: string | null; score: number; why: string; fresh: boolean }>;
+type QueueRow = { slug: string; name: string; kind: string; gadget: string | null; brand?: string | null; score: number; why: string; fresh: boolean; readiness?: string };
+type Queue = QueueRow[];
+
+const READINESS_LABEL: Record<string, string> = {
+  "waiting-mockups": "waits for mockups",
+  "hub-covers": "brand page covers it",
+};
 type Status = {
   updatedAt: number;
   facts: { models: number; brands: number; designs: number };
@@ -73,6 +79,24 @@ export default function SeoAutomationPage() {
   const [publish, setPublish] = useState(false);
   const [writeCount, setWriteCount] = useState("10");
   const [picked, setPicked] = useState<Set<string>>(new Set());
+  const [pickedNames, setPickedNames] = useState<Record<string, string>>({});
+  const [search, setSearch] = useState("");
+  const [allMissing, setAllMissing] = useState<Queue | null>(null);
+  const [missingLoading, setMissingLoading] = useState(false);
+
+  // Every page not written yet, ready or not — loaded the first time someone searches.
+  const loadMissing = async () => {
+    if (allMissing || missingLoading) return;
+    setMissingLoading(true);
+    try {
+      const res: any = await run({ pendingOnly: true });
+      setAllMissing(Array.isArray(res?.pending) ? res.pending : []);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not load the full list");
+    } finally {
+      setMissingLoading(false);
+    }
+  };
 
   useEffect(() => {
     const v = (perDaySetting as any)?.value;
@@ -102,7 +126,7 @@ export default function SeoAutomationPage() {
         description: (res?.slugs || []).slice(0, 8).join(", ") || undefined,
         duration: 20000,
       });
-      if (!args.dryRun) { setPicked(new Set()); await load(false); }
+      if (!args.dryRun) { setPicked(new Set()); setPickedNames({}); setAllMissing(null); await load(false); }
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "That did not run");
     } finally {
@@ -127,11 +151,24 @@ export default function SeoAutomationPage() {
 
   const s = status;
   const model = s?.byKind?.model;
-  const toggle = (slug: string) => setPicked((prev) => {
-    const next = new Set(prev);
-    if (next.has(slug)) next.delete(slug); else if (next.size < 30) next.add(slug);
-    return next;
-  });
+  const toggle = (row: { slug: string; name: string }) => {
+    const on = picked.has(row.slug);
+    if (!on && picked.size >= 30) { toast.error("Up to 30 at a time"); return; }
+    setPicked((prev) => {
+      const next = new Set(prev);
+      if (on) next.delete(row.slug); else next.add(row.slug);
+      return next;
+    });
+    setPickedNames((prev) => ({ ...prev, [row.slug]: row.name }));
+  };
+  const words = search.toLowerCase().split(/\s+/).filter(Boolean);
+  const matches = (q: QueueRow) => {
+    const hay = `${q.name} ${q.slug} ${q.brand || ""} ${q.gadget || ""}`.toLowerCase();
+    return words.every((w) => hay.includes(w));
+  };
+  const rows: Queue = words.length
+    ? (allMissing || s?.queue || []).filter(matches).slice(0, 150)
+    : s?.queue || [];
 
   return (
     <AdminLayout>
@@ -286,18 +323,50 @@ export default function SeoAutomationPage() {
               </Button>
               <span className="pb-2 text-xs text-muted-foreground">Up to 30 at a time; a run takes a few minutes.</span>
             </div>
+            <div className="space-y-1.5">
+              <Input
+                placeholder="Search any model, brand or page not written yet — e.g. vivo v80, galaxy s26, ps5"
+                value={search}
+                onFocus={() => void loadMissing()}
+                onChange={(e) => { setSearch(e.target.value); void loadMissing(); }}
+              />
+              <p className="text-xs text-muted-foreground">
+                {words.length
+                  ? missingLoading && !allMissing
+                    ? "Loading every unwritten page (about a minute) — showing the ready list meanwhile…"
+                    : `${rows.length}${rows.length === 150 ? "+" : ""} match${rows.length === 1 ? "" : "es"}. A page you tick is written even if it is still waiting for mockups.`
+                  : `Showing the top ${(s?.queue || []).length} ready pages. Search to find any of the others.`}
+              </p>
+            </div>
+            {picked.size > 0 && (
+              <div className="flex flex-wrap items-center gap-1.5 rounded-lg bg-muted/50 p-2 text-xs">
+                <span className="font-semibold">Selected ({picked.size}):</span>
+                {[...picked].map((slug) => (
+                  <button key={slug} type="button" onClick={() => toggle({ slug, name: pickedNames[slug] || slug })}
+                    className="rounded-full border bg-background px-2 py-0.5 hover:border-destructive hover:text-destructive">
+                    {pickedNames[slug] || slug} ✕
+                  </button>
+                ))}
+                <button type="button" className="ml-1 underline" onClick={() => { setPicked(new Set()); setPickedNames({}); }}>Clear</button>
+              </div>
+            )}
             <div className="max-h-[28rem] overflow-y-auto rounded-lg border">
-              {(s?.queue || []).length === 0 ? (
-                <p className="p-4 text-sm text-muted-foreground">{loading ? "Loading…" : "Nothing ready to write."}</p>
+              {rows.length === 0 ? (
+                <p className="p-4 text-sm text-muted-foreground">
+                  {loading || missingLoading ? "Loading…" : words.length ? "No unwritten page matches — it may already have one (SEO Pages)." : "Nothing ready to write."}
+                </p>
               ) : (
                 <ul className="divide-y">
-                  {s!.queue.map((q) => (
+                  {rows.map((q) => (
                     <li key={q.slug} className="flex items-center gap-3 px-3 py-2 text-sm">
-                      <input type="checkbox" className="size-4" checked={picked.has(q.slug)} onChange={() => toggle(q.slug)} />
+                      <input type="checkbox" className="size-4" checked={picked.has(q.slug)} onChange={() => toggle(q)} />
                       <span className="min-w-0 flex-1 truncate">
                         <span className="font-medium">{q.name}</span>
                         <span className="ml-2 text-xs text-muted-foreground">/{q.slug}</span>
                       </span>
+                      {q.readiness && q.readiness !== "ready" && (
+                        <Badge variant="secondary" className="shrink-0">{READINESS_LABEL[q.readiness] || q.readiness}</Badge>
+                      )}
                       <Badge variant="outline" className="shrink-0">{KIND_LABEL[q.kind] || q.kind}</Badge>
                       <span className="hidden w-56 shrink-0 truncate text-right text-xs text-muted-foreground md:block">{q.why}</span>
                     </li>
