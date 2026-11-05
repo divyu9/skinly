@@ -1,4 +1,5 @@
 import * as admin from "firebase-admin";
+import Anthropic from "@anthropic-ai/sdk";
 import { onCall, HttpsError } from "firebase-functions/v1/https";
 import { requireAdmin } from "./auth";
 import { enforceDailyRateLimit } from "./rate-limit";
@@ -39,18 +40,35 @@ export const resolveAnthropicKey = async (): Promise<string> => {
   );
 };
 
-export const resolveOpenAIKey = async (): Promise<string> => {
-  // Environment only. This used to read settings/openaiApiKey — a document in a
-  // world-readable collection, under a third spelling of the name that never
-  // existed, so SEO generation had been failing on a missing key while two
-  // live copies of the real one sat there for anyone to download. The key lives
-  // in functions/.env now, with every other secret.
-  if (process.env.OPENAI_API_KEY) return process.env.OPENAI_API_KEY;
-  throw new HttpsError(
-    "failed-precondition",
-    "OPENAI_API_KEY is not set in the functions environment."
-  );
-};
+/**
+ * One Claude Sonnet 5.5 call that must answer with a JSON object. Thinking is
+ * off ("between_tools" is the only accepted off switch on this model; with no
+ * tools in the request it means none). Sampling knobs are not sent. Returns the
+ * reply text with any code fence stripped, plus why the model stopped.
+ */
+export async function askClaudeJson(args: {
+  system: string;
+  user: string;
+  maxTokens: number;
+  imageUrl?: string;
+}): Promise<{ text: string; stopReason: string; refusal: string }> {
+  const client = new Anthropic({ apiKey: await resolveAnthropicKey() });
+  const content: Anthropic.ContentBlockParam[] = [];
+  if (args.imageUrl) content.push({ type: "image", source: { type: "url", url: args.imageUrl } });
+  content.push({ type: "text", text: args.user });
+  const res = await client.messages.create({
+    model: "claude-sonnet-5-5",
+    max_tokens: args.maxTokens,
+    thinking: { type: "between_tools" },
+    output_config: { effort: "medium" },
+    system: `${args.system}\n\nReply with one JSON object only — no prose, no markdown fences.`,
+    messages: [{ role: "user", content }],
+  });
+  const text = res.content.filter((b) => b.type === "text").map((b) => (b as Anthropic.TextBlock).text).join("")
+    .replace(/^\s*```(?:json)?\s*/i, "").replace(/\s*```\s*$/, "");
+  const refusal = res.stop_reason === "refusal" ? String(res.stop_details?.explanation || res.stop_details?.category || "refusal") : "";
+  return { text, stopReason: String(res.stop_reason || ""), refusal };
+}
 
 // ---------------------------------------------------------------------------
 // Auto-fetch top models from supportedModels collection (brand pages)
@@ -308,41 +326,19 @@ export async function generateSeoContentCore(data: any): Promise<{
     resolvedModels,
   };
 
-  const [apiKey, prompt] = await Promise.all([
-    resolveOpenAIKey(),
-    Promise.resolve(buildPrompt(args)),
-  ]);
-
-  const fetch = require("node-fetch");
-  const response = await fetch("https://api.openai.com/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model: "gpt-4o",
-      messages: [
-        { role: "system", content: SYSTEM_PROMPT },
-        { role: "user",   content: prompt },
-      ],
-      temperature: 0.65,
-      max_tokens: 3000,
-      response_format: { type: "json_object" },
-    }),
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    console.error("OpenAI API error:", errorText);
-    throw new HttpsError("internal", "OpenAI API request failed");
+  const prompt = buildPrompt(args);
+  let generatedText = "";
+  try {
+    const r = await askClaudeJson({ system: SYSTEM_PROMPT, user: prompt, maxTokens: 4000 });
+    if (r.refusal) throw new Error(`Claude declined: ${r.refusal}`);
+    generatedText = r.text;
+  } catch (e: any) {
+    console.error("Claude API error:", e?.message || e);
+    throw new HttpsError("internal", "Claude API request failed");
   }
 
-  const responseData: any = await response.json();
-  const generatedText: string = responseData.choices?.[0]?.message?.content || "";
-
   if (!generatedText) {
-    throw new HttpsError("internal", "OpenAI returned an empty response");
+    throw new HttpsError("internal", "Claude returned an empty response");
   }
 
   const parsed = parseGeneratedContent(generatedText);

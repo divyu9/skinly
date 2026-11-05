@@ -1,6 +1,7 @@
 import * as admin from "firebase-admin";
 import { onCall, HttpsError } from "firebase-functions/v1/https";
 import { requireAdmin } from "./auth";
+import { askClaudeJson } from "./seo";
 
 /**
  * Creates the missing product listing for a design, from the studio.
@@ -21,18 +22,6 @@ import { requireAdmin } from "./auth";
  * Only the words are generated — title, slug, meta, description, tags — and
  * only those, because those are the part with no precedent to copy.
  */
-
-const resolveOpenAIKey = async (): Promise<string> => {
-  // .env first: that is where the key actually lives for this project. The
-  // Firestore doc is the admin-settings convention the SEO tool uses.
-  // Environment only: `settings` is world-readable by rule, so a key kept there
-  // is a key anyone can download.
-  if (process.env.OPENAI_API_KEY) return process.env.OPENAI_API_KEY;
-  throw new HttpsError(
-    "failed-precondition",
-    "OPENAI_API_KEY is not set in the functions environment."
-  );
-};
 
 interface VariantTemplate {
   /** The tail after the design code: LP, LPK, CAM… Empty for single-variant gadgets. */
@@ -295,8 +284,6 @@ export async function writeListingCopy(
     .map((d) => ({ id: d.id, name: String((d.data() as any).name || (d.data() as any).title || "").trim(), rules: (d.data() as any).rules }))
     .filter((c) => c.name && !isGadgetCollection(c.name) && !(Array.isArray(c.rules) && c.rules.length));
 
-  const apiKey = await resolveOpenAIKey();
-  const fetchFn: any = (global as any).fetch || require("node-fetch");
   const listingName = args.listingName || "";
   const device = deviceNameFor(listingName, args.gadgetLabel);
   // Older rolls were named after their whole listing title ("... Matte Finish
@@ -306,19 +293,7 @@ export async function writeListingCopy(
     .replace(/\s+skins?\s*$/i, "")
     .trim() || args.designCode;
   const ask = async (attempt: number) => {
-    const res = await fetchFn("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
-      body: JSON.stringify({
-        model: "gpt-4o",
-        temperature: attempt > 1 ? 0.4 : 0.7,
-        max_tokens: 4000,
-        response_format: { type: "json_object" },
-        messages: [
-          { role: "system", content: SYSTEM },
-          {
-            role: "user",
-            content:
+    const user =
               `Design name: ${designName}\n` +
               `Design code: ${args.designCode}\n` +
               `Gadget: ${args.gadgetLabel}\n` +
@@ -330,18 +305,15 @@ export async function writeListingCopy(
               `Variants offered: ${args.variantTitles.join(", ")}\n` +
               `Collections: ${themeCollections.map((c) => c.name).join(" | ")}` +
               // A second run follows a first that came back cut off or empty.
-              (attempt > 1 ? "\n\nKeep the description to about 300 words, and reply with the JSON only." : ""),
-          },
-        ],
-      }),
-    });
-    if (!res.ok) {
-      console.error("writeListingCopy: OpenAI failed", await res.text());
+              (attempt > 1 ? "\n\nKeep the description to about 300 words, and reply with the JSON only." : "");
+    let r: { text: string; stopReason: string; refusal: string };
+    try {
+      r = await askClaudeJson({ system: SYSTEM, user, maxTokens: 4000 });
+    } catch (e: any) {
+      console.error("writeListingCopy: Claude failed", e?.message || e);
       throw new HttpsError("internal", "The copywriter call failed — try again");
     }
-    const body: any = await res.json();
-    const choice = body.choices?.[0] || {};
-    const parsed = parseCopyJson(choice.message?.content || "");
+    const parsed = parseCopyJson(r.text);
     // A title with no description is a listing with an empty page, so a reply
     // that arrived only half-written counts as a failure worth retrying.
     const usable = parsed && String(parsed.description || "").trim().length > 200;
@@ -352,12 +324,12 @@ export async function writeListingCopy(
           designCode: args.designCode,
           listing: listingName,
           attempt,
-          finishReason: choice.finish_reason || "",
-          refusal: choice.message?.refusal || "",
-          head: String(choice.message?.content || "").slice(0, 400),
+          finishReason: r.stopReason,
+          refusal: r.refusal,
+          head: r.text.slice(0, 400),
         })
       );
-      return { copy: null as any, reason: String(choice.finish_reason || (parsed ? "short description" : "unreadable")) };
+      return { copy: null as any, reason: String(r.refusal || r.stopReason || (parsed ? "short description" : "unreadable")) };
     }
     return { copy: parsed, reason: "" };
   };
@@ -776,36 +748,22 @@ export const suggestDesignDetails = onCall(async (data: any, context: any) => {
   await requireAdmin(context);
   const imageUrl = String(data?.imageUrl || "");
   if (!/^https:\/\//.test(imageUrl)) throw new HttpsError("invalid-argument", "An https image URL is required");
-  const apiKey = await resolveOpenAIKey();
-  const res = await fetch("https://api.openai.com/v1/chat/completions", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
-    body: JSON.stringify({
-      model: "gpt-4o",
-      temperature: 0.3,
-      max_tokens: 400,
-      response_format: { type: "json_object" },
-      messages: [
-        {
-          role: "system",
-          content:
+  const system =
             "You name printed vinyl skin designs for an Indian gadget-skin shop from a photo of the printed roll or sheet. " +
             "Reply with JSON only: {\"name\": \"2-5 word shop name for the artwork, Title Case, no brand names unless the artwork is a logo design\", " +
             "\"finish\": \"Matte\" | \"3D Textured\" | \"Tranzy (transparent)\" | \"unknown\" (3D Textured if the surface shows raised relief; Tranzy if the design sits on clear film over white backing paper), " +
             "\"themes\": [\"1-4 lowercase themes such as anime, cars, marvel, abstract, nature, space, gaming, minimal, animals, music, sports, quotes, religious\"], " +
-            "\"colors\": [\"1-3 lowercase dominant colours\"]}",
-        },
-        { role: "user", content: [{ type: "image_url", image_url: { url: imageUrl } }] },
-      ],
-    }),
-  });
-  if (!res.ok) {
-    console.error("suggestDesignDetails failed", await res.text());
+            "\"colors\": [\"1-3 lowercase dominant colours\"]}";
+  let text = "{}";
+  try {
+    const r = await askClaudeJson({ system, user: "Name this design from the photo.", maxTokens: 400, imageUrl });
+    text = r.text || "{}";
+  } catch (e: any) {
+    console.error("suggestDesignDetails failed", e?.message || e);
     throw new HttpsError("internal", "Could not read the design — fill the details in yourself");
   }
-  const body: any = await res.json();
   let out: any = {};
-  try { out = JSON.parse(body.choices?.[0]?.message?.content || "{}"); } catch { /* empty */ }
+  try { out = JSON.parse(text); } catch { /* empty */ }
   return {
     name: String(out.name || "").slice(0, 60),
     finish: ["Matte", "3D Textured", "Tranzy (transparent)"].includes(out.finish) ? out.finish : "",
