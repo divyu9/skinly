@@ -31,6 +31,14 @@ interface ParsedContent {
 // Frontend uses the same convention: settings.getSetting({ key: "openaiApiKey" })
 // ---------------------------------------------------------------------------
 
+export const resolveAnthropicKey = async (): Promise<string> => {
+  if (process.env.ANTHROPIC_API_KEY) return process.env.ANTHROPIC_API_KEY;
+  throw new HttpsError(
+    "failed-precondition",
+    "ANTHROPIC_API_KEY is not set in the functions environment."
+  );
+};
+
 export const resolveOpenAIKey = async (): Promise<string> => {
   // Environment only. This used to read settings/openaiApiKey — a document in a
   // world-readable collection, under a third spelling of the name that never

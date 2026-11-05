@@ -233,7 +233,7 @@ export default function SeoAutomationPage() {
             <CardDescription>
               Every night at 1:30 am: write up to this many ready pages (new models first, then what customers have ordered or
               asked for, then hub pages, then the rest), spend what is left of the number rewriting old pages, then rebuild the
-              store. About ₹3 of OpenAI per page. Only pages that pass the quality check are published; the rest wait below.
+              store. About ₹1.5 of Claude per page. Only pages that pass the quality check are published; the rest wait below.
             </CardDescription>
           </CardHeader>
           <CardContent>

@@ -1,5 +1,6 @@
 import * as admin from "firebase-admin";
-import { resolveOpenAIKey, parseGeneratedContent } from "./seo";
+import Anthropic from "@anthropic-ai/sdk";
+import { resolveAnthropicKey, parseGeneratedContent } from "./seo";
 
 /**
  * What an SEO landing page says, and whether it is fit to publish.
@@ -370,22 +371,24 @@ export function qualityIssues(html: string, faqs: any[], facts: SiteFacts, kind:
 /* ------------------------------------------------------------------ write */
 
 async function callModel(system: string, user: string): Promise<{ contentHTML: string; faqs: any[]; imageAltTexts: string[] }> {
-  const apiKey = await resolveOpenAIKey();
-  const fetch = require("node-fetch");
-  const res = await fetch("https://api.openai.com/v1/chat/completions", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
-    body: JSON.stringify({
-      model: "gpt-4o",
-      messages: [{ role: "system", content: system }, { role: "user", content: user }],
-      temperature: 0.6,
-      max_tokens: 2600,
-      response_format: { type: "json_object" },
-    }),
+  // Claude Sonnet 5.5 (was OpenAI gpt-4o). No thinking for plain copywriting:
+  // "between_tools" is the only accepted off switch on this model, and with no
+  // tools in the request it means none at all. Sampling knobs are not sent
+  // (non-default temperature is rejected).
+  const client = new Anthropic({ apiKey: await resolveAnthropicKey() });
+  const res = await client.messages.create({
+    model: "claude-sonnet-5-5",
+    max_tokens: 4000,
+    thinking: { type: "between_tools" },
+    output_config: { effort: "medium" },
+    system: `${system}\n\nReply with one JSON object only — no prose, no markdown fences.`,
+    messages: [{ role: "user", content: user }],
   });
-  if (!res.ok) throw new Error(`OpenAI ${res.status}: ${(await res.text()).slice(0, 200)}`);
-  const data: any = await res.json();
-  const parsed = parseGeneratedContent(data.choices?.[0]?.message?.content || "");
+  if (res.stop_reason === "refusal") throw new Error(`Claude declined: ${res.stop_details?.explanation || res.stop_details?.category || "refusal"}`);
+  if (res.stop_reason === "max_tokens") throw new Error("Claude hit max_tokens before finishing the page");
+  const raw = res.content.filter((b) => b.type === "text").map((b) => (b as Anthropic.TextBlock).text).join("")
+    .replace(/^\s*```(?:json)?\s*/i, "").replace(/\s*```\s*$/, "");
+  const parsed = parseGeneratedContent(raw);
   // Words the prompt forbids but the model still reaches for are swapped
   // rather than failing a whole page over one adjective.
   const tidy = (t: string) => String(t || "")
