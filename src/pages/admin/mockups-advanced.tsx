@@ -3,7 +3,7 @@ import { addDoc, collection, deleteDoc, doc, getDocs, limit, onSnapshot, query, 
 import { httpsCallable } from "firebase/functions";
 import {
   AlertCircleIcon, CheckCircle2Icon, CopyIcon, ImageIcon, Maximize2Icon, Minimize2Icon, RefreshCwIcon,
-  ListTodoIcon, SearchIcon, Trash2Icon, UploadIcon, XCircleIcon, XIcon,
+  Link2Icon, ListTodoIcon, SearchIcon, Trash2Icon, UploadIcon, XCircleIcon, XIcon,
 } from "lucide-react";
 import { toast } from "sonner";
 import { db } from "@/lib/firebase-db";
@@ -37,12 +37,12 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
  */
 
 type Model = { _id: string; brandName: string; modelName: string; category?: string; isActive?: boolean; mergedInto?: string };
-type Coverage = { _id: string; skus: string[] };
+type Coverage = { _id: string; skus: string[]; aliasOf?: string; aliasOfModel?: string };
 type TodoRow = { modelId: string; brand: string; model: string; score: number; orders365: number; orders90: number; requests: number; newDays: number | null; have: number; reasons: string[] };
 type Todo = { rows: TodoRow[]; need: number; coveredAt: number; candidates: number; computedAt: number; search?: { ok: boolean; pages?: number; error?: string } };
 type Mockup = { _id: string; sku: string; cloudinaryUrl?: string; r2Url?: string };
 type Design = { code: string; inStock: boolean; listings: number };
-type Row = Model & { have: number; missing: Design[]; extra: number };
+type Row = Model & { have: number; missing: Design[]; extra: number; aliasOf?: string; aliasOfModel?: string };
 
 type UploadTask = {
   id: string; modelId: string; brandName: string; modelName: string; files: File[];
@@ -133,7 +133,7 @@ export default function MockupsAdvancedPage() {
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState<"missing" | "az">("missing");
   const [shown, setShown] = useState(PAGE);
-  const [dialog, setDialog] = useState<{ kind: "upload" | "missing" | "view" | "delete"; row: Row } | null>(null);
+  const [dialog, setDialog] = useState<{ kind: "upload" | "missing" | "view" | "delete" | "alias"; row: Row } | null>(null);
   const [toolsOpen, setToolsOpen] = useState<"design" | null>(null);
   const [tasks, setTasks] = useState<UploadTask[]>([]);
   const [busy, setBusy] = useState(false);
@@ -141,11 +141,12 @@ export default function MockupsAdvancedPage() {
 
   const rows = useMemo<Row[]>(() => {
     if (!models || !coverage || !designs) return [];
-    const cov = new Map(coverage.map((c) => [c._id, new Set(c.skus || [])]));
+    const cov = new Map(coverage.map((c) => [c._id, c]));
     return models.filter((m) => m.isActive !== false && !m.mergedInto).map((m) => {
-      const has = cov.get(m._id) || new Set<string>();
+      const c = cov.get(m._id);
+      const has = new Set(c?.skus || []);
       const missing = [...designs.values()].filter((d) => !has.has(d.code));
-      return { ...m, have: designs.size - missing.length, missing, extra: [...has].filter((c) => !designs.has(c)).length };
+      return { ...m, have: designs.size - missing.length, missing, extra: [...has].filter((cd) => !designs.has(cd)).length, aliasOf: c?.aliasOf, aliasOfModel: c?.aliasOfModel };
     });
   }, [models, coverage, designs]);
 
@@ -320,7 +321,10 @@ export default function MockupsAdvancedPage() {
                         <TableCell className="text-sm text-muted-foreground">{t.reasons.filter((x) => !/designs done/.test(x)).join(" · ")}</TableCell>
                         <TableCell className="text-right font-mono text-sm">{t.score}</TableCell>
                         <TableCell className="text-right">
-                          {r && <Button size="sm" onClick={() => setDialog({ kind: "upload", row: r })}><UploadIcon className="mr-1 size-4" /> Upload</Button>}
+                          {r && <div className="flex justify-end gap-1">
+                            <Button size="sm" onClick={() => setDialog({ kind: "upload", row: r })}><UploadIcon className="mr-1 size-4" /> Upload</Button>
+                            <Button size="sm" variant="outline" onClick={() => setDialog({ kind: "alias", row: r })}><Link2Icon className="mr-1 size-4" /> Same as…</Button>
+                          </div>}
                         </TableCell>
                       </TableRow>
                     );
@@ -385,7 +389,7 @@ export default function MockupsAdvancedPage() {
                         <TableRow key={r._id}>
                           <TableCell>
                             <div className="font-medium">{r.modelName}</div>
-                            <div className="text-xs text-muted-foreground">{r.brandName}</div>
+                            <div className="text-xs text-muted-foreground">{r.brandName}{r.aliasOfModel ? <span className="ml-1 rounded bg-sunny/60 px-1 py-0.5 text-[10px] font-semibold text-ink"><Link2Icon className="mr-0.5 inline size-3" />same as {r.aliasOfModel}</span> : null}</div>
                           </TableCell>
                           <TableCell>
                             <div className="flex items-center gap-2">
@@ -403,6 +407,9 @@ export default function MockupsAdvancedPage() {
                           <TableCell className="text-right">
                             <div className="flex justify-end gap-1">
                               <Button size="sm" onClick={() => setDialog({ kind: "upload", row: r })}><UploadIcon className="mr-1 size-4" /> Upload</Button>
+                              <Button size="sm" variant="outline" title="Show another model's mockups on this one (same back, different size)" onClick={() => setDialog({ kind: "alias", row: r })}>
+                                <Link2Icon className="mr-1 size-4" /> {r.aliasOf ? "Linked" : "Same as…"}
+                              </Button>
                               <Button size="sm" variant="outline" disabled={!r.have && !r.extra} onClick={() => setDialog({ kind: "view", row: r })}>
                                 <ImageIcon className="mr-1 size-4" /> View
                               </Button>
@@ -444,6 +451,7 @@ export default function MockupsAdvancedPage() {
       {dialog?.kind === "missing" && <MissingDialog row={dialog.row} onClose={() => setDialog(null)} />}
       {dialog?.kind === "view" && <ViewDialog row={dialog.row} designs={designs} onClose={() => setDialog(null)} />}
       {dialog?.kind === "delete" && <DeleteDialog row={dialog.row} onClose={() => setDialog(null)} />}
+      {dialog?.kind === "alias" && <AliasDialog row={dialog.row} rows={rows} total={total} onClose={() => setDialog(null)} />}
       {toolsOpen === "design" && <DeleteDesignDialog onClose={() => setToolsOpen(null)} />}
       <UploadPanel tasks={tasks}
         onCancel={(id) => { tasks.find((t) => t.id === id)?.controller.abort(); patchTask(id, { status: "cancelled" }); }}
@@ -560,6 +568,71 @@ function ViewDialog({ row, designs, onClose }: { row: Row; designs: Map<string, 
             </div>
           ))}
         </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/**
+ * "Same as": pick the model whose mockups this one should show. Only models of
+ * the same brand with (nearly) every design, and never one that is itself a
+ * link. The function copies the docs (same files); unlink deletes only those.
+ */
+function AliasDialog({ row, rows, total, onClose }: { row: Row; rows: Row[]; total: number; onClose: () => void }) {
+  const [source, setSource] = useState(row.aliasOf || "");
+  const [q, setQ] = useState("");
+  const [busy, setBusy] = useState(false);
+  const options = useMemo(() => rows
+    .filter((r) => r._id !== row._id && r.brandName === row.brandName && !r.aliasOf && total && r.have >= total * 0.9)
+    .filter((r) => !q.trim() || r.modelName.toLowerCase().includes(q.trim().toLowerCase()))
+    .sort((a, b) => a.modelName.localeCompare(b.modelName, undefined, { numeric: true })), [rows, row, total, q]);
+  const call = async (data: Record<string, unknown>, done: (r: any) => string) => {
+    setBusy(true);
+    try { const r: any = (await httpsCallable(functions, "aliasMockups", { timeout: 300_000 })(data)).data; toast.success(done(r)); onClose(); }
+    catch (e: any) { toast.error(e?.message || "Could not link"); } finally { setBusy(false); }
+  };
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>{row.brandName} {row.modelName}: same as…</DialogTitle>
+          <DialogDescription>
+            For a phone that looks the same from the back as another (only the size differs — S25 and S25 Plus, Edge 70 Fusion and
+            Fusion+). This model will show the chosen model's mockups under its own name; nothing is copied on storage. Uploading
+            its own mockups later replaces them.
+            {row.aliasOfModel ? <> Currently linked to <b>{row.aliasOfModel}</b>.</> : null}
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-2">
+          <div className="relative">
+            <SearchIcon className="absolute left-2.5 top-2.5 size-4 text-muted-foreground" />
+            <Input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder={`Search ${row.brandName} models with mockups`} className="pl-8" />
+          </div>
+          <div className="max-h-72 overflow-y-auto rounded-md border">
+            {options.length ? options.map((r) => (
+              <label key={r._id} className={`flex cursor-pointer items-center gap-3 border-b px-3 py-2 text-sm last:border-b-0 hover:bg-muted/50 ${source === r._id ? "bg-muted" : ""}`}>
+                <input type="radio" name="alias-source" checked={source === r._id} onChange={() => setSource(r._id)} />
+                <span className="flex-1">{r.modelName}</span>
+                <span className="text-xs text-muted-foreground">{r.have}/{total}</span>
+              </label>
+            )) : <p className="p-4 text-center text-sm text-muted-foreground">No {row.brandName} model with a full set of mockups{q ? " matches" : " yet"}.</p>}
+          </div>
+        </div>
+        <DialogFooter className="gap-2 sm:justify-between">
+          <div>
+            {row.aliasOf && (
+              <Button variant="outline" disabled={busy} onClick={() => call({ aliasId: row._id, remove: true }, (r) => `Unlinked: ${r.removed} mockups removed from ${row.modelName}`)}>
+                <XIcon className="mr-1 size-4" /> Unlink
+              </Button>
+            )}
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={onClose}>Cancel</Button>
+            <Button disabled={busy || !source || source === row.aliasOf} onClick={() => call({ aliasId: row._id, sourceId: source }, (r) => `${row.modelName} now shows ${rows.find((x) => x._id === source)?.modelName}'s mockups (${r.written} linked${r.kept ? `, ${r.kept} of its own kept` : ""})`)}>
+              <Link2Icon className="mr-1 size-4" /> {busy ? "Linking…" : "Link"}
+            </Button>
+          </div>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

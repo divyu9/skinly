@@ -27,6 +27,7 @@ export * from "./collectionSync";
 export * from "./productGadget";
 export * from "./mockupCoverage";
 export * from "./mockupTodo";
+export * from "./mockupAlias";
 export * from "./referrals";
 export * from "./brands";
 export * from "./whatsappWorker";
