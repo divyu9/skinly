@@ -175,6 +175,7 @@ export default function ProductDetailPage() {
     updateRequestForm,
     handleSubmitRequest,
     similarModels,
+    pickSimilar,
     allBrands,
   } = useModelSelector(deviceCategory, {
     modelBrands: productData?.modelBrands,
@@ -752,6 +753,7 @@ export default function ProductDetailPage() {
         onUpdateForm={updateRequestForm}
         onSubmit={handleSubmitRequest}
         onClose={resetRequestForm}
+        onPickSimilar={pickSimilar}
       />
 
       {/* Sticky Bottom Bar */}

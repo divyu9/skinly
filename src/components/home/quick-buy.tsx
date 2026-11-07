@@ -241,6 +241,7 @@ function QuickBuyBody({ slug, onDone }: { slug: string; onDone: () => void }) {
         onUpdateForm={selector.updateRequestForm}
         onSubmit={selector.handleSubmitRequest}
         onClose={selector.resetRequestForm}
+        onPickSimilar={selector.pickSimilar}
       />
     </div>
   );

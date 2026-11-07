@@ -17,12 +17,9 @@ import {
   SelectValue,
 } from "@/components/ui/select.tsx";
 import { WhatsAppOptIn } from "@/components/whatsapp-opt-in.tsx";
-import { AlertCircleIcon } from "lucide-react";
+import { DidYouMean, type SuggestedModel } from "@/components/did-you-mean.tsx";
 
-interface SimilarModel {
-  brandName: string;
-  modelName: string;
-}
+type SimilarModel = SuggestedModel;
 
 interface RequestModelDialogProps {
   open: boolean;
@@ -44,6 +41,8 @@ interface RequestModelDialogProps {
   onUpdateForm: (updates: Partial<RequestModelDialogProps["formState"]>) => void;
   onSubmit: () => void;
   onClose: () => void;
+  /** A suggested model was tapped: go to its skins. */
+  onPickSimilar?: (m: SimilarModel) => void;
 }
 
 const DEVICE_CATEGORIES = [
@@ -67,6 +66,7 @@ export function RequestModelDialog({
   onUpdateForm,
   onSubmit,
   onClose,
+  onPickSimilar,
 }: RequestModelDialogProps) {
   const handleBrandChange = (value: string) => {
     if (value === "other_new_brand") {
@@ -137,39 +137,23 @@ export function RequestModelDialog({
             />
           </div>
 
-          {/* Similar Models Warning */}
+          {/* Models we already list that this names: one tap to their skins */}
+          <DidYouMean models={similarModels} onPick={(m) => onPickSimilar?.(m)} />
           {similarModels && similarModels.length > 0 && (
-            <div className="p-4 border-2 border-yellow-500/50 bg-yellow-500/5 rounded-lg space-y-3">
-              <div className="flex items-start gap-2">
-                <AlertCircleIcon className="size-5 text-yellow-600 flex-shrink-0 mt-0.5" />
-                <div className="flex-1">
-                  <p className="font-semibold text-yellow-900 dark:text-yellow-100 mb-2">
-                    Similar models found in our database:
-                  </p>
-                  <ul className="space-y-1 mb-3">
-                    {similarModels.slice(0, 5).map((model, idx) => (
-                      <li key={idx} className="text-sm text-yellow-800 dark:text-yellow-200">
-                        • {model.brandName} {model.modelName}
-                      </li>
-                    ))}
-                  </ul>
-                  <div className="flex items-start gap-2 mt-3 p-3 bg-yellow-500/10 rounded">
-                    <Checkbox
-                      id="confirm-not-match"
-                      checked={formState.confirmedNotMatch}
-                      onCheckedChange={(checked) => 
-                        onUpdateForm({ confirmedNotMatch: checked === true })
-                      }
-                    />
-                    <label
-                      htmlFor="confirm-not-match"
-                      className="text-sm font-medium leading-tight cursor-pointer"
-                    >
-                      I confirm my device model is different from the models listed above
-                    </label>
-                  </div>
-                </div>
-              </div>
+            <div className="flex items-start gap-2 rounded-lg bg-muted/60 p-3">
+              <Checkbox
+                id="confirm-not-match"
+                checked={formState.confirmedNotMatch}
+                onCheckedChange={(checked) =>
+                  onUpdateForm({ confirmedNotMatch: checked === true })
+                }
+              />
+              <label
+                htmlFor="confirm-not-match"
+                className="text-sm font-medium leading-tight cursor-pointer"
+              >
+                My device is different from the models above
+              </label>
             </div>
           )}
 

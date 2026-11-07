@@ -23,7 +23,8 @@ import { collectionKey } from "./collection-key";
 import { loadCatalogue, loadHomeProducts, loadModelCatalogue } from "./catalogue";
 import { searchRows } from "./search-match";
 import { calculateGST } from "./gst";
-import { laptopBodyKeys, squash } from "./laptop-body";
+import { laptopBodyKeys } from "./laptop-body";
+import { suggestModels } from "./model-match";
 import { brandInScope } from "./device-fit";
 import { getPath, sortVariants } from './firebase-hooks';
 
@@ -2029,24 +2030,23 @@ export async function runQuery(c: QueryCtx) {
             setData([]);
           } else {
             const brandSearch = args?.brandName?.toLowerCase().trim();
-            const keywords = search.split(/\s+/).filter((k: string) => k.length > 1);
-            // Spacing-blind, and for laptops also by body: a request for
-            // "15s-fq5111TU" suggests the 15S FQ models already listed, which
-            // take the same skin (src/lib/laptop-body.ts).
-            const squashed = squash(search);
+            // The admin's "Already on site" rules (src/lib/model-match.ts): brand
+            // written in front, Galaxy/Moto, 4G/5G set aside, surest first.
+            // For laptops also by body: a request for "15s-fq5111TU" suggests
+            // the 15S FQ models already listed, which take the same skin
+            // (src/lib/laptop-body.ts).
             const wantBody = args?.category === "laptop" && brandSearch ? new Set(laptopBodyKeys(brandSearch, search)) : new Set<string>();
             const similar = (rows: any[]) => {
-              const inScope = rows.filter(m => (!args?.category || m.category === args.category)
-                && (!brandSearch || (m.brandName || "").toLowerCase() === brandSearch));
-              const byName = inScope.filter(m => {
-                const name = (m.modelName || "").toLowerCase();
-                return keywords.every((k: string) => name.includes(k)) || (squashed.length >= 3 && squash(name).includes(squashed));
-              });
+              const byName = suggestModels(rows, args?.brandName || "", args?.modelName || "", args?.category, 5);
+              const named = new Set(byName.map((m: any) => m._id));
               const byBody = wantBody.size
-                ? inScope.filter(m => !byName.includes(m) && laptopBodyKeys(brandSearch, m.modelName || "").some((k) => wantBody.has(k)))
+                ? rows.filter(m => !named.has(m._id) && (!args?.category || m.category === args.category)
+                    && (m.brandName || "").toLowerCase() === brandSearch
+                    && laptopBodyKeys(brandSearch, m.modelName || "").some((k) => wantBody.has(k)))
+                    .map((m) => ({ ...m, level: "similar" }))
                 : [];
               return [...byName, ...byBody].slice(0, 5)
-                .map(m => ({ _id: m._id, brandName: m.brandName, modelName: m.modelName, category: m.category }));
+                .map((m: any) => ({ _id: m._id, brandName: m.brandName, modelName: m.modelName, category: m.category, level: m.level }));
             };
             const modelRows = await catalogueModels();
             if (modelRows) {

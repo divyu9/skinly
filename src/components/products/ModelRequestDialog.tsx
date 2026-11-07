@@ -1,5 +1,8 @@
 import { memo, useState, useCallback } from "react";
-import { useMutation } from "@/lib/firebase-hooks";
+import { useNavigate } from "react-router-dom";
+import { useMutation, useQuery } from "@/lib/firebase-hooks";
+import { useDebounce } from "@/hooks/use-debounce.ts";
+import { DidYouMean, shopLinkFor } from "@/components/did-you-mean.tsx";
 import { api } from "@/lib/firebase-api";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button.tsx";
@@ -52,6 +55,15 @@ export const ModelRequestDialog = memo(function ModelRequestDialog({
   
   const createModelRequest = useMutation(api.modelRequests.createModelRequest);
   const [optIn, setOptIn] = useState(false);
+  const navigate = useNavigate();
+
+  // Already listed under another spelling? Show it before they wait a day for it.
+  const [typed] = useDebounce(`${formState.brand}\u0000${formState.model}`, 400);
+  const [qBrand, qModel] = typed.split("\u0000");
+  const similar = useQuery(
+    api.modelRequests.findSimilarModels,
+    open && qModel.trim().length >= 2 ? { brandName: qBrand.trim() || undefined, modelName: qModel, category: formState.category || undefined } as any : "skip",
+  ) as any[] | undefined;
   
   const updateField = useCallback((field: string, value: string) => {
     setFormState(prev => ({ ...prev, [field]: value }));
@@ -131,6 +143,11 @@ export const ModelRequestDialog = memo(function ModelRequestDialog({
             />
           </div>
           
+          <DidYouMean
+            models={similar}
+            onPick={(m) => { onOpenChange(false); resetForm(); navigate(shopLinkFor(m)); }}
+          />
+
           <div className="space-y-2">
             <Label htmlFor="category">Device Type *</Label>
             <Select 

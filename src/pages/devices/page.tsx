@@ -1,5 +1,6 @@
 import { useState, useMemo, useRef, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { DidYouMean, shopLinkFor } from "@/components/did-you-mean.tsx";
 import { Helmet } from "react-helmet-async";
 import { Card, CardContent } from "@/components/ui/card.tsx";
 import { Input } from "@/components/ui/input.tsx";
@@ -20,7 +21,6 @@ import {
   PackageIcon,
   ZapIcon,
   HelpCircleIcon,
-  AlertCircleIcon,
 } from "lucide-react";
 import { MobileHeader } from "@/components/mobile-header.tsx";
 import { MobileNav } from "@/components/mobile-nav.tsx";
@@ -89,6 +89,7 @@ export default function DevicesPage() {
   
   // Mutations
   const createModelRequest = useMutation(api.modelRequests.createModelRequest);
+  const navigate = useNavigate();
   
   // Debounce model search for fuzzy matching
   const [debouncedRequestModel] = useDebounce(requestModel, 500);
@@ -790,37 +791,24 @@ export default function DevicesPage() {
               />
             </div>
 
-            {/* Similar Models Warning */}
+            {/* Models we already list that this names: one tap to their skins */}
+            <DidYouMean
+              models={similarModels as any}
+              onPick={(m) => { setRequestDialogOpen(false); setRequestModel(""); navigate(shopLinkFor(m)); }}
+            />
             {similarModels && similarModels.length > 0 && (
-              <div className="p-4 border-2 border-yellow-500/50 bg-yellow-500/5 rounded-lg space-y-3">
-                <div className="flex items-start gap-2">
-                  <AlertCircleIcon className="size-5 text-yellow-600 flex-shrink-0 mt-0.5" />
-                  <div className="flex-1">
-                    <p className="font-semibold text-yellow-900 dark:text-yellow-100 mb-2">
-                      Similar models found in our database:
-                    </p>
-                    <ul className="space-y-1 mb-3">
-                      {similarModels.slice(0, 5).map((model, idx) => (
-                        <li key={idx} className="text-sm text-yellow-800 dark:text-yellow-200">
-                          • {model.brandName} {model.modelName}
-                        </li>
-                      ))}
-                    </ul>
-                    <div className="flex items-start gap-2 mt-3 p-3 bg-yellow-500/10 rounded">
-                      <Checkbox
-                        id="confirm-not-match"
-                        checked={confirmedNotMatch}
-                        onCheckedChange={(checked) => setConfirmedNotMatch(checked === true)}
-                      />
-                      <label
-                        htmlFor="confirm-not-match"
-                        className="text-sm font-medium leading-tight cursor-pointer"
-                      >
-                        I confirm my device model is different from the models listed above
-                      </label>
-                    </div>
-                  </div>
-                </div>
+              <div className="flex items-start gap-2 rounded-lg bg-muted/60 p-3">
+                <Checkbox
+                  id="confirm-not-match"
+                  checked={confirmedNotMatch}
+                  onCheckedChange={(checked) => setConfirmedNotMatch(checked === true)}
+                />
+                <label
+                  htmlFor="confirm-not-match"
+                  className="text-sm font-medium leading-tight cursor-pointer"
+                >
+                  My device is different from the models above
+                </label>
               </div>
             )}
 

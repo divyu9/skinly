@@ -1,6 +1,9 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { useMutation } from "@/lib/firebase-hooks";
+import { useNavigate } from "react-router-dom";
+import { useMutation, useQuery } from "@/lib/firebase-hooks";
+import { useDebounce } from "@/hooks/use-debounce.ts";
+import { DidYouMean, shopLinkFor } from "@/components/did-you-mean.tsx";
 import { api } from "@/lib/firebase-api";
 import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
@@ -44,6 +47,15 @@ export function RequestModelDialog({
   const [email, setEmail] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [optIn, setOptIn] = useState(false);
+  const navigate = useNavigate();
+
+  // Already listed under another spelling? Show it before they wait a day for it.
+  const [typed] = useDebounce(`${brand}\u0000${model}`, 400);
+  const [qBrand, qModel] = typed.split("\u0000");
+  const similar = useQuery(
+    api.modelRequests.findSimilarModels,
+    open && qModel.trim().length >= 2 ? { brandName: qBrand.trim() || undefined, modelName: qModel, category: category || undefined } as any : "skip",
+  ) as any[] | undefined;
 
   // Opened from the picker, the brand and category are already known — asking
   // again for what the shopper just tapped is how a two-field form becomes four.
@@ -115,6 +127,11 @@ export function RequestModelDialog({
               required
             />
           </div>
+
+          <DidYouMean
+            models={similar}
+            onPick={(m) => { onOpenChange(false); setModel(""); navigate(shopLinkFor(m)); }}
+          />
 
           <div className="space-y-2">
             <Label htmlFor="request-category">Device category *</Label>

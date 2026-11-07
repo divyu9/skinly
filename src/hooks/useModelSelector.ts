@@ -310,6 +310,13 @@ export function useModelSelector(
   const updateRequestForm = useCallback((updates: Partial<RequestFormState>) => {
     setRequestState(prev => ({ ...prev, ...updates }));
   }, []);
+
+  // A model the request form found already listed (src/lib/model-match.ts):
+  // pick it as if chosen in the selector, so they land on its skins now.
+  const pickSimilar = useCallback((m: { brandName: string; modelName: string }) => {
+    resetRequestForm();
+    void handleModelSelect(m.modelName, m.brandName);
+  }, [resetRequestForm, handleModelSelect]);
   
   return {
     // Selector state
@@ -334,5 +341,6 @@ export function useModelSelector(
     updateRequestForm,
     handleSubmitRequest,
     similarModels,
+    pickSimilar,
   };
 }
