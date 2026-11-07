@@ -4,7 +4,7 @@ import { getFunctions, httpsCallable } from "firebase/functions";
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import {
   AlertTriangleIcon, ArrowDownRightIcon, ArrowUpRightIcon, BellRingIcon, BugIcon, CheckCircle2Icon, ChevronRightIcon,
-  ClockIcon, CreditCardIcon, ExternalLinkIcon, FlameIcon, PackageIcon, PlusIcon, RefreshCwIcon, RocketIcon,
+  ClockIcon, CreditCardIcon, ExternalLinkIcon, FlameIcon, ListTodoIcon, PackageIcon, PlusIcon, RefreshCwIcon, RocketIcon,
   ShoppingBagIcon, SmartphoneIcon, SparklesIcon, StarIcon, TruckIcon, WalletIcon,
 } from "lucide-react";
 import { AdminLayout } from "@/components/admin-layout.tsx";
@@ -640,6 +640,9 @@ function DashboardInner() {
       {/* ── Upsells ──────────────────────────────────────────────────────── */}
       {data.upsells && <UpsellPanel u={data.upsells} />}
 
+      {/* ── Mockups to make ──────────────────────────────────────────────── */}
+      <MockupTodoPanel />
+
       {/* ── Demand ───────────────────────────────────────────────────────── */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <Panel title="Customers are waiting for" icon={<BellRingIcon className="size-4 text-indigo-600" />} action={<PanelLink to="/backend-skinly/stock-notifications">Stock alerts</PanelLink>}>
@@ -718,6 +721,75 @@ function DashboardInner() {
  * nightly), the paid step from the shop's own confirmed orders. Each bar shows
  * how many of the step before made it; the worst drop is called out.
  */
+type TodoRow = { modelId: string; brand: string; model: string; score: number; reasons: string[]; have: number };
+type Todo = { rows: TodoRow[]; need: number; coveredAt: number; candidates: number; computedAt: number };
+
+/**
+ * The mockup to-do list (functions/src/mockupTodo.ts): the phone models that
+ * most need mockups, from orders, model requests and new launches. Rows drop
+ * off live as the admin uploads — each listed model's coverage doc is watched.
+ */
+function MockupTodoPanel() {
+  const [todo, setTodo] = useState<Todo | null | undefined>(undefined);
+  const [have, setHave] = useState<Record<string, number>>({});
+  const [show, setShow] = useState<"10" | "20" | "50">("10");
+  useEffect(() => {
+    let off = () => {};
+    void import("@/lib/firestore-sdk").then(({ db, doc, onSnapshot }) => {
+      off = onSnapshot(doc(db, "mockupTodo", "latest"), (snap) => setTodo(snap.exists() ? (snap.data() as Todo) : null), () => setTodo(null));
+    });
+    return () => off();
+  }, []);
+  const ids = useMemo(() => (todo?.rows || []).slice(0, 60).map((r) => r.modelId).join(","), [todo]);
+  useEffect(() => {
+    if (!ids) return;
+    const offs: Array<() => void> = [];
+    void import("@/lib/firestore-sdk").then(({ db, doc, onSnapshot }) => {
+      for (const id of ids.split(",")) {
+        offs.push(onSnapshot(doc(db, "mockupCoverage", id), (snap) => setHave((h) => ({ ...h, [id]: ((snap.get("skus") as string[] | undefined) || []).length })), () => {}));
+      }
+    });
+    return () => offs.forEach((f) => f());
+  }, [ids]);
+  if (todo === undefined) return null;
+  const rows = (todo?.rows || []).filter((r) => (have[r.modelId] ?? r.have) < (todo?.coveredAt || 1)).slice(0, Number(show));
+  return (
+    <Panel
+      title="Mockups to make next"
+      icon={<ListTodoIcon className="size-4 text-brand" />}
+      action={(
+        <span className="flex items-center gap-3">
+          <Tabs value={show} options={[["10", "Top 10"], ["20", "Top 20"], ["50", "Top 50"]]} onChange={setShow} />
+          <PanelLink to="/backend-skinly/mockups-advanced">Upload</PanelLink>
+        </span>
+      )}
+    >
+      <p className="mb-3 text-xs text-muted-foreground">
+        Ranked from orders (recent ones count double), customer model requests and new launches; a model drops off as soon as its
+        uploads cover {todo?.coveredAt || "…"} of the {todo?.need || "…"} designs in stock.
+      </p>
+      {!rows.length ? (
+        <p className="py-6 text-center text-sm text-muted-foreground">{todo ? "Nothing waiting — every model with demand has its mockups." : "List not built yet — open Advanced Mockups and press Rebuild now."}</p>
+      ) : (
+        <ol className="grid grid-cols-1 gap-x-6 gap-y-2 md:grid-cols-2">
+          {rows.map((r, i) => (
+            <li key={r.modelId} className="flex items-center gap-3">
+              <span className={cn("grid size-7 shrink-0 place-items-center rounded-md text-xs font-extrabold tabular-nums", i < 3 ? "border-2 border-ink bg-sunny" : "border border-ink/15 text-muted-foreground")}>{i + 1}</span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-sm font-semibold">{r.brand} {r.model}</span>
+                <span className="block truncate text-xs text-muted-foreground">
+                  {r.reasons.filter((x) => !/designs done/.test(x)).join(" · ")}{(have[r.modelId] ?? r.have) ? ` · ${have[r.modelId] ?? r.have} done` : ""}
+                </span>
+              </span>
+              <span className="font-mono text-xs text-muted-foreground tabular-nums">{r.score}</span>
+            </li>
+          ))}
+        </ol>
+      )}
+    </Panel>
+  );
+}
+
 function FunnelPanel({ funnel, onRefreshed }: { funnel: Dashboard["funnel"]; onRefreshed: () => void }) {
   const [busy, setBusy] = useState(false);
   const refresh = async () => {
