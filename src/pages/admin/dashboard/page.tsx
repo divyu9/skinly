@@ -722,7 +722,7 @@ function DashboardInner() {
  * how many of the step before made it; the worst drop is called out.
  */
 type TodoRow = { modelId: string; brand: string; model: string; score: number; reasons: string[]; have: number };
-type Todo = { rows: TodoRow[]; need: number; coveredAt: number; candidates: number; computedAt: number };
+type Todo = { rows: TodoRow[]; need: number; coveredAt: number; candidates: number; computedAt: number; search?: { ok: boolean } };
 
 /**
  * The mockup to-do list (functions/src/mockupTodo.ts): the phone models that
@@ -765,8 +765,8 @@ function MockupTodoPanel() {
       )}
     >
       <p className="mb-3 text-xs text-muted-foreground">
-        Ranked from orders (recent ones count double), customer model requests and new launches; a model drops off as soon as its
-        uploads cover {todo?.coveredAt || "…"} of the {todo?.need || "…"} designs in stock.
+        Ranked from orders (recent ones count double), customer model requests, new launches{todo?.search?.ok ? " and Google Search impressions" : ""}; a model drops off as soon as its
+        uploads cover {todo?.coveredAt || "…"} of the {todo?.need || "…"} designs in stock.{todo?.search && !todo.search.ok ? " Google Search is not linked yet." : ""}
       </p>
       {!rows.length ? (
         <p className="py-6 text-center text-sm text-muted-foreground">{todo ? "Nothing waiting — every model with demand has its mockups." : "List not built yet — open Advanced Mockups and press Rebuild now."}</p>

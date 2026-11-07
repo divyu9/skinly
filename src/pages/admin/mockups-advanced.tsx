@@ -39,7 +39,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 type Model = { _id: string; brandName: string; modelName: string; category?: string; isActive?: boolean; mergedInto?: string };
 type Coverage = { _id: string; skus: string[] };
 type TodoRow = { modelId: string; brand: string; model: string; score: number; orders365: number; orders90: number; requests: number; newDays: number | null; have: number; reasons: string[] };
-type Todo = { rows: TodoRow[]; need: number; coveredAt: number; candidates: number; computedAt: number };
+type Todo = { rows: TodoRow[]; need: number; coveredAt: number; candidates: number; computedAt: number; search?: { ok: boolean; pages?: number; error?: string } };
 type Mockup = { _id: string; sku: string; cloudinaryUrl?: string; r2Url?: string };
 type Design = { code: string; inStock: boolean; listings: number };
 type Row = Model & { have: number; missing: Design[]; extra: number };
@@ -281,6 +281,9 @@ export default function MockupsAdvancedPage() {
                   Models that most need mockups, ranked from orders (recent ones count double), customer model requests and how
                   new the phone is on the site. A model leaves the list the moment its uploads cover {todo?.coveredAt || "…"} of the {todo?.need || "…"} designs in stock.
                   {todo?.computedAt ? ` Ranked ${new Date(todo.computedAt).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}; rebuilt nightly.` : ""}
+                  {todo?.search && (todo.search.ok
+                    ? <span className="text-emerald-700"> Google Search linked ({todo.search.pages} pages, 28 days).</span>
+                    : <span className="text-amber-700"> Google Search not linked yet: add skinly-3003b@appspot.gserviceaccount.com as a user on the Search Console property, then rebuild.</span>)}
                 </p>
               </div>
               <div className="flex items-center gap-2">
