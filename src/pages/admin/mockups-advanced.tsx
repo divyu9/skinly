@@ -471,7 +471,8 @@ function ViewDialog({ row, designs, onClose }: { row: Row; designs: Map<string, 
           <DialogTitle>{row.brandName} {row.modelName}</DialogTitle>
           <DialogDescription>{mockups ? `${mockups.length} mockups` : "Loading…"} · faded ones are designs not live as phone skins now</DialogDescription>
         </DialogHeader>
-        <div className="grid flex-1 grid-cols-3 gap-3 overflow-y-auto p-1 sm:grid-cols-5">
+        {/* auto-rows-max: with a fixed dialog height a CSS grid squashes auto rows of overflow-hidden cells to 0 (315 mockups became 2px lines) */}
+        <div className="grid flex-1 auto-rows-max grid-cols-3 gap-3 overflow-y-auto p-1 sm:grid-cols-5">
           {list.map((m) => (
             <div key={m._id} className={`group relative overflow-hidden rounded-lg border ${designs && !designs.has(m.sku.toUpperCase()) ? "opacity-50" : ""}`}>
               <img src={m.r2Url || m.cloudinaryUrl} alt={m.sku} loading="lazy" className="aspect-[9/16] w-full bg-muted object-cover" />

@@ -115,18 +115,22 @@ export const ProductCard = memo(function ProductCard({
   return (
     <Link to={productUrl}>
       <Card className="group cursor-pointer overflow-hidden rounded-2xl border-2 border-ink/15 p-0 transition-all duration-200 hover:border-ink hover:shadow-xl">
+          {/* Model label: a sticker strip above the picture (never on it, so no design is covered).
+              The whole model name: cutting it to two words turned "iPhone 16 Pro" into "iPhone 16". */}
+          {modelFilter && (
+            <div className="flex h-[22px] items-center justify-center bg-white px-1 sm:h-[26px]">
+              {hasMockup && badgeModel ? (
+                <span className="inline-flex max-w-full items-center gap-1 truncate rounded-md border-2 border-ink bg-[#FFD400] px-1.5 py-0.5 text-[8px] font-extrabold leading-none text-ink shadow-[2px_2px_0_#111] sm:px-2.5 sm:py-1 sm:text-xs">
+                  <Sparkles className="size-2.5 shrink-0 sm:size-3" />
+                  For {badgeModel.replace(/\s*\(?5G\)?\s*$/i, '').trim()}
+                </span>
+              ) : null /* same height when there is no model picture, so the row's cards line up */}
+            </div>
+          )}
         {/* Product Image */}
         <div className={`relative aspect-square overflow-hidden bg-gray-50 dark:bg-gray-800 ${
           isOutOfStock && autoSortOOS ? 'opacity-30' : ''
         }`}>
-          {/* Mockup Badge - Show when mockup is displayed */}
-          {hasMockup && badgeModel && (
-            <div className="absolute top-2 left-2 z-10 px-1.5 py-0.5 sm:px-2 sm:py-1 bg-gradient-to-r from-green-500 to-emerald-500 text-white text-[7px] sm:text-[10px] font-bold rounded-full shadow-md flex items-center gap-0.5">
-              <Sparkles className="size-2.5 sm:size-3" />
-              <span>{badgeModel?.split(' ').slice(0, 2).join(' ')}</span>
-            </div>
-          )}
-          
           {realPhotoCount > 0 && (
             <div className="absolute bottom-1.5 left-1.5 z-10 flex items-center gap-1 rounded-full bg-ink/85 px-1.5 py-0.5 text-[8px] font-semibold text-white shadow-sm sm:bottom-2 sm:left-2 sm:px-2 sm:text-[11px]">
               <CameraIcon className="size-2.5 sm:size-3" />
@@ -141,7 +145,8 @@ export const ProductCard = memo(function ProductCard({
           <ProductThumb
             src={displayImageUrl}
             alt={mainImage?.alt || product.title}
-            className="group-hover:scale-110 transition-transform duration-300"
+            // Model mockups are square with 4.5% white above and below the phone: shown at 1.1x so the phone meets the label strip, and not zoomed further on hover — any more would cut the phone.
+            className={hasMockup ? "origin-center scale-[1.1]" : "transition-transform duration-300 group-hover:scale-110"}
           />
         </div>
         
