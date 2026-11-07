@@ -37,7 +37,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
  */
 
 type Model = { _id: string; brandName: string; modelName: string; category?: string; isActive?: boolean; mergedInto?: string };
-type Coverage = { _id: string; skus: string[]; aliasOf?: string; aliasOfModel?: string };
+type Coverage = { _id: string; skus?: string[]; aliasOf?: string; aliasOfModel?: string };
 type TodoRow = { modelId: string; brand: string; model: string; score: number; orders365: number; orders90: number; requests: number; newDays: number | null; have: number; reasons: string[] };
 type Todo = { rows: TodoRow[]; need: number; coveredAt: number; candidates: number; computedAt: number; search?: { ok: boolean; pages?: number; error?: string } };
 type Mockup = { _id: string; sku: string; cloudinaryUrl?: string; r2Url?: string };
@@ -313,7 +313,7 @@ export default function MockupsAdvancedPage() {
                 <TableBody>
                   {todoRows.slice(0, todoShow).map((t, i) => {
                     const r = rows.find((x) => x._id === t.modelId);
-                    const have = coverage?.find((c) => c._id === t.modelId)?.skus.length || 0;
+                    const have = coverage?.find((c) => c._id === t.modelId)?.skus?.length || 0;
                     return (
                       <TableRow key={t.modelId}>
                         <TableCell className="text-muted-foreground">{i + 1}</TableCell>
