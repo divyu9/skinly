@@ -58,7 +58,7 @@ const isImg = (f) => /\.(jpe?g|png|webp)$/i.test(f) && !f.startsWith(".");
     // Exact first (Samsung with the "Galaxy" prefix preferred over duplicate short names), then "+" ↔ "PLUS",
     // then Moto/Phone prefixes and 4G suffix. "Plus" is never dropped (S26 PLUS must not become S26).
     const exact = (c) => models.find((x) => x.key === b + "|" + c);
-    const cands = ["galaxy" + m, m, b + m, "moto" + m, m.replace(/^moto/, ""), "phone" + m, m.replace(/^phone/, ""), m + "4g", "galaxy" + m + "4g"];
+    const cands = ["galaxy" + m, m, b + m, "moto" + m, m.replace(/^moto/, ""), "phone" + m, m.replace(/^phone/, ""), m + "4g", "galaxy" + m + "4g", m.replace(/4g$/, ""), "galaxy" + m.replace(/4g$/, "")];
     for (const c of cands) { const hit = exact(c); if (hit) return hit; }
     if (/plus$/.test(m)) {
       const p = m.replace(/plus$/, "");  // site stores "+" which norm() strips: Galaxy S26+ -> galaxys26
