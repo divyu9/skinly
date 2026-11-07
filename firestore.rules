@@ -100,13 +100,18 @@ service cloud.firestore {
     match /pltSync/{id} { allow read: if isAdmin(); allow write: if false; }
     // Each phone model's mockup design codes, kept by functions (mockupCoverage.ts).
     match /mockupCoverage/{id} { allow read: if isAdmin(); allow write: if false; }
+    // The ranked mockup to-do list, written nightly by functions (mockupTodo.ts).
+    match /mockupTodo/{id} { allow read: if isAdmin(); allow write: if false; }
     // Which account owns each referral code; written only by functions (referrals.ts).
     match /referralCodes/{code} { allow read: if isAdmin(); allow write: if false; }
     // Who referred each order and what they are owed: admins only, never the customer (referrals.ts).
     match /orderReferrals/{orderId} { allow read: if isAdmin(); allow write: if false; }
 
     match /reviews/{id} {
-      allow read: if true;
+      // Moderated (functions/src/reviewRewards.ts): the public reads approved
+      // reviews only, so every storefront query filters status == "approved".
+      // Pending ones reach their own customer through viewOrder.
+      allow read: if isAdmin() || resource.data.status == "approved";
       allow create, update, delete: if isAdmin();
     }
 
@@ -144,7 +149,15 @@ service cloud.firestore {
     // One order is fetchable by anyone holding its document id — that is how
     // guest tracking works, and the ids are unguessable.
     match /orders/{orderId} {
-      allow get: if true;
+      // Owner or admin only. Anyone else — a guest's own emailed link, the
+      // payment-return and review pages — reads through the viewOrder function
+      // (functions/src/orderView.ts), which returns the full order only to a
+      // signed link or the owner. This was `if true`: any leaked /orders/<id>
+      // opened the customer's name, phone, address and tracking.
+      allow get: if isAdmin() || (isSignedIn() && (
+        resource.data.ownerUid == request.auth.uid ||
+        (request.auth.token.email != null && request.auth.token.email_verified == true
+         && resource.data.email == request.auth.token.email)));
       // A customer lists only their own orders, by ownerUid (set at checkout,
       // on a guest claim, and backfilled; see functions/src/ownership.ts).
       // This was `isSignedIn()`, which let any Google account read every

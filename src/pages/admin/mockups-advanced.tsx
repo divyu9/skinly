@@ -3,7 +3,7 @@ import { addDoc, collection, deleteDoc, doc, getDocs, limit, onSnapshot, query, 
 import { httpsCallable } from "firebase/functions";
 import {
   AlertCircleIcon, CheckCircle2Icon, CopyIcon, ImageIcon, Maximize2Icon, Minimize2Icon, RefreshCwIcon,
-  SearchIcon, Trash2Icon, UploadIcon, XCircleIcon, XIcon,
+  ListTodoIcon, SearchIcon, Trash2Icon, UploadIcon, XCircleIcon, XIcon,
 } from "lucide-react";
 import { toast } from "sonner";
 import { db } from "@/lib/firebase-db";
@@ -38,6 +38,8 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 
 type Model = { _id: string; brandName: string; modelName: string; category?: string; isActive?: boolean; mergedInto?: string };
 type Coverage = { _id: string; skus: string[] };
+type TodoRow = { modelId: string; brand: string; model: string; score: number; orders365: number; orders90: number; requests: number; newDays: number | null; have: number; reasons: string[] };
+type Todo = { rows: TodoRow[]; need: number; coveredAt: number; candidates: number; computedAt: number };
 type Mockup = { _id: string; sku: string; cloudinaryUrl?: string; r2Url?: string };
 type Design = { code: string; inStock: boolean; listings: number };
 type Row = Model & { have: number; missing: Design[]; extra: number };
@@ -109,6 +111,21 @@ function useLiveDesigns() {
 export default function MockupsAdvancedPage() {
   const models = useLive<Model>(query(collection(db, "supportedModels"), where("category", "==", "phone")), "phone-models");
   const coverage = useLive<Coverage>(collection(db, "mockupCoverage"), "coverage");
+  // The ranked to-do list (functions/src/mockupTodo.ts), with rows dropped live as their coverage fills in.
+  const [todo, setTodo] = useState<Todo | null>(null);
+  const [todoShow, setTodoShow] = useState(10);
+  const [todoBusy, setTodoBusy] = useState(false);
+  useEffect(() => onSnapshot(doc(db, "mockupTodo", "latest"), (s) => setTodo(s.exists() ? (s.data() as Todo) : { rows: [], need: 0, coveredAt: 0, candidates: 0, computedAt: 0 }), () => setTodo(null)), []);
+  const todoRows = useMemo(() => {
+    if (!todo || !coverage) return [];
+    const cov = new Map(coverage.map((c) => [c._id, (c.skus || []).length]));
+    return todo.rows.filter((r) => (cov.get(r.modelId) || 0) < todo.coveredAt);
+  }, [todo, coverage]);
+  const refreshTodo = async () => {
+    setTodoBusy(true);
+    try { const r: any = (await httpsCallable(functions, "refreshMockupTodo", { timeout: 300_000 })({})).data; toast.success(`To-do list rebuilt: ${r.candidates} models need mockups`); }
+    catch (e: any) { toast.error(e?.message || "Could not rebuild the list"); } finally { setTodoBusy(false); }
+  };
   const designs = useLiveDesigns();
 
   const [tab, setTab] = useState<"some" | "none" | "done" | "all">("some");
@@ -254,6 +271,63 @@ export default function MockupsAdvancedPage() {
             </Card>
           ))}
         </div>
+
+        <Card>
+          <CardContent className="space-y-3 pt-5">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <h2 className="flex items-center gap-2 text-lg font-semibold"><ListTodoIcon className="size-5" /> Mockup to-do</h2>
+                <p className="text-sm text-muted-foreground">
+                  Models that most need mockups, ranked from orders (recent ones count double), customer model requests and how
+                  new the phone is on the site. A model leaves the list the moment its uploads cover {todo?.coveredAt || "…"} of the {todo?.need || "…"} designs in stock.
+                  {todo?.computedAt ? ` Ranked ${new Date(todo.computedAt).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}; rebuilt nightly.` : ""}
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <Select value={String(todoShow)} onValueChange={(v) => setTodoShow(Number(v))}>
+                  <SelectTrigger className="w-28"><SelectValue /></SelectTrigger>
+                  <SelectContent>{[10, 20, 50, 100].map((n) => <SelectItem key={n} value={String(n)}>Top {n}</SelectItem>)}</SelectContent>
+                </Select>
+                <Button variant="outline" size="sm" disabled={todoBusy} onClick={refreshTodo}><RefreshCwIcon className={`mr-1 size-4 ${todoBusy ? "animate-spin" : ""}`} /> Rebuild now</Button>
+              </div>
+            </div>
+            {!todo ? (
+              <p className="py-4 text-center text-sm text-muted-foreground">Loading…</p>
+            ) : !todoRows.length ? (
+              <p className="py-4 text-center text-sm text-muted-foreground">Nothing waiting — every model with demand has its mockups.</p>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-10">#</TableHead>
+                    <TableHead>Model</TableHead>
+                    <TableHead>Why</TableHead>
+                    <TableHead className="w-20 text-right">Score</TableHead>
+                    <TableHead className="w-28" />
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {todoRows.slice(0, todoShow).map((t, i) => {
+                    const r = rows.find((x) => x._id === t.modelId);
+                    const have = coverage?.find((c) => c._id === t.modelId)?.skus.length || 0;
+                    return (
+                      <TableRow key={t.modelId}>
+                        <TableCell className="text-muted-foreground">{i + 1}</TableCell>
+                        <TableCell><div className="font-medium">{t.model}</div><div className="text-xs text-muted-foreground">{t.brand}{have ? ` · ${have} designs done` : ""}</div></TableCell>
+                        <TableCell className="text-sm text-muted-foreground">{t.reasons.filter((x) => !/designs done/.test(x)).join(" · ")}</TableCell>
+                        <TableCell className="text-right font-mono text-sm">{t.score}</TableCell>
+                        <TableCell className="text-right">
+                          {r && <Button size="sm" onClick={() => setDialog({ kind: "upload", row: r })}><UploadIcon className="mr-1 size-4" /> Upload</Button>}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            )}
+            {todo && todo.candidates > todoRows.length && <p className="text-xs text-muted-foreground">{todo.candidates} models have some demand in all; the list keeps the top 100.</p>}
+          </CardContent>
+        </Card>
 
         <Card>
           <CardContent className="space-y-4 pt-5">
