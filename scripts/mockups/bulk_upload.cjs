@@ -69,12 +69,15 @@ const isImg = (f) => /\.(jpe?g|png|webp)$/i.test(f) && !f.startsWith(".");
   };
   for (const f of folders) {
     let hit = null;
-    const soft = f.match(/^([A-Z]+)\s+(.+?)\s*-\s*B\d*$/i);  // "<BRAND> <MODEL> - B"
+    const soft = f.match(/^([A-Z]+)\s+(.+?)\s*-\s*[A-Z]*B\d*$/i);  // "<BRAND> <MODEL> - B" (also "- B1", "- LB")
     if (soft) {
-      let brand = soft[1], model = soft[2];
+      const brand = soft[1], model = soft[2];
       const two = (brand + " " + model.split(" ")[0]).toLowerCase();
-      if (SUBBRAND[two]) { brand = SUBBRAND[two]; model = model.split(" ").slice(1).join(" "); }
-      hit = findModel(brand, model);
+      // "VIVO IQOO 13" -> iQOO / 13; "XIAOMI REDMI NOTE 17 PRO" -> Xiaomi / Redmi Note 17 Pro (sub-brand kept in the model name too)
+      if (SUBBRAND[two]) hit = findModel(SUBBRAND[two], model.split(" ").slice(1).join(" ")) || findModel(SUBBRAND[two], model);
+      if (!hit) hit = findModel(brand, model);
+      // No brand in the folder name ("IPHONE 12 MINI - LB"): the whole name as a model, if it is unique across brands.
+      if (!hit) { const c = models.filter((x) => x.mkey === norm(brand + " " + model)); if (c.length === 1) hit = c[0]; }
     }
     const m = f.match(/^(.+?)\s*[-_–]\s+(.+)$/);
     if (!hit && m) hit = findModel(m[1], m[2]);
