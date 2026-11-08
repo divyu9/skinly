@@ -128,15 +128,31 @@ export function resolveSeoTarget(page, models, collectionNames = []) {
 
   // Brand and model pages. Device and skin-type pages never name a device.
   if (page?.pageType !== "device" && page?.pageType !== "skin-type" && words.length) {
+    const exactFull = [];
     const exact = [];
     const prefixed = [];
+    // "Galaxy A54 (5G)" is the Galaxy A54 a page names; drop network tags.
+    const noNet = (x) => x.replace(/(^|-)(5g|4g|lte)(?=-|$)/g, "").replace(/^-+|-+$/g, "");
+    /*
+     * The page's slug loses its network tag too. Model pages are written as
+     * "oppo-k14-plus-5g-skins", and comparing that against the tag-less
+     * "oppo-k14-plus" matched nothing, so every 5G/4G model page fell back to
+     * the brand page: brand title, brand products (8 Nov 2026, ChatGPT could
+     * not find our Oppo K14 Plus 5G skins). A slug that keeps the tag still
+     * prefers the model with that exact tag ("K14 5G" over "K14").
+     */
+    const baseNoNet = noNet(base);
+    const named = (b, own) => [`${slugify(b)}-${own}`, own, `${squash(b)}-${own}`];
     for (const m of active) {
-      // "Galaxy A54 (5G)" is the Galaxy A54 a page names; drop network tags.
-      const own = slugify(m.modelName).replace(/(^|-)(5g|4g|lte)(?=-|$)/g, "").replace(/^-+|-+$/g, "");
-      const cands = [`${slugify(m.brandName)}-${own}`, own, `${squash(m.brandName)}-${own}`];
-      if (cands.includes(base)) exact.push(m);
+      const full = slugify(m.modelName);
+      const cands = named(m.brandName, noNet(full));
+      if (named(m.brandName, full).includes(base)) exactFull.push(m);
+      else if (cands.includes(base) || cands.includes(baseNoNet)) exact.push(m);
+      // "honor-magic6-pro" names the Honor MAGIC 6 PRO: same letters, different hyphens.
+      else if (squash(baseNoNet) === squash(`${m.brandName}-${noNet(full)}`)) exact.push(m);
       else if (cands.some((c) => c.startsWith(base + "-"))) prefixed.push(m);
     }
+    exact.unshift(...exactFull);
     const majority = (list) => {
       const cats = {};
       for (const m of list) cats[m.category] = (cats[m.category] || 0) + 1;
