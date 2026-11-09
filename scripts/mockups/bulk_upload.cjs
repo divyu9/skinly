@@ -31,8 +31,11 @@ const norm = (s) => String(s || "").toLowerCase().replace(/\(5g\)|\b5g\b/g, "").
 function skuOf(name) {
   const clean = name.replace(/\.[a-z0-9]+$/i, "").replace(/_B\d*(?=_|$| )/gi, "_");
   const all = [...clean.matchAll(/(?:^|[^A-Za-z0-9])([LMSBFART]-\d+)(?!\d)/gi)];
-  return all.length ? all[all.length - 1][1].toUpperCase() : null;
+  const code = all.length ? all[all.length - 1][1].toUpperCase() : null;
+  return code && RECODE[code] ? RECODE[code] : code;
 }
+// Master-folder files still named after a duplicate code; the listings use the real one (9 Nov 2026).
+const RECODE = { "R-32": "R-03", "R-78": "R-60" };
 const isImg = (f) => /\.(jpe?g|png|webp)$/i.test(f) && !f.startsWith(".");
 
 (async () => {
@@ -74,7 +77,8 @@ const isImg = (f) => /\.(jpe?g|png|webp)$/i.test(f) && !f.startsWith(".");
       const brand = soft[1], model = soft[2];
       const two = (brand + " " + model.split(" ")[0]).toLowerCase();
       // "VIVO IQOO 13" -> iQOO / 13; "XIAOMI REDMI NOTE 17 PRO" -> Xiaomi / Redmi Note 17 Pro (sub-brand kept in the model name too)
-      if (SUBBRAND[two]) hit = findModel(SUBBRAND[two], model.split(" ").slice(1).join(" ")) || findModel(SUBBRAND[two], model);
+      // Full name first: "XIAOMI REDMI 15 5G" is the Redmi 15 (5G); without "Redmi" it matched the Xiaomi 15 5G (8 Nov 2026).
+      if (SUBBRAND[two]) hit = findModel(SUBBRAND[two], model) || findModel(SUBBRAND[two], model.split(" ").slice(1).join(" "));
       if (!hit) hit = findModel(brand, model);
       // No brand in the folder name ("IPHONE 12 MINI - LB"): the whole name as a model, if it is unique across brands.
       if (!hit) { const c = models.filter((x) => x.mkey === norm(brand + " " + model)); if (c.length === 1) hit = c[0]; }
