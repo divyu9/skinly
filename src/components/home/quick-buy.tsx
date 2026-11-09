@@ -186,8 +186,8 @@ export function QuickBuyBody({ slug, onDone, fixedDevice, hideThumb = false }: {
                 <TruckIcon className="size-5 text-ink" strokeWidth={2.2} />
               </span>
               <div className="min-w-0 text-[13px] leading-snug">
-                <p className="font-extrabold">Printed and cut for your {fixedDevice.model}</p>
-                <p className="mt-1 text-[12px] font-semibold text-foreground/80">Ships in 2–3 days · delivered across India in 4–6</p>
+                <p className="font-extrabold">Made to order, ships in 2–3 days</p>
+                <p className="mt-1 text-[12px] font-semibold text-foreground/80">Delivered across India in 4–6 days</p>
               </div>
             </div>
           )}
