@@ -2690,8 +2690,9 @@ async function main() {
       if (!cur || weight(info) > weight(cur)) pages[key] = info.slug;
     }
     await fs.mkdir(path.join(DIST, "data"), { recursive: true });
-    await fs.writeFile(path.join(DIST, "data", "model-pages.json"), JSON.stringify(pages));
-    log(`model pages index: ${Object.keys(pages).length} phones`);
+    const buyBox = Object.keys(pages).filter((k) => seoInfo.get(pages[k])?.buyBox);
+    await fs.writeFile(path.join(DIST, "data", "model-pages.json"), JSON.stringify({ pages, buyBox }));
+    log(`model pages index: ${Object.keys(pages).length} phones, ${buyBox.length} with a buy box`);
   }
   const themes = themeIndex(seoDocs, seoInfo);
   if (themes.length) log(`themes: ${themes.length} style pages, now linked from /skins and from every gadget page`);

@@ -33,10 +33,22 @@ const slug = `${brand} ${model}`.toLowerCase().replace(/\(.*?\)/g, (m) => m.repl
     .composite([{ input: body, gravity: "centre" }])
     .webp({ quality: 82 })
     .toFile(out);
-  const mf = path.join(DIR, "manifest.json");
-  const manifest = fs.existsSync(mf) ? JSON.parse(fs.readFileSync(mf, "utf8")) : {};
-  manifest[`${brand}|${model}`] = `/phones/${slug}.webp`;
-  const sorted = Object.fromEntries(Object.entries(manifest).sort(([a], [b]) => a.localeCompare(b)));
-  fs.writeFileSync(mf, JSON.stringify(sorted, null, 2) + "\n");
+  // Several runs at once (one per brand) share the manifest: take a lock around the read-modify-write.
+  const mf = path.join(DIR, "manifest.json"), lock = mf + ".lock";
+  for (let i = 0; ; i++) {
+    try { fs.mkdirSync(lock); break; } catch {
+      if (i > 200) { try { fs.rmdirSync(lock); } catch {} continue; }  // a stale lock (crashed run)
+      await new Promise((r) => setTimeout(r, 50 + Math.random() * 100));
+    }
+  }
+  try {
+    const manifest = fs.existsSync(mf) ? JSON.parse(fs.readFileSync(mf, "utf8")) : {};
+    manifest[`${brand}|${model}`] = `/phones/${slug}.webp`;
+    const sorted = Object.fromEntries(Object.entries(manifest).sort(([a], [b]) => a.localeCompare(b)));
+    fs.writeFileSync(mf + ".tmp", JSON.stringify(sorted, null, 2) + "\n");
+    fs.renameSync(mf + ".tmp", mf);
+  } finally {
+    fs.rmdirSync(lock);
+  }
   console.log(`${out}  (${Math.round(fs.statSync(out).size / 1024)} KB, ${W}x${H})`);
 })().catch((e) => { console.error(String(e.message || e)); process.exit(1); });

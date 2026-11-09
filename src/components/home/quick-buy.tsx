@@ -21,6 +21,7 @@ import { api } from "@/lib/firebase-api";
 import { readActiveDevice, writeActiveDevice } from "@/lib/active-device";
 import { brandInScope } from "@/lib/device-fit";
 import { responsiveImg } from "@/lib/image-cdn";
+import { loadModelPages } from "@/lib/model-pages";
 import { trackProductView } from "@/lib/analytics.ts";
 
 /**
@@ -80,10 +81,8 @@ export function QuickBuyBody({ slug, onDone, fixedDevice, hideThumb = false }: {
     // design's product page cut for it when the phone has no page.
     if (fixedDevice && product?.slug) {
       const slug = product.slug;
-      fetch("/data/model-pages.json", { headers: { accept: "application/json" } })
-        .then((r) => (r.ok ? r.json() : {}))
-        .catch(() => ({}))
-        .then((pages: Record<string, string>) => {
+      loadModelPages()
+        .then(({ pages }) => {
           const page = pages[`${brand}|${model}`];
           navigate(page
             ? `/${page}?${new URLSearchParams({ design: slug })}`

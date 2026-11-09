@@ -32,8 +32,34 @@ import { writeActiveDevice } from "@/lib/active-device";
 import { CATEGORY_PAGES, canonicalListingPath } from "@/lib/category-paths.mjs";
 import { ANNOUNCEMENT_DISMISSED_EVENT, isAnnouncementDismissed, announcementLikelyShown, announcementLive } from "@/lib/announcement-dismissed.ts";
 import { BrandPicker } from "./_components/brand-picker.tsx";
+import { useNavigate } from "react-router-dom";
+import { loadModelPages } from "@/lib/model-pages";
 
 export default function ProductsPage() {
+  /*
+   * A phone chosen in search (header, homepage, device picker) lands here as
+   * /products?brand=…&model=…. When that phone has a buy-box page, that page
+   * is the better place: it shows every design on this very phone and sells
+   * from the first screen. Only a plain "skins for this phone" visit goes
+   * there; one already narrowed by finish, search or collection stays here.
+   */
+  const navigateTo = useNavigate();
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search);
+    const brand = q.get("brand"), model = q.get("model");
+    if (!brand || !model) return;
+    const type = q.get("productType");
+    if (type && type !== "skin") return;
+    if (q.get("gadget") && q.get("gadget") !== "phone") return;
+    if (["finish", "search", "q", "collection", "tag", "sort"].some((k) => q.get(k))) return;
+    let gone = false;
+    loadModelPages().then(({ pages, buyBox }) => {
+      const key = `${brand}|${model}`;
+      if (!gone && buyBox.has(key) && pages[key]) navigateTo(`/${pages[key]}`, { replace: true });
+    });
+    return () => { gone = true; };
+  }, [navigateTo]);
+
   // ============================================
   // STATE & DIALOGS
   // ============================================
