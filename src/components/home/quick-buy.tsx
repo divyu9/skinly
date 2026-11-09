@@ -127,6 +127,8 @@ export function QuickBuyBody({ slug, onDone, fixedDevice, hideThumb = false }: {
     requiresDeviceSelection: needsDevice,
     extras,
     onAdded: () => setResetKey((n) => n + 1),
+    // So the dashboard can count what the model page's buy box sells.
+    addedFrom: fixedDevice ? "buy_box" : "quick_buy",
   });
 
   if (product === undefined) {

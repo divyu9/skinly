@@ -21,6 +21,8 @@ interface CartItemParams {
   coverage?: "only_back" | "full_body_wrap";
   /** The lens a camera skin's "With Lens" finish is cut for. */
   lensModel?: string;
+  /** Where the line was added from ("buy_box" on a model page, "quick_buy"), carried onto the order item. */
+  addedFrom?: string;
 }
 
 interface UseCartActionsParams {
@@ -48,6 +50,8 @@ interface UseCartActionsParams {
   extras?: Array<CartItemParams & { upsellRuleId: string }>;
   /** Called once the item and its add-ons are in the cart. */
   onAdded?: () => void;
+  /** Where this was added from, saved on the cart line and so on the order item. */
+  addedFrom?: string;
 }
 
 export function useCartActions({
@@ -62,6 +66,7 @@ export function useCartActions({
   lensModel,
   extras = [],
   onAdded,
+  addedFrom,
 }: UseCartActionsParams) {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -91,9 +96,10 @@ export function useCartActions({
     if (phoneModel) item.phoneModel = phoneModel;
     if (phoneBrand) item.phoneBrand = phoneBrand;
     if (requiresLens && lensModel?.trim()) item.lensModel = lensModel.trim();
+    if (addedFrom) item.addedFrom = addedFrom;
     
     return item as CartItemParams;
-  }, [product, selectedVariant, displayImage, phoneModel, phoneBrand, coverage, requiresLens, lensModel]);
+  }, [product, selectedVariant, displayImage, phoneModel, phoneBrand, coverage, requiresLens, lensModel, addedFrom]);
   
   const addToCart = useCallback(async (cartItem: CartItemParams) => {
     if (user) {

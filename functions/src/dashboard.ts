@@ -191,6 +191,23 @@ export async function buildDashboard(db: admin.firestore.Firestore) {
     aovWithout: nWithout ? aovWithout / nWithout : 0,
     byKind: [...byKind.entries()].map(([kind, v]) => ({ kind, ...v })).sort((a, b) => b.sales - a.sales),
     bySource: [...bySource.entries()].map(([source, v]) => ({ source, ...v })).sort((a, b) => b.sales - a.sales),
+    // Where the skin itself was added from (cart line addedFrom): the model page's buy box, quick buy.
+    addedFrom: (() => {
+      const m = new Map<string, { orders: number; pieces: number; sales: number }>();
+      for (const o of last30) {
+        const seen = new Set<string>();
+        for (const it of o.items || []) {
+          const from = String(it.addedFrom || "");
+          if (!from || it.upsellRuleId) continue;
+          const qty = Number(it.quantity) || 1;
+          const row = m.get(from) || { orders: 0, pieces: 0, sales: 0 };
+          row.pieces += qty; row.sales += (Number(it.price) || 0) * qty;
+          if (!seen.has(from)) { row.orders++; seen.add(from); }
+          m.set(from, row);
+        }
+      }
+      return [...m.entries()].map(([from, v]) => ({ from, ...v })).sort((a, b) => b.sales - a.sales);
+    })(),
   };
 
   // ── Funnel (GA4, refreshed nightly by funnel.ts) ────────────────────────

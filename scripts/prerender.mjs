@@ -2674,6 +2674,46 @@ async function main() {
     ...active.map((p) => `/products/${p.slug}`),
   ]);
   /*
+   * One landing page per phone. Some phones have two (samsung-galaxy-s24-ultra-skins
+   * and …-5g-skins, one-plus-13-skins and oneplus-13-skins): the same products,
+   * buy box and ProductGroup under two URLs, which splits their ranking and
+   * repeats the same structured data. The cleaner URL keeps the page ("oneplus"
+   * as the brand spells it, then the shorter one); the other is not written,
+   * leaves the sitemap and 301s to it (.htaccess).
+   */
+  const dupRedirects = new Map();  // losing slug -> winning slug
+  {
+    const byPhone = new Map();
+    for (const info of seoInfo.values()) {
+      const t = info?.target;
+      if (!info || t?.kind !== "model" || !t.brand || !t.model || !(info.total > 0)) continue;
+      const key = `${t.brand}|${t.model}`;
+      byPhone.set(key, [...(byPhone.get(key) || []), info.slug]);
+    }
+    const rank = (slug) => [/(^|-)one-plus-/.test(slug) ? 1 : 0, slug.length, slug];
+    for (const slugs of byPhone.values()) {
+      if (slugs.length < 2) continue;
+      const sorted = [...slugs].sort((a, b) => {
+        const ra = rank(a), rb = rank(b);
+        return ra[0] - rb[0] || ra[1] - rb[1] || String(ra[2]).localeCompare(String(rb[2]));
+      });
+      for (const loser of sorted.slice(1)) dupRedirects.set(loser, sorted[0]);
+    }
+    if (dupRedirects.size) log(`duplicate model pages: ${dupRedirects.size} now 301 to their phone's main page`);
+    // Links to a retired duplicate point at the page it moved to (no 301 hop inside the site).
+    if (dupRedirects.size) {
+      for (const info of seoInfo.values()) {
+        let changed = false;
+        for (const m of info?.models || []) {
+          const to = m.href && dupRedirects.get(m.href.replace(/^\//, ""));
+          if (to) { m.href = `/${to}`; changed = true; }
+        }
+        if (changed) await fs.writeFile(path.join(DIST, "seo-data", `${info.slug}.json`), JSON.stringify(info));
+      }
+    }
+  }
+
+  /*
    * Each phone's own landing page, for the buy box's "change model": picking
    * another phone there opens that phone's page, not a product page. Fetched
    * only when someone changes the model. Where two pages name one model, the
@@ -2684,7 +2724,7 @@ async function main() {
     const weight = (i) => (i.buyBox ? 1e6 : 0) + (i.total || 0);
     for (const info of seoInfo.values()) {
       const t = info?.target;
-      if (!info || t?.kind !== "model" || !t.brand || !t.model || !(info.total > 0)) continue;
+      if (!info || t?.kind !== "model" || !t.brand || !t.model || !(info.total > 0) || dupRedirects.has(info.slug)) continue;
       const key = `${t.brand}|${t.model}`;
       const cur = pages[key] && seoInfo.get(pages[key]);
       if (!cur || weight(info) > weight(cur)) pages[key] = info.slug;
@@ -2696,7 +2736,7 @@ async function main() {
   }
   const themes = themeIndex(seoDocs, seoInfo);
   if (themes.length) log(`themes: ${themes.length} style pages, now linked from /skins and from every gadget page`);
-  const seo = seoDocs.map((s) => seoPage(s, seoInfo.get(s.slug), knownPaths, themes));
+  const seo = seoDocs.filter((s) => !dupRedirects.has(s.slug)).map((s) => seoPage(s, seoInfo.get(s.slug), knownPaths, themes));
   if (safeHtml.dead) log(`dropped ${safeHtml.dead} generated links pointing at pages that do not exist`);
   for (const p of seo) await writePage(p.route, render(template, p));
 
@@ -2804,6 +2844,8 @@ async function main() {
     typeof p.redirectTo === "string" && /^\/[a-z0-9/-]*$/.test(p.redirectTo)
   );
   const legacy = await legacyRedirects(active, variantsByProduct);
+  const reEsc = (x) => x.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  for (const [from, to] of dupRedirects) legacy.push(`RewriteRule ^${reEsc(from)}$ ${SITE}/${to} [R=301,L]`);
   await writeHtaccess(true, retired, legacy);
   if (retired.length) log(`redirects: ${retired.length} retired listings`);
   if (legacy.length) log(`redirects: ${legacy.length} old-store URLs`);

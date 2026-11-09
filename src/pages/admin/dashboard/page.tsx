@@ -43,6 +43,8 @@ type Dashboard = {
     attachRate: number; orders: number; baseOrders: number; sales: number; aovWith: number; aovWithout: number;
     byKind: Array<{ kind: string; pieces: number; sales: number }>;
     bySource: Array<{ source: string; pieces: number; sales: number }>;
+    /** Skins by where they were added: "buy_box" (model pages), "quick_buy". */
+    addedFrom?: Array<{ from: string; orders: number; pieces: number; sales: number }>;
   };
   hours: number[];
   topProducts: Array<{ productId: string; title: string; image: string; qty: number; sales: number }>;
@@ -935,6 +937,19 @@ function UpsellPanel({ u }: { u: NonNullable<Dashboard["upsells"]> }) {
             </div>
           ) : <p className="text-sm text-muted-foreground">Product page, cart, checkout and add-to-parcel appear here.</p>}
         </div>
+      </div>
+      {/* The skins themselves, by where they were added (since 9 Nov 2026). */}
+      <div className="mt-5 flex flex-wrap gap-2 border-t-2 border-ink/10 pt-4 text-sm">
+        <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-muted-foreground self-center">Skins sold from</span>
+        {[["buy_box", "Model page buy box"], ["quick_buy", "Homepage quick buy"]].map(([key, label]) => {
+          const r = (u.addedFrom || []).find((x) => x.from === key);
+          return (
+            <span key={key} className="rounded-lg border-2 border-ink/10 px-3 py-1.5">
+              <span className="font-semibold">{label}</span>{" "}
+              <span className="tabular-nums">{r ? <><b>{r.orders}</b> orders · <b>{inr(r.sales)}</b> · {r.pieces} pcs</> : <span className="text-muted-foreground">none yet</span>}</span>
+            </span>
+          );
+        })}
       </div>
     </Panel>
   );
