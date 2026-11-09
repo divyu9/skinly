@@ -47,19 +47,16 @@ export function CashbackLine({
   const effective = price - back;
 
   return (
-    <div className="mt-3 flex items-start gap-2.5 rounded-xl border-2 border-sunny/70 bg-sunny/15 px-3 py-2.5">
-      <span className="mt-0.5 inline-flex size-7 shrink-0 items-center justify-center rounded-full bg-sunny">
-        <CoinsIcon className="size-4 text-ink" strokeWidth={2.4} />
+    <div className="sticker mt-3 flex items-center gap-3 rounded-2xl border-2 border-ink bg-sunny/40 px-3 py-2.5">
+      <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-full border-2 border-ink bg-sunny">
+        <CoinsIcon className="size-5 text-ink" strokeWidth={2.4} />
       </span>
       <div className="min-w-0 text-[13px] leading-snug">
-        <p className="font-bold text-foreground">
-          ₹{back} back in Skinly Coins
-          <span className="font-semibold text-muted-foreground">
-            {" "}— ₹{effective} effective
-          </span>
+        <p className="font-extrabold text-ink dark:text-foreground">
+          <span className="rounded-md bg-ink px-1.5 py-0.5 text-sunny">₹{back} back</span> in Skinly Coins
         </p>
-        <p className="mt-0.5 text-[11px] text-muted-foreground">
-          You pay ₹{price} today; the coins land in your wallet and come off your next order.
+        <p className="mt-1 text-[12px] font-semibold text-foreground/80">
+          Effectively <b className="text-foreground">₹{effective}</b> · you pay ₹{price} today, the coins come off your next order.
         </p>
       </div>
     </div>

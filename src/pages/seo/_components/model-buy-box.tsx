@@ -65,8 +65,9 @@ export default function ModelBuyBox({ data, hasH1 = false, onSeeAll }: {
                 className="aspect-square w-full object-contain"
               />
             </div>
-            <p className="mt-2 text-center text-xs text-muted-foreground">
-              {d.title} on the {t.brand} {t.model}
+            {/* One line, always: a long title wrapping to two moved everything below it. */}
+            <p className="mt-2 truncate text-center text-xs text-muted-foreground" title={`${d.title} on the ${t.brand} ${t.model}`}>
+              On the {t.brand} {t.model}
             </p>
           </div>
 
@@ -107,7 +108,7 @@ export default function ModelBuyBox({ data, hasH1 = false, onSeeAll }: {
               ))}
             </div>
 
-            <p className="mt-3 text-sm font-bold">
+            <p className="mt-3 truncate text-sm font-bold" title={d.title}>
               Design: <span className="font-semibold text-muted-foreground">{d.title}</span>
             </p>
             <div className="mt-2 grid grid-cols-6 gap-1.5 sm:gap-2">
@@ -155,7 +156,7 @@ export default function ModelBuyBox({ data, hasH1 = false, onSeeAll }: {
             )}
 
             <div className="mt-5">
-              <QuickBuyBody key={d.slug} slug={d.slug} onDone={() => {}} fixedDevice={{ brand: t.brand!, model: t.model! }} hideThumb />
+              <QuickBuyBody slug={d.slug} onDone={() => {}} fixedDevice={{ brand: t.brand!, model: t.model! }} hideThumb />
             </div>
           </div>
         </div>

@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
-import { ShoppingCartIcon, SmartphoneIcon, ZapIcon, ArrowRightIcon, PencilIcon } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { ShoppingCartIcon, SmartphoneIcon, ZapIcon, ArrowRightIcon, PencilIcon, ArrowLeftRightIcon, TruckIcon } from "lucide-react";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog.tsx";
 import { Sheet, SheetContent, SheetTitle, SheetDescription } from "@/components/ui/sheet.tsx";
 import { Button } from "@/components/ui/button.tsx";
@@ -10,7 +10,7 @@ import { RequestModelDialog } from "@/components/product/RequestModelDialog";
 import { CoverageSelector } from "@/components/product/CoverageSelector";
 import { VariantSelector } from "@/components/product/VariantSelector";
 import { SmartSetup, type SetupCartItem } from "@/pages/products/detail/_components/smart-setup.tsx";
-import { CashbackLine } from "@/pages/products/detail/_components/cashback-line.tsx";
+import { CashbackLine, cashbackAmount } from "@/pages/products/detail/_components/cashback-line.tsx";
 import { ShippingLine } from "@/pages/products/detail/_components/shipping-line.tsx";
 import { useIsMobile } from "@/hooks/use-mobile.ts";
 import { useCartActions } from "@/hooks/useCartActions";
@@ -43,7 +43,12 @@ const stockOf = (v: any) => Number(v?.inventoryQuantity ?? v?.inventory_quantity
 export function QuickBuyBody({ slug, onDone, fixedDevice, hideThumb = false }: {
   slug: string; onDone: () => void; fixedDevice?: { brand: string; model: string }; hideThumb?: boolean;
 }) {
-  const product = useQuery(api.products.getProductBySlug, { slug }) as any;
+  const live = useQuery(api.products.getProductBySlug, { slug }) as any;
+  // In the model page's buy box the design changes in place: keep showing the
+  // last one until the next arrives instead of a skeleton that jumps the page.
+  const lastRef = useRef<any>(undefined);
+  if (live !== undefined) lastRef.current = live;
+  const product = live === undefined && fixedDevice ? lastRef.current : live;
   const gadgetTypes = useQuery(api.gadgetTypes.list, {}) as Array<{ _id: string; name?: string }> | undefined;
   const cashbackInfo = useQuery(api.cashbackHelpers.getProductCashbackInfo, product?._id ? { productId: product._id } : "skip");
 
@@ -67,10 +72,16 @@ export function QuickBuyBody({ slug, onDone, fixedDevice, hideThumb = false }: {
     }
   }, [product?._id, deviceCategory]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const navigate = useNavigate();
   const onSelect = useCallback((model: string, brand: string) => {
-    setDevice({ brand, model });
     writeActiveDevice(brand, model, deviceCategory);
-  }, [deviceCategory]);
+    // On a model page the phone is the page: another phone opens this design's page cut for it.
+    if (fixedDevice && product?.slug) {
+      navigate(`/products/${product.slug}?${new URLSearchParams({ brand, model })}`);
+      return;
+    }
+    setDevice({ brand, model });
+  }, [deviceCategory, fixedDevice, product?.slug, navigate]);
 
   const selector = useModelSelector(deviceCategory, {
     modelBrands: product?.modelBrands, modelBrandsExclude: product?.modelBrandsExclude,
@@ -143,7 +154,8 @@ export function QuickBuyBody({ slug, onDone, fixedDevice, hideThumb = false }: {
             className="size-24 shrink-0 rounded-xl border-2 border-ink/15 object-cover" />
         )}
         <div className="min-w-0 flex-1">
-          <h2 className="line-clamp-2 text-[15px] font-bold leading-snug">{product.title}</h2>
+          {/* Two lines reserved, so a one-line title does not pull the price up and back on the next design. */}
+          <h2 className="line-clamp-2 min-h-[2.75em] text-[15px] font-bold leading-snug">{product.title}</h2>
           <div className="mt-1 flex flex-wrap items-baseline gap-x-2">
             <span className="text-xl font-extrabold text-brand">₹{price.toLocaleString("en-IN")}</span>
             {off > 0 && (
@@ -159,18 +171,45 @@ export function QuickBuyBody({ slug, onDone, fixedDevice, hideThumb = false }: {
         </div>
       </div>
 
-      <CashbackLine info={cashbackInfo as any} price={price} />
+      {fixedDevice ? (
+        /*
+         * The model page's buy box swaps designs in place, and only some carry
+         * coins: the box appearing and vanishing moved everything below it by
+         * 95px. The slot keeps its height; without coins it says how delivery works.
+         */
+        <div className="min-h-[95px]">
+          {cashbackInfo === undefined ? null : cashbackAmount(cashbackInfo as any, price) > 0 ? (
+            <CashbackLine info={cashbackInfo as any} price={price} />
+          ) : (
+            <div className="mt-3 flex items-center gap-3 rounded-2xl border-2 border-ink/15 bg-card px-3 py-2.5">
+              <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-full border-2 border-ink/20 bg-muted">
+                <TruckIcon className="size-5 text-ink" strokeWidth={2.2} />
+              </span>
+              <div className="min-w-0 text-[13px] leading-snug">
+                <p className="font-extrabold">Printed and cut for your {fixedDevice.model}</p>
+                <p className="mt-1 text-[12px] font-semibold text-foreground/80">Ships in 2–3 days · delivered across India in 4–6</p>
+              </div>
+            </div>
+          )}
+        </div>
+      ) : (
+        <CashbackLine info={cashbackInfo as any} price={price} />
+      )}
       <ShippingLine price={price} />
 
       {/* Device */}
       {needsDevice && (
         device && fixedDevice ? (
-          <div className="flex w-full items-center gap-3 rounded-2xl border-2 border-ink/15 bg-card p-3">
+          <div className="flex w-full items-center gap-3 rounded-2xl border-2 border-ink bg-card p-3">
             <SmartphoneIcon className="size-5 shrink-0 text-brand" />
             <span className="min-w-0 flex-1">
-              <span className="block text-[11px] text-muted-foreground">Cutting for</span>
-              <span className="block truncate text-sm font-bold">{device.brand} {device.model}</span>
+              <span className="block text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Cutting for</span>
+              <span className="block text-sm font-extrabold leading-tight">{device.brand} {device.model}</span>
             </span>
+            <button type="button" onClick={selector.openSelector} aria-label="Change model" title="Change model"
+              className="sticker sticker-press inline-flex size-10 shrink-0 items-center justify-center rounded-xl border-2 border-ink bg-sunny text-ink">
+              <ArrowLeftRightIcon className="size-5" strokeWidth={2.5} />
+            </button>
           </div>
         ) : device ? (
           <button type="button" onClick={selector.openSelector}
