@@ -2221,6 +2221,7 @@ function categoryPages(products, variantsByProduct, themes = []) {
 const PHONE_PHOTOS = (() => {
   try { return JSON.parse(readFileSync(new URL("../public/phones/manifest.json", import.meta.url), "utf8")); } catch { return {}; }
 })();
+const PHONE_PHOTOS_CI = new Map(Object.entries(PHONE_PHOTOS).map(([k, v]) => [k.toLowerCase(), v]));
 const keyOf = (s) => String(s || "").toLowerCase().replace(/\(5g\)|\b5g\b|\b4g\b/g, "").replace(/[^a-z0-9]/g, "");
 const FINISH_TABS = [
   ["matte", "Matte"], ["embossed", "3D Textured"], ["transparent", "Tranzy"], ["premium-leather", "Leather"], ["sparkling", "Sparkling"],
@@ -2455,7 +2456,8 @@ async function seoPageData(project, seoDocs, data, variantsByProduct) {
       : null;
 
     // The phone's own back photo (public/phones/manifest.json, official renders on white) for the compact hero.
-    const heroPhone = target.kind === "model" ? PHONE_PHOTOS[`${target.brand}|${target.model}`] : undefined;
+    // Matched without letter case: model names get tidied ("SMART 6" -> "Smart 6").
+    const heroPhone = target.kind === "model" ? PHONE_PHOTOS_CI.get(`${target.brand}|${target.model}`.toLowerCase()) : undefined;
 
     const info = {
       ...(buyBox ? { buyBox } : {}),
