@@ -156,6 +156,14 @@ export function QuickBuyBody({ slug, onDone, fixedDevice, hideThumb = false }: {
     ? `/products/${product.slug}?${new URLSearchParams({ brand: device.brand, model: device.model })}`
     : `/products/${product.slug}`;
   const busy = isAdding || isBuyingNow;
+  // Same rule as the product cards: Google sees the clean product URL; a click carries the phone.
+  const cleanHref = product ? `/products/${product.slug}` : fullHref;
+  const openFull = (e: React.MouseEvent) => {
+    onDone();
+    if (fullHref === cleanHref || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    e.preventDefault();
+    navigate(fullHref);
+  };
 
   return (
     <div className="space-y-4">
@@ -177,7 +185,7 @@ export function QuickBuyBody({ slug, onDone, fixedDevice, hideThumb = false }: {
               </>
             )}
           </div>
-          <Link to={fullHref} onClick={onDone} className="mt-1 inline-flex items-center gap-1 text-xs font-semibold text-brand hover:underline">
+          <Link to={cleanHref} onClick={openFull} className="mt-1 inline-flex items-center gap-1 text-xs font-semibold text-brand hover:underline">
             View full details <ArrowRightIcon className="size-3" />
           </Link>
         </div>
@@ -265,7 +273,7 @@ export function QuickBuyBody({ slug, onDone, fixedDevice, hideThumb = false }: {
 
       {!inStock ? (
         <Button asChild size="lg" variant="outline" className="h-12 w-full rounded-2xl border-ink font-bold">
-          <Link to={fullHref} onClick={onDone}>Out of stock — get notified</Link>
+          <Link to={cleanHref} onClick={openFull}>Out of stock — get notified</Link>
         </Button>
       ) : needsDevice && !device ? null : (
         <div className="flex gap-2.5">

@@ -1,0 +1,234 @@
+brand,model,result,source_or_reason
+Xiaomi,REDMI TURBO 5 5G,added,https://i03.appmifile.com/480_item_in/15/06/2026/44f657c1fafef09231fa9a5208b7bdd6.png
+Xiaomi,Redmi Note 17,added,https://i03.appmifile.com/283_item_in/28/07/2026/dfffc8663a59945ba8d672842793ef93.png
+Xiaomi,Redmi Note 15 (5G),added,https://i03.appmifile.com/616_item_in/31/12/2025/bcadf2913f3cb92d7ca9093282693cd3.png
+Xiaomi,Redmi Note 14 SE (5G),added,https://i03.appmifile.com/135_item_in/29/07/2025/9a1acb1ca1043f84dad0a338968417a0.png
+Xiaomi,Redmi Note 13 Pro 5G,added,https://i03.appmifile.com/231_item_in/19/12/2024/b43a01a6f9423e7a4225c111c855ad22.jpg
+Xiaomi,Redmi A7 Pro,added,https://i03.appmifile.com/155_item_in/17/04/2026/c08cb5fca831e3390adfe85a5eb2814f.png
+Xiaomi,Redmi A7 Pro 4G,added,https://i03.appmifile.com/155_item_in/17/04/2026/c08cb5fca831e3390adfe85a5eb2814f.png
+Xiaomi,Redmi A7,added,https://i03.appmifile.com/120_item_in/17/04/2026/dd6bbdeca6dfcb57dd76714539e4c5d5.png
+Xiaomi,Redmi 17,added,https://i03.appmifile.com/950_item_in/26/08/2026/7ecb5a9a77fb3b994f6bf0b8eba59a31.png
+Xiaomi,17 5G,added,https://i03.appmifile.com/438_item_in/11/03/2026/bbfbe198c5103d0e562d3ce5432cee90.png
+Xiaomi,15 ULTRA,added,https://i03.appmifile.com/297_item_in/19/03/2025/baf6ee3a8747ac83f00a8334235d9c59.png
+Xiaomi,Redmi Note 14 Pro 5G,added,https://i03.appmifile.com/685_item_in/01/07/2025/dbed50bcebf71e872c1c2229b02667b8.png
+Xiaomi,Xiaomi Black Shark 2,skipped,Black Shark not sold on mi.com; no official source
+Xiaomi,Xiaomi 18 Fold,skipped,no mi.com product page or store listing found (discontinued/not on mi.com)
+Xiaomi,Xiaomi 17T Pro,skipped,mi.com images are only front+back combos / lifestyle / angled crops; no clean single back render
+Xiaomi,Xiaomi 17T,skipped,mi.com images are only front+back combos / lifestyle / angled crops; no clean single back render
+Xiaomi,Xiaomi 17 Ultra,skipped,mi.com images are only front+back combos / lifestyle / angled crops; no clean single back render
+Xiaomi,Xiaomi 17 Max,skipped,no mi.com product page or store listing found (discontinued/not on mi.com)
+Xiaomi,Redmi Y3,skipped,mi.com images are only front+back combos / lifestyle / angled crops; no clean single back render
+Xiaomi,Redmi Y2,skipped,mi.com images are only front+back combos / lifestyle / angled crops; no clean single back render
+Xiaomi,Redmi Y1 Lite,skipped,mi.com images are only front+back combos / lifestyle / angled crops; no clean single back render
+Xiaomi,Redmi Y1,skipped,mi.com images are only front+back combos / lifestyle / angled crops; no clean single back render
+Xiaomi,REDMI TURBO 5 MAX 5G,skipped,no mi.com product page or store listing found (discontinued/not on mi.com)
+Xiaomi,Redmi Turbo 4 Pro (5G),skipped,no mi.com product page or store listing found (discontinued/not on mi.com)
+Xiaomi,REDMI S2,skipped,mi.com images are only front+back combos / lifestyle / angled crops; no clean single back render
+Xiaomi,Redmi Note 17 4G,skipped,mi.com images are only front+back combos / lifestyle / angled crops; no clean single back render
+Xiaomi,REDMI NOTE 15R,skipped,no mi.com product page or store listing found (discontinued/not on mi.com)
+Xiaomi,Redmi Note 15 Special,skipped,no mi.com product page or store listing found (discontinued/not on mi.com)
+Xiaomi,REDMI NOTE 14S 4G,skipped,mi.com images are only front+back combos / lifestyle / angled crops; no clean single back render
+Xiaomi,Redmi Note 13 5G,skipped,mi.com images are only front+back combos / lifestyle / angled crops; no clean single back render
+Xiaomi,REDMI NOTE 12S,skipped,mi.com images are only front+back combos / lifestyle / angled crops; no clean single back render
+Xiaomi,Redmi Note 12 Pro Plus 5G,skipped,mi.com images are only front+back combos / lifestyle / angled crops; no clean single back render
+Xiaomi,Redmi Note 12 Pro 5G,skipped,mi.com images are only front+back combos / lifestyle / angled crops; no clean single back render
+Xiaomi,Redmi Note 12 5G,skipped,mi.com images are only front+back combos / lifestyle / angled crops; no clean single back render
+Xiaomi,Redmi Note 11T 5G,skipped,mi.com images are only front+back combos / lifestyle / angled crops; no clean single back render
+Xiaomi,Redmi Note 11SE,skipped,no mi.com product page or store listing found (discontinued/not on mi.com)
+Xiaomi,REDMI NOTE 11S,skipped,mi.com images are only front+back combos / lifestyle / angled crops; no clean single back render
+Xiaomi,REDMI NOTE 11E,skipped,no mi.com product page or store listing found (discontinued/not on mi.com)
+Xiaomi,Redmi Note 11 Pro Plus 5G,skipped,mi.com images are only front+back combos / lifestyle / angled crops; no clean single back render
+Xiaomi,Redmi Note 11 Pro,skipped,mi.com images are only front+back combos / lifestyle / angled crops; no clean single back render
+Xiaomi,Redmi Note 11,skipped,mi.com images are only front+back combos / lifestyle / angled crops; no clean single back render
+Xiaomi,Redmi Note 10T 5G,skipped,mi.com images are only front+back combos / lifestyle / angled crops; no clean single back render
+Xiaomi,Redmi Note 10S,skipped,mi.com images are only front+back combos / lifestyle / angled crops; no clean single back render
+Xiaomi,Redmi Note 10 Pro Max,skipped,only small (~650px) official single back render: https://i01.appmifile.com/v1/MI_18455B3E4DA706226CF7535A58E875F0267/pms_1628859291.34764512.jpg
+Xiaomi,REDMI NOTE 10 LITE,skipped,mi.com images are only front+back combos / lifestyle / angled crops; no clean single back render
+Xiaomi,Redmi Note 9T 5G,skipped,mi.com images are only front+back combos / lifestyle / angled crops; no clean single back render
+Xiaomi,REDMI NOTE 9S,skipped,mi.com images are only front+back combos / lifestyle / angled crops; no clean single back render
+Xiaomi,Redmi Note 9 Pro,skipped,mi.com images are only front+back combos / lifestyle / angled crops; no clean single back render
+Xiaomi,REDMI NOTE 8T,skipped,no mi.com product page or store listing found (discontinued/not on mi.com)
+Xiaomi,Redmi Note 8 Pro,skipped,mi.com images are only front+back combos / lifestyle / angled crops; no clean single back render
+Xiaomi,Redmi Note 8,skipped,mi.com images are only front+back combos / lifestyle / angled crops; no clean single back render
+Xiaomi,REDMI NOTE 7S,skipped,mi.com images are only front+back combos / lifestyle / angled crops; no clean single back render
+Xiaomi,REDMI NOTE 7,skipped,mi.com images are only front+back combos / lifestyle / angled crops; no clean single back render
+Xiaomi,Redmi Note 6 Pro,skipped,mi.com images are only front+back combos / lifestyle / angled crops; no clean single back render
+Xiaomi,REDMI NOTE 6,skipped,no mi.com product page or store listing found (discontinued/not on mi.com)
+Xiaomi,REDMI NOTE 5A,skipped,mi.com images are only front+back combos / lifestyle / angled crops; no clean single back render
+Xiaomi,REDMI NOTE 5 PRO,skipped,mi.com images are only front+back combos / lifestyle / angled crops; no clean single back render
+Xiaomi,REDMI NOTE 5,skipped,mi.com images are only front+back combos / lifestyle / angled crops; no clean single back render
+Xiaomi,REDMI NOTE 4,skipped,no mi.com product page or store listing found (discontinued/not on mi.com)
+Xiaomi,REDMI NOTE 3,skipped,no mi.com product page or store listing found (discontinued/not on mi.com)
+Xiaomi,REDMI NOTE 2,skipped,no mi.com product page or store listing found (discontinued/not on mi.com)
+Xiaomi,Redmi K90 Pro Max Lamborghini Edition,skipped,no mi.com product page or store listing found (discontinued/not on mi.com)
+Xiaomi,REDMI K90 PRO MAX 5G,skipped,no mi.com product page or store listing found (discontinued/not on mi.com)
+Xiaomi,REDMI K90 MAX 5G,skipped,no mi.com product page or store listing found (discontinued/not on mi.com)
+Xiaomi,REDMI K90 5G,skipped,no mi.com product page or store listing found (discontinued/not on mi.com)
+Xiaomi,REDMI K80 ULTRA 5G,skipped,no mi.com product page or store listing found (discontinued/not on mi.com)
+Xiaomi,REDMI K80 PRO 5G,skipped,no mi.com product page or store listing found (discontinued/not on mi.com)
+Xiaomi,REDMI K80 5G,skipped,no mi.com product page or store listing found (discontinued/not on mi.com)
+Xiaomi,REDMI K70 ULTRA,skipped,no mi.com product page or store listing found (discontinued/not on mi.com)
+Xiaomi,Redmi K50i 5G,skipped,mi.com images are only front+back combos / lifestyle / angled crops; no clean single back render
+Xiaomi,REDMI K50 PRO,skipped,no mi.com product page or store listing found (discontinued/not on mi.com)
+Xiaomi,REDMI K50 GAMING,skipped,no mi.com product page or store listing found (discontinued/not on mi.com)
+Xiaomi,Redmi K40 Gaming (5G),skipped,no mi.com product page or store listing found (discontinued/not on mi.com)
+Xiaomi,REDMI K30I 5G,skipped,no mi.com product page or store listing found (discontinued/not on mi.com)
+Xiaomi,REDMI K30 ULTRA,skipped,no mi.com product page or store listing found (discontinued/not on mi.com)
+Xiaomi,REDMI K30 PRO,skipped,no mi.com product page or store listing found (discontinued/not on mi.com)
+Xiaomi,REDMI K30,skipped,no mi.com product page or store listing found (discontinued/not on mi.com)
+Xiaomi,Redmi K20 Pro,skipped,no mi.com product page or store listing found (discontinued/not on mi.com)
+Xiaomi,REDMI K20,skipped,mi.com images are only front+back combos / lifestyle / angled crops; no clean single back render
+Xiaomi,REDMI GO,skipped,only small (~650px) official single back render: https://i01.appmifile.com/webfile/globalimg/in/cms/B80F1207-D687-5744-6483-9B60089C6931.jpg
+Xiaomi,REDMI A5 4G,skipped,mi.com images are only front+back combos / lifestyle / angled crops; no clean single back render
+Xiaomi,REDMI A4 5G,skipped,mi.com images are only front+back combos / lifestyle / angled crops; no clean single back render
+Xiaomi,REDMI A3X,skipped,mi.com images are only front+back combos / lifestyle / angled crops; no clean single back render
+Xiaomi,REDMI A3 PRO 4G,skipped,no mi.com product page or store listing found (discontinued/not on mi.com)
+Xiaomi,REDMI A3,skipped,mi.com images are only front+back combos / lifestyle / angled crops; no clean single back render
+Xiaomi,Redmi A2 Plus,skipped,mi.com images are only front+back combos / lifestyle / angled crops; no clean single back render
+Xiaomi,REDMI A2,skipped,mi.com images are only front+back combos / lifestyle / angled crops; no clean single back render
+Xiaomi,REDMI A1 PLUS,skipped,mi.com images are only front+back combos / lifestyle / angled crops; no clean single back render
+Xiaomi,REDMI A1,skipped,mi.com images are only front+back combos / lifestyle / angled crops; no clean single back render
+Xiaomi,Redmi 17C 4G,skipped,no mi.com product page or store listing found (discontinued/not on mi.com)
+Xiaomi,Redmi 17C,skipped,mi.com images are only front+back combos / lifestyle / angled crops; no clean single back render
+Xiaomi,Redmi 17 4G,skipped,mi.com images are only front+back combos / lifestyle / angled crops; no clean single back render
+Xiaomi,Redmi 15C (5G),skipped,mi.com images are only front+back combos / lifestyle / angled crops; no clean single back render
+Xiaomi,REDMI 14C,skipped,only Redmi 14C 5G on mi.com/in (different phone); 4G model has no listing
+Xiaomi,REDMI 13X 4G,skipped,mi.com images are only front+back combos / lifestyle / angled crops; no clean single back render
+Xiaomi,Redmi 13C 5G,skipped,mi.com images are only front+back combos / lifestyle / angled crops; no clean single back render
+Xiaomi,Redmi 13C,skipped,mi.com images are only front+back combos / lifestyle / angled crops; no clean single back render
+Xiaomi,REDMI 13 PRO,skipped,no mi.com product page or store listing found (discontinued/not on mi.com)
+Xiaomi,REDMI 13 5G,skipped,only small (615px) render and from a page that may be the 4G Redmi 13
+Xiaomi,REDMI 12C,skipped,mi.com images are only front+back combos / lifestyle / angled crops; no clean single back render
+Xiaomi,Redmi 12 PRO,skipped,no mi.com product page or store listing found (discontinued/not on mi.com)
+Xiaomi,Redmi 12 4G,skipped,mi.com images are only front+back combos / lifestyle / angled crops; no clean single back render
+Xiaomi,Redmi 11i Hyper Charge,skipped,no such Redmi model (likely Xiaomi 11i HyperCharge 5G); needs human decision
+Xiaomi,Redmi 11 Prime 5G,skipped,mi.com images are only front+back combos / lifestyle / angled crops; no clean single back render
+Xiaomi,Redmi 11 Lite NE 5G,skipped,no mi.com product page or store listing found (discontinued/not on mi.com)
+Xiaomi,REDMI 10X PRO 5G,skipped,no mi.com product page or store listing found (discontinued/not on mi.com)
+Xiaomi,REDMI 10X,skipped,no mi.com product page or store listing found (discontinued/not on mi.com)
+Xiaomi,REDMI 10I,skipped,no mi.com product page or store listing found (discontinued/not on mi.com)
+Xiaomi,REDMI 10C,skipped,mi.com images are only front+back combos / lifestyle / angled crops; no clean single back render
+Xiaomi,REDMI 10A SPORT,skipped,mi.com images are only front+back combos / lifestyle / angled crops; no clean single back render
+Xiaomi,REDMI 10A,skipped,mi.com images are only front+back combos / lifestyle / angled crops; no clean single back render
+Xiaomi,Redmi 10 Prime,skipped,only small (~650px) official single back render: https://i01.appmifile.com/v1/MI_18455B3E4DA706226CF7535A58E875F0267/pms_1630575838.4349778.png
+Xiaomi,Redmi 10 Power,skipped,mi.com images are only front+back combos / lifestyle / angled crops; no clean single back render
+Xiaomi,Redmi 10,skipped,mi.com images are only front+back combos / lifestyle / angled crops; no clean single back render
+Xiaomi,REDMI 9T,skipped,mi.com images are only front+back combos / lifestyle / angled crops; no clean single back render
+Xiaomi,REDMI 9I SPORT,skipped,mi.com images are only front+back combos / lifestyle / angled crops; no clean single back render
+Xiaomi,Redmi 9i,skipped,mi.com images are only front+back combos / lifestyle / angled crops; no clean single back render
+Xiaomi,REDMI 9C,skipped,mi.com images are only front+back combos / lifestyle / angled crops; no clean single back render
+Xiaomi,REDMI 9A,skipped,mi.com images are only front+back combos / lifestyle / angled crops; no clean single back render
+Xiaomi,Redmi 9 Prime,skipped,mi.com images are only front+back combos / lifestyle / angled crops; no clean single back render
+Xiaomi,Redmi 9 Power,skipped,mi.com images are only front+back combos / lifestyle / angled crops; no clean single back render
+Xiaomi,REDMI 9 ACTIV,skipped,mi.com images are only front+back combos / lifestyle / angled crops; no clean single back render
+Xiaomi,REDMI 9,skipped,mi.com images are only front+back combos / lifestyle / angled crops; no clean single back render
+Xiaomi,REDMI 8T,skipped,no mi.com product page or store listing found (discontinued/not on mi.com)
+Xiaomi,REDMI 8A,skipped,mi.com images are only front+back combos / lifestyle / angled crops; no clean single back render
+Xiaomi,REDMI 8 POWER,skipped,no mi.com product page or store listing found (discontinued/not on mi.com)
+Xiaomi,REDMI 8,skipped,mi.com images are only front+back combos / lifestyle / angled crops; no clean single back render
+Xiaomi,REDMI 7A,skipped,mi.com images are only front+back combos / lifestyle / angled crops; no clean single back render
+Xiaomi,REDMI 7,skipped,mi.com images are only front+back combos / lifestyle / angled crops; no clean single back render
+Xiaomi,REDMI 6X,skipped,no mi.com product page or store listing found (discontinued/not on mi.com)
+Xiaomi,REDMI 6A,skipped,mi.com images are only front+back combos / lifestyle / angled crops; no clean single back render
+Xiaomi,REDMI 6 PRO,skipped,mi.com images are only front+back combos / lifestyle / angled crops; no clean single back render
+Xiaomi,REDMI 6,skipped,mi.com images are only front+back combos / lifestyle / angled crops; no clean single back render
+Xiaomi,REDMI 5A,skipped,mi.com redmi-5a listing shows Redmi 5 items; exact model unconfirmed
+Xiaomi,REDMI 5 PLUS,skipped,mi.com images are only front+back combos / lifestyle / angled crops; no clean single back render
+Xiaomi,REDMI 5,skipped,mi.com images are only front+back combos / lifestyle / angled crops; no clean single back render
+Xiaomi,REDMI 4X,skipped,no mi.com product page or store listing found (discontinued/not on mi.com)
+Xiaomi,REDMI 4A,skipped,no mi.com product page or store listing found (discontinued/not on mi.com)
+Xiaomi,REDMI 4 PRO,skipped,no mi.com product page or store listing found (discontinued/not on mi.com)
+Xiaomi,REDMI 4,skipped,no mi.com product page or store listing found (discontinued/not on mi.com)
+Xiaomi,REDMI 3S PRIME,skipped,no mi.com product page or store listing found (discontinued/not on mi.com)
+Xiaomi,REDMI 3S,skipped,no mi.com product page or store listing found (discontinued/not on mi.com)
+Xiaomi,REDMI 3,skipped,no mi.com product page or store listing found (discontinued/not on mi.com)
+Xiaomi,REDMI 1S,skipped,no mi.com product page or store listing found (discontinued/not on mi.com)
+Xiaomi,MI X9,skipped,no mi.com product page or store listing found (discontinued/not on mi.com)
+Xiaomi,MI PLAY,skipped,no mi.com product page or store listing found (discontinued/not on mi.com)
+Xiaomi,MI NOTE 10 LITE,skipped,mi.com images are only front+back combos / lifestyle / angled crops; no clean single back render
+Xiaomi,MI NOTE 10,skipped,mi.com images are only front+back combos / lifestyle / angled crops; no clean single back render
+Xiaomi,MI NOTE 4X,skipped,no mi.com product page or store listing found (discontinued/not on mi.com)
+Xiaomi,MI NOTE 4,skipped,no mi.com product page or store listing found (discontinued/not on mi.com)
+Xiaomi,MI NOTE 3,skipped,no mi.com product page or store listing found (discontinued/not on mi.com)
+Xiaomi,MI NOTE,skipped,no mi.com product page or store listing found (discontinued/not on mi.com)
+Xiaomi,MI MIX EVO,skipped,no mi.com product page or store listing found (discontinued/not on mi.com)
+Xiaomi,MI MIX 3,skipped,no mi.com product page or store listing found (discontinued/not on mi.com)
+Xiaomi,MI MIX 2S,skipped,no mi.com product page or store listing found (discontinued/not on mi.com)
+Xiaomi,MI MIX 2,skipped,no mi.com product page or store listing found (discontinued/not on mi.com)
+Xiaomi,MI MAX PRIME,skipped,no mi.com product page or store listing found (discontinued/not on mi.com)
+Xiaomi,MI MAX 3,skipped,no mi.com product page or store listing found (discontinued/not on mi.com)
+Xiaomi,MI MAX 2,skipped,no mi.com product page or store listing found (discontinued/not on mi.com)
+Xiaomi,MI MAX,skipped,no mi.com product page or store listing found (discontinued/not on mi.com)
+Xiaomi,MI CC9 PRO,skipped,no mi.com product page or store listing found (discontinued/not on mi.com)
+Xiaomi,MI CC9,skipped,no mi.com product page or store listing found (discontinued/not on mi.com)
+Xiaomi,MI A3,skipped,mi.com images are only front+back combos / lifestyle / angled crops; no clean single back render
+Xiaomi,MI A2 LITE,skipped,mi.com images are only front+back combos / lifestyle / angled crops; no clean single back render
+Xiaomi,MI A2,skipped,mi.com images are only front+back combos / lifestyle / angled crops; no clean single back render
+Xiaomi,MI A1,skipped,mi.com images are only front+back combos / lifestyle / angled crops; no clean single back render
+Xiaomi,Mi 14 Civi,skipped,mi.com images are only front+back combos / lifestyle / angled crops; no clean single back render
+Xiaomi,Mi 14,skipped,mi.com images are only front+back combos / lifestyle / angled crops; no clean single back render
+Xiaomi,Mi 12S Ultra 5G,skipped,mi.com images are only front+back combos / lifestyle / angled crops; no clean single back render
+Xiaomi,Mi 12 Lite,skipped,mi.com images are only front+back combos / lifestyle / angled crops; no clean single back render
+Xiaomi,Mi 11X Pro,skipped,mi.com images are only front+back combos / lifestyle / angled crops; no clean single back render
+Xiaomi,MI 11X LITE,skipped,no mi.com product page or store listing found (discontinued/not on mi.com)
+Xiaomi,MI 11T,skipped,mi.com images are only front+back combos / lifestyle / angled crops; no clean single back render
+Xiaomi,Mi 11i 5G,skipped,mi.com images are only front+back combos / lifestyle / angled crops; no clean single back render
+Xiaomi,Mi 11 X,skipped,mi.com images are only front+back combos / lifestyle / angled crops; no clean single back render
+Xiaomi,Mi 11 Ultra,skipped,mi.com images are only front+back combos / lifestyle / angled crops; no clean single back render
+Xiaomi,Mi 11 T Pro,skipped,mi.com images are only front+back combos / lifestyle / angled crops; no clean single back render
+Xiaomi,MI 11 PRO,skipped,no mi.com product page or store listing found (discontinued/not on mi.com)
+Xiaomi,Mi 11 Lite,skipped,only small (~650px) official single back render: https://i01.appmifile.com/v1/MI_18455B3E4DA706226CF7535A58E875F0267/pms_1623672149.92567648.jpg
+Xiaomi,MI 11,skipped,mi.com images are only front+back combos / lifestyle / angled crops; no clean single back render
+Xiaomi,MI 10T PRO,skipped,mi.com images are only front+back combos / lifestyle / angled crops; no clean single back render
+Xiaomi,Mi 10T 5G,skipped,mi.com images are only front+back combos / lifestyle / angled crops; no clean single back render
+Xiaomi,Mi 10i,skipped,mi.com images are only front+back combos / lifestyle / angled crops; no clean single back render
+Xiaomi,MI 10 YOUTH 5G,skipped,no mi.com product page or store listing found (discontinued/not on mi.com)
+Xiaomi,MI 10 ULTRA,skipped,no mi.com product page or store listing found (discontinued/not on mi.com)
+Xiaomi,Mi 10 T Lite,skipped,mi.com images are only front+back combos / lifestyle / angled crops; no clean single back render
+Xiaomi,MI 10 PRO,skipped,mi.com images are only front+back combos / lifestyle / angled crops; no clean single back render
+Xiaomi,MI 10 LITE 5G,skipped,mi.com images are only front+back combos / lifestyle / angled crops; no clean single back render
+Xiaomi,Mi 10 5G,skipped,mi.com images are only front+back combos / lifestyle / angled crops; no clean single back render
+Xiaomi,MI 9T PRO,skipped,no mi.com product page or store listing found (discontinued/not on mi.com)
+Xiaomi,MI 9T,skipped,no mi.com product page or store listing found (discontinued/not on mi.com)
+Xiaomi,MI 9 SE,skipped,mi.com images are only front+back combos / lifestyle / angled crops; no clean single back render
+Xiaomi,MI 9 PRO,skipped,no mi.com product page or store listing found (discontinued/not on mi.com)
+Xiaomi,MI 9 LITE,skipped,mi.com images are only front+back combos / lifestyle / angled crops; no clean single back render
+Xiaomi,MI 9,skipped,no mi.com product page or store listing found (discontinued/not on mi.com)
+Xiaomi,MI 8 SE,skipped,no mi.com product page or store listing found (discontinued/not on mi.com)
+Xiaomi,MI 8 LITE,skipped,mi.com images are only front+back combos / lifestyle / angled crops; no clean single back render
+Xiaomi,MI 8,skipped,no mi.com product page or store listing found (discontinued/not on mi.com)
+Xiaomi,MI 6,skipped,no mi.com product page or store listing found (discontinued/not on mi.com)
+Xiaomi,MI 5,skipped,no mi.com product page or store listing found (discontinued/not on mi.com)
+Xiaomi,MI 4I,skipped,no mi.com product page or store listing found (discontinued/not on mi.com)
+Xiaomi,MI 4,skipped,no mi.com product page or store listing found (discontinued/not on mi.com)
+Xiaomi,MI 3,skipped,no mi.com product page or store listing found (discontinued/not on mi.com)
+Xiaomi,MI 2S,skipped,no mi.com product page or store listing found (discontinued/not on mi.com)
+Xiaomi,MI 2 PRIME,skipped,no mi.com product page or store listing found (discontinued/not on mi.com)
+Xiaomi,MI 2,skipped,no mi.com product page or store listing found (discontinued/not on mi.com)
+Xiaomi,K80 EXTREME EDITION,skipped,no mi.com product page or store listing found (discontinued/not on mi.com)
+Xiaomi,K40 GAMING,skipped,no mi.com product page or store listing found (discontinued/not on mi.com)
+Xiaomi,CIVI,skipped,no mi.com product page or store listing found (discontinued/not on mi.com)
+Xiaomi,BLACK SHARK 3,skipped,Black Shark not sold on mi.com; no official source
+Xiaomi,15T PRO,skipped,mi.com images are only front+back combos / lifestyle / angled crops; no clean single back render
+Xiaomi,15T 5G,skipped,mi.com images are only front+back combos / lifestyle / angled crops; no clean single back render
+Xiaomi,15 PRO 5G,skipped,no mi.com product page or store listing found (discontinued/not on mi.com)
+Xiaomi,14T PRO 5G,skipped,mi.com images are only front+back combos / lifestyle / angled crops; no clean single back render
+Xiaomi,14T 5G,skipped,mi.com images are only front+back combos / lifestyle / angled crops; no clean single back render
+Xiaomi,14 ULTRA 5G,skipped,mi.com images are only front+back combos / lifestyle / angled crops; no clean single back render
+Xiaomi,14 CIVI 5G,skipped,mi.com images are only front+back combos / lifestyle / angled crops; no clean single back render
+Xiaomi,13T PRO,skipped,no mi.com product page or store listing found (discontinued/not on mi.com)
+Xiaomi,13T,skipped,no mi.com product page or store listing found (discontinued/not on mi.com)
+Xiaomi,13 PRO 5G,skipped,mi.com images are only front+back combos / lifestyle / angled crops; no clean single back render
+Xiaomi,13 LITE 5G,skipped,mi.com images are only front+back combos / lifestyle / angled crops; no clean single back render
+Xiaomi,13,skipped,mi.com images are only front+back combos / lifestyle / angled crops; no clean single back render
+Xiaomi,12X,skipped,mi.com images are only front+back combos / lifestyle / angled crops; no clean single back render
+Xiaomi,12T PRO,skipped,mi.com images are only front+back combos / lifestyle / angled crops; no clean single back render
+Xiaomi,12T,skipped,mi.com images are only front+back combos / lifestyle / angled crops; no clean single back render
+Xiaomi,12S ULTRA 5G,skipped,mi.com images are only front+back combos / lifestyle / angled crops; no clean single back render
+Xiaomi,12 PRO 5G,skipped,mi.com images are only front+back combos / lifestyle / angled crops; no clean single back render
+Xiaomi,12 LITE,skipped,mi.com images are only front+back combos / lifestyle / angled crops; no clean single back render
+Xiaomi,12,skipped,mi.com images are only front+back combos / lifestyle / angled crops; no clean single back render
+Xiaomi,11T 5G,skipped,mi.com images are only front+back combos / lifestyle / angled crops; no clean single back render
+Xiaomi,11I HYPERCHARGE 5G,skipped,mi.com images are only front+back combos / lifestyle / angled crops; no clean single back render
+Xiaomi,11I 5G,skipped,mi.com images are only front+back combos / lifestyle / angled crops; no clean single back render
+Xiaomi,10 5G,skipped,mi.com images are only front+back combos / lifestyle / angled crops; no clean single back render

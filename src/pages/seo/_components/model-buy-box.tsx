@@ -89,7 +89,7 @@ export default function ModelBuyBox({ data, hasH1 = false, onSeeAll }: {
               <img
                 key={d.mockupUrl}
                 {...responsiveImg(d.mockupUrl, [480, 720, 960], "(min-width: 768px) 560px, calc(100vw - 24px)")}
-                alt={`${t.brand} ${t.model} skin: ${d.title}`}
+                alt={box.generic ? `${d.title} (design preview)` : `${t.brand} ${t.model} skin: ${d.title}`}
                 width={960}
                 height={960}
                 className="aspect-square w-full object-contain"
@@ -113,7 +113,7 @@ export default function ModelBuyBox({ data, hasH1 = false, onSeeAll }: {
             </div>
             {/* One line, always: a long title wrapping to two moved everything below it. */}
             <p className="mt-2 hidden truncate text-center text-xs text-muted-foreground md:block" title={`${d.title} on the ${t.brand} ${t.model}`}>
-              On the {t.brand} {t.model}
+              {box.generic ? `Design preview · cut to fit your ${t.model}` : `On the ${t.brand} ${t.model}`}
             </p>
           </div>
 

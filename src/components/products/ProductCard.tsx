@@ -1,7 +1,7 @@
 import { memo } from "react";
 import { BrandBadge } from "@/components/products/BrandBadge.tsx";
 import { brandInScope, productFitsDevice } from "@/lib/device-fit";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Card } from "@/components/ui/card.tsx";
 import { ProductThumb } from "@/components/product-thumb.tsx";
 import { PackageIcon, BellIcon, Sparkles, CameraIcon } from "lucide-react";
@@ -111,9 +111,24 @@ export const ProductCard = memo(function ProductCard({
       ? `?${new URLSearchParams({ brand: brandHint }).toString()}`
       : '';
   const productUrl = `/products/${product.slug}${deviceQuery}`;
+  const navigate = useNavigate();
+  
+  /*
+   * The link Google sees is the product's own URL; the chosen phone rides
+   * along only on a real click. Every card carrying ?brand=&model= gave each
+   * design one URL per phone: 15,923 "Alternative page with proper canonical"
+   * copies in Search Console (9 Nov 2026), crawl spent on duplicates instead
+   * of new pages. A plain click still opens the product with the phone set;
+   * a new-tab click opens the clean page.
+   */
+  const openWithDevice = (e: React.MouseEvent) => {
+    if (!deviceQuery || e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    e.preventDefault();
+    navigate(productUrl);
+  };
   
   return (
-    <Link to={productUrl}>
+    <Link to={`/products/${product.slug}`} onClick={openWithDevice}>
       <Card className="group cursor-pointer overflow-hidden rounded-2xl border-2 border-ink/15 p-0 transition-all duration-200 hover:border-ink hover:shadow-xl">
           {/* Model label: a sticker strip above the picture (never on it, so no design is covered).
               The whole model name: cutting it to two words turned "iPhone 16 Pro" into "iPhone 16". */}

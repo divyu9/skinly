@@ -31,6 +31,8 @@ export interface SeoPageData {
     /** "Best sellers" first, then one per finish: how many designs it has here, and which to show. */
     tabs?: Array<{ key: string; label: string; count: number; slugs: string[] }>;
     rating: { value: number; count: number } | null;
+    /** Photos are the listing's own (MacBook, iPad): a preview of the design, not this exact model. */
+    generic?: boolean;
     schema: Record<string, unknown>;
   };
 }
