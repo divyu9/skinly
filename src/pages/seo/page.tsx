@@ -48,6 +48,9 @@ export default function SEOPage() {
   const page = pageLive !== undefined ? pageLive : seeded?.page;
   const product = productLive !== undefined ? productLive : seeded ? null : undefined;
   const data = useSeoPageData(page && page.isPublished ? page : null);
+  // Known from the build before the page's data arrives, so the hero never
+  // shows and then vanishes (scripts/prerender.mjs seoPage marks the seed).
+  const buyBoxPage = !!(data ? data.buyBox : seeded?.page?._buyBox);
 
   // Loading state
   if (page === undefined || product === undefined) {
@@ -89,6 +92,16 @@ export default function SEOPage() {
   // until then (and for pages whose device we do not carry).
   const title = data?.title || page.metaTitle;
   const description = data?.description || page.metaDescription;
+  // A model page shows its own device's mockup, the same picture the build
+  // put in og:image (scripts/prerender.mjs seoPage); Helmet would otherwise
+  // set the generic hero back once the page runs.
+  const mockup = data?.target?.kind !== "model" ? undefined : (data?.products || []).map((p: any) => p.mockupUrl).find((u: any) => typeof u === "string" && /^https:\/\//.test(u));
+  const shareImage = (mockup && mockup.replace(/^https:\/\/pub-[a-z0-9]+\.r2\.dev\//i, "https://cdn.goskinly.com/"))
+    || page.heroImageUrl || "https://goskinly.com/og-default.jpg";
+  const mockupImages = data?.target?.kind === "model"
+    ? [...new Set((data?.products || []).map((p: any) => p.mockupUrl).filter((u: any) => typeof u === "string" && /^https:\/\//.test(u))
+        .map((u: string) => u.replace(/^https:\/\/pub-[a-z0-9]+\.r2\.dev\//i, "https://cdn.goskinly.com/")))].slice(0, 6)
+    : [];
 
   return (
     <>
@@ -107,13 +120,13 @@ export default function SEOPage() {
         <meta property="og:url" content={currentUrl} />
         <meta property="og:site_name" content="GoSkinly" />
         {/* No fragments inside Helmet: it does not read their children. */}
-        <meta property="og:image" content={page.heroImageUrl || "https://goskinly.com/og-default.jpg"} />
+        <meta property="og:image" content={shareImage} />
 
         {/* Twitter Card */}
         <meta name="twitter:card" content="summary_large_image" />
         <meta name="twitter:title" content={title} />
         <meta name="twitter:description" content={description} />
-        <meta name="twitter:image" content={page.heroImageUrl || "https://goskinly.com/og-default.jpg"} />
+        <meta name="twitter:image" content={shareImage} />
 
         {/* CollectionPage Structured Data */}
         <script type="application/ld+json">
@@ -123,6 +136,7 @@ export default function SEOPage() {
             "name": page.h1Heading,
             "description": description,
             "url": currentUrl,
+            ...(mockup ? { "image": mockupImages } : {}),
             "provider": {
               "@type": "Organization",
               "name": "GoSkinly",
@@ -130,6 +144,11 @@ export default function SEOPage() {
             }
           })}
         </script>
+
+        {/* The top models' buy box: the ProductGroup the build wrote, as is. */}
+        {data?.buyBox?.schema && (
+          <script type="application/ld+json">{JSON.stringify(data.buyBox.schema)}</script>
+        )}
 
         {/* BreadcrumbList Structured Data */}
         <script type="application/ld+json">
@@ -173,9 +192,9 @@ export default function SEOPage() {
       </Helmet>
 
       {/* Render appropriate layout based on page type */}
-      {page.pageType === "keyword" && <KeywordPageLayout page={page} data={data} />}
-      {page.pageType === "device" && <DevicePageLayout page={page} data={data} />}
-      {page.pageType === "brand" && <BrandPageLayout page={page} data={data} />}
+      {page.pageType === "keyword" && <KeywordPageLayout page={page} data={data} buyBoxPage={buyBoxPage} />}
+      {page.pageType === "device" && <DevicePageLayout page={page} data={data} buyBoxPage={buyBoxPage} />}
+      {page.pageType === "brand" && <BrandPageLayout page={page} data={data} buyBoxPage={buyBoxPage} />}
       {page.pageType === "skin-type" && <SkinTypePageLayout page={page} data={data} />}
       {page.pageType === "product" && <ProductPageLayout page={page} />}
     </>

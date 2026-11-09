@@ -111,9 +111,23 @@ export async function computeMockupTodo(db: admin.firestore.Firestore) {
   const gsc = await searchByPage();
 
   const rows: Row[] = [];
+  /*
+   * The models that get the buy box on their landing page (scripts/prerender.mjs):
+   * the 100 best sellers and most searched among those whose mockups are done,
+   * by the same score, without the "new" bonus (a new phone with no orders and
+   * no searches has not earned it yet). Public settings doc: the build reads
+   * Firestore without credentials. Model names and scores only.
+   */
+  const buyBox: Array<{ brand: string; model: string; score: number }> = [];
   for (const m of models.values()) {
     const h = have.get(m.id) || 0;
-    if (h >= coveredAt) continue;
+    if (h >= coveredAt) {
+      const search = gsc.rows.get("/" + modelSlug(m.brand, m.model)) || { impressions: 0, clicks: 0 };
+      const score = (orders365.get(m.id) || 0) * 5 + (orders90.get(m.id) || 0) * 5 + (requests.get(m.id) || 0) * 4
+        + search.clicks * 5 + Math.round(search.impressions / 100);
+      if (score > 0) buyBox.push({ brand: m.brand, model: m.model, score });
+      continue;
+    }
     const o365 = orders365.get(m.id) || 0, o90 = orders90.get(m.id) || 0, req = requests.get(m.id) || 0;
     const newDays = m.createdAt ? Math.floor((now - m.createdAt) / DAY) : null;
     const major = MAJOR.has(norm(m.brand));
@@ -130,6 +144,8 @@ export async function computeMockupTodo(db: admin.firestore.Firestore) {
     rows.push({ modelId: m.id, brand: m.brand, model: m.model, score, orders365: o365, orders90: o90, requests: req, newDays, impressions: search.impressions, clicks: search.clicks, have: h, reasons });
   }
   rows.sort((a, b) => b.score - a.score || a.brand.localeCompare(b.brand) || a.model.localeCompare(b.model));
+  buyBox.sort((a, b) => b.score - a.score || a.brand.localeCompare(b.brand) || a.model.localeCompare(b.model));
+  await db.collection("settings").doc("buyBoxModels").set({ models: buyBox.slice(0, 100), computedAt: now, search: !gsc.error });
   const top = rows.slice(0, 100);
   await db.collection("mockupTodo").doc("latest").set({
     rows: top, need, coveredAt, candidates: rows.length, computedAt: now,

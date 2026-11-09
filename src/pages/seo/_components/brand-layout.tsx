@@ -20,9 +20,11 @@ import { SeoBrandGadgetsSection, SeoModelsSection, SeoProductsSection } from "./
 interface BrandPageLayoutProps {
   page: Doc<"seoPages">;
   data?: SeoPageData;
+  /** A top model's page with the buy box: the buy box carries the H1, the tall hero goes. */
+  buyBoxPage?: boolean;
 }
 
-export default function BrandPageLayout({ page, data }: BrandPageLayoutProps) {
+export default function BrandPageLayout({ page, data, buyBoxPage = false }: BrandPageLayoutProps) {
   const template = useQuery(api.seoTemplates.getTemplateByType, { pageType: "brand" });
   
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -128,7 +130,7 @@ export default function BrandPageLayout({ page, data }: BrandPageLayoutProps) {
 
   const renderProducts = () => (
     <>
-      <SeoProductsSection data={data} heading={`Shop ${brandName} skins`} />
+      <SeoProductsSection data={data} heading={`Shop ${brandName} skins`} h1={buyBoxPage ? page.h1Heading : undefined} intro={page.metaDescription || data?.description} />
       {data && ["brand", "family", "unlisted", "model"].includes(data.target.kind) && <SeoModelsSection data={data} />}
     </>
   );
@@ -175,7 +177,7 @@ export default function BrandPageLayout({ page, data }: BrandPageLayoutProps) {
     .sort((a: Section, b: Section) => a.order - b.order);
   // The products are the point of the page: always on, and straight after the
   // hero rather than below the generated copy, where the templates had them.
-  const rest = configured.filter((s) => s.id !== "products");
+  const rest = configured.filter((s) => s.id !== "products" && !(buyBoxPage && s.id === "hero"));
   const heroFirst = rest[0]?.id === "hero";
   const productsSection: Section = { id: "products", enabled: true, order: 0 };
   const sections: Section[] = heroFirst

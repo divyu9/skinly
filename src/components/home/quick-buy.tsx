@@ -35,7 +35,14 @@ import { trackProductView } from "@/lib/analytics.ts";
 const DEVICE_WORD = /\b(iphone|ipad|galaxy|samsung|pixel|oneplus|one plus|redmi|xiaomi|poco|vivo|oppo|realme|iqoo|motorola|moto|nothing|cmf)\b/i;
 const stockOf = (v: any) => Number(v?.inventoryQuantity ?? v?.inventory_quantity ?? 0);
 
-function QuickBuyBody({ slug, onDone }: { slug: string; onDone: () => void }) {
+/**
+ * `fixedDevice`: the model page's buy box (src/pages/seo/_components/model-buy-box.tsx)
+ * already knows the phone, so the device is set and cannot be changed here.
+ * `hideThumb`: that box shows the big photo itself.
+ */
+export function QuickBuyBody({ slug, onDone, fixedDevice, hideThumb = false }: {
+  slug: string; onDone: () => void; fixedDevice?: { brand: string; model: string }; hideThumb?: boolean;
+}) {
   const product = useQuery(api.products.getProductBySlug, { slug }) as any;
   const gadgetTypes = useQuery(api.gadgetTypes.list, {}) as Array<{ _id: string; name?: string }> | undefined;
   const cashbackInfo = useQuery(api.cashbackHelpers.getProductCashbackInfo, product?._id ? { productId: product._id } : "skip");
@@ -51,9 +58,9 @@ function QuickBuyBody({ slug, onDone }: { slug: string; onDone: () => void }) {
   const { needsDeviceSelector, isSkinProduct, isPhoneSkin } = useProductRules(forRules);
 
   // Start on the shopper's saved device when this skin fits it.
-  const [device, setDevice] = useState<{ brand: string; model: string } | null>(null);
+  const [device, setDevice] = useState<{ brand: string; model: string } | null>(fixedDevice || null);
   useEffect(() => {
-    if (!product || product.productCategory !== "skin") return;
+    if (fixedDevice || !product || product.productCategory !== "skin") return;
     const d = readActiveDevice();
     if (d && d.isConfirmed !== false && (d.category || "phone") === deviceCategory && brandInScope(product, d.brand)) {
       setDevice((cur) => cur || { brand: d.brand, model: d.model });
@@ -131,7 +138,7 @@ function QuickBuyBody({ slug, onDone }: { slug: string; onDone: () => void }) {
     <div className="space-y-4">
       {/* What it is */}
       <div className="flex gap-3">
-        {product.images?.[0]?.url && (
+        {!hideThumb && product.images?.[0]?.url && (
           <img {...responsiveImg(product.images[0].url, [160, 240], "96px")} alt={product.title} width={96} height={96}
             className="size-24 shrink-0 rounded-xl border-2 border-ink/15 object-cover" />
         )}
@@ -157,7 +164,15 @@ function QuickBuyBody({ slug, onDone }: { slug: string; onDone: () => void }) {
 
       {/* Device */}
       {needsDevice && (
-        device ? (
+        device && fixedDevice ? (
+          <div className="flex w-full items-center gap-3 rounded-2xl border-2 border-ink/15 bg-card p-3">
+            <SmartphoneIcon className="size-5 shrink-0 text-brand" />
+            <span className="min-w-0 flex-1">
+              <span className="block text-[11px] text-muted-foreground">Cutting for</span>
+              <span className="block truncate text-sm font-bold">{device.brand} {device.model}</span>
+            </span>
+          </div>
+        ) : device ? (
           <button type="button" onClick={selector.openSelector}
             className="flex w-full items-center gap-3 rounded-2xl border-2 border-ink/15 bg-card p-3 text-left hover:border-ink">
             <SmartphoneIcon className="size-5 shrink-0 text-brand" />

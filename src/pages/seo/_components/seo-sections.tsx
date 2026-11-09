@@ -1,9 +1,14 @@
+import { lazy, Suspense, useState } from "react";
+import { loadCatalogue } from "@/lib/catalogue";
 import { Link } from "react-router-dom";
 import { useDeviceDetection } from "@/hooks/useDeviceDetection";
 import { brandGadgetLabel, oneRowPerDesign } from "@/lib/seo-pages.mjs";
 import { ProductCard } from "@/components/products/ProductCard.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import type { SeoPageData } from "../use-seo-page-data";
+
+// Its own chunk: only the top model pages carry a buy box.
+const ModelBuyBox = lazy(() => import("./model-buy-box.tsx"));
 
 /**
  * The products an SEO page is about.
@@ -14,7 +19,11 @@ import type { SeoPageData } from "../use-seo-page-data";
  * site's product card, so on a model page each design shows on that model when
  * we have the photo and opens with the model already chosen.
  */
-export function SeoProductsSection({ data, heading }: { data: SeoPageData | undefined; heading: string }) {
+export function SeoProductsSection({ data, heading, h1, intro }: {
+  data: SeoPageData | undefined; heading: string;
+  /** Set on a buy-box page: the page's H1 and intro, shown in the buy box instead of a hero. */
+  h1?: string; intro?: string;
+}) {
   /*
    * The device this visitor already told us about.
    *
@@ -28,6 +37,65 @@ export function SeoProductsSection({ data, heading }: { data: SeoPageData | unde
    * cards are left alone by the fit check that was already there.
    */
   const { device: savedDevice } = useDeviceDetection();
+  /*
+   * Buy-box pages: every in-stock design is on this page. The grid starts with
+   * the build's 48; the rest (data.more) come from catalogue.json, loaded once
+   * when the shopper asks for more or picks a finish. `finish` is shared with
+   * the buy box: its "+N more" scrolls here showing that tab's finish.
+   */
+  const [rest, setRest] = useState<any[] | null>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [finish, setFinish] = useState<string | null>(null);
+  const [limit, setLimit] = useState(48);
+  const ensureRest = async () => {
+    if (rest || !data?.more?.length) return;
+    setLoadingMore(true);
+    try {
+      const cat = await loadCatalogue();
+      const byId = new Map((cat?.products || []).map((p) => [p._id, p]));
+      setRest(data.more.map(([id, mockupUrl]) => {
+        const p: any = byId.get(id);
+        if (!p) return null;
+        // The grid's card reads `available` and `inventory_quantity`, as the build writes them.
+        const variants = (p.variants || []).map((v: any) => ({ ...v, inventory_quantity: v.inventoryQuantity, available: Number(v.inventoryQuantity) > 0 }));
+        return { ...p, variants, ...(mockupUrl ? { mockupUrl } : {}) };
+      }).filter(Boolean));
+    } finally {
+      setLoadingMore(false);
+    }
+  };
+  const chooseFinish = (f: string | null) => {
+    setFinish(f);
+    setLimit(48);
+    if (f) void ensureRest();
+  };
+  const showMore = async () => {
+    await ensureRest();
+    setLimit((n) => n + 48);
+  };
+  const toGrid = (f: string | null) => {
+    chooseFinish(f);
+    document.getElementById("all-designs")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
+  // A buy-box page has no hero: its H1 must paint before the data arrives.
+  const h1Block = h1 ? (
+    <div className="container mx-auto max-w-6xl px-3 pt-5 sm:px-4 md:pt-8">
+      <h1 className="text-2xl font-extrabold leading-tight sm:text-3xl md:text-4xl">{h1}</h1>
+      {intro && <p className="mt-1.5 line-clamp-2 text-sm text-muted-foreground md:text-base">{intro}</p>}
+    </div>
+  ) : null;
+
+  if (data === undefined && h1) {
+    return (
+      <>
+        {h1Block}
+        <div className="container mx-auto max-w-6xl px-3 py-5 sm:px-4">
+          <Skeleton className="aspect-square w-full rounded-3xl md:aspect-[2/1]" />
+        </div>
+      </>
+    );
+  }
 
   if (data === undefined) {
     return (
@@ -59,6 +127,15 @@ export function SeoProductsSection({ data, heading }: { data: SeoPageData | unde
    * copies of this rule would eventually disagree.
    */
   const cards = oneRowPerDesign(data.products as any[], forBrand) as typeof data.products;
+  const finishTabs = (data.buyBox?.tabs || []).filter((x) => x.key !== "best");
+  const pool = [...cards, ...(rest || [])] as typeof data.products;
+  const matching = finish ? pool.filter((p: any) => p.finishType === finish) : pool;
+  const visible = matching.slice(0, limit);
+  // How many this view has in all, loaded or not: the tab's count once a finish is chosen.
+  const allCount = finish
+    ? (finishTabs.find((x) => x.key === finish)?.count ?? matching.length)
+    : cards.length + (data.more?.length || 0);
+  const left = Math.max(0, allCount - visible.length);
 
   if (data.total === 0) {
     return (
@@ -80,18 +157,42 @@ export function SeoProductsSection({ data, heading }: { data: SeoPageData | unde
   }
 
   return (
-    <section className="border-y-2 border-ink/10 bg-card/60">
+    <>
+    {h1Block}
+    {onDevice && data.buyBox && data.buyBox.designs.length > 0 && (
+      <Suspense fallback={<div className="min-h-[520px]" aria-hidden />}>
+        <ModelBuyBox data={data} hasH1={!!h1} onSeeAll={data.more?.length ? toGrid : undefined} />
+      </Suspense>
+    )}
+    <section id="all-designs" className="scroll-mt-20 border-y-2 border-ink/10 bg-card/60">
       <div className="container mx-auto px-3 py-10 sm:px-4 md:py-14">
         <div className="mx-auto mb-8 max-w-2xl text-center">
           <h2 className="text-2xl font-bold sm:text-3xl text-balance">{heading}</h2>
           <p className="mt-2 text-sm text-muted-foreground">
-            {cards.length} designs
+            {data.more?.length ? allCount : cards.length} designs
             {data.minPrice ? ` · from ₹${data.minPrice}` : ""}
             {onDevice ? ` · each cut for the ${t.model}` : " · each cut for your exact device"}
           </p>
         </div>
+        {finishTabs.length > 0 && (data.more?.length || 0) > 0 && (
+          <div role="tablist" aria-label="Finish" className="-mx-1 mb-5 flex justify-start gap-2 overflow-x-auto px-1 pb-1 sm:justify-center">
+            {[{ key: null as string | null, label: "All", count: cards.length + (data.more?.length || 0) }, ...finishTabs].map((x) => (
+              <button
+                key={x.key ?? "all"}
+                type="button"
+                role="tab"
+                aria-selected={finish === x.key}
+                onClick={() => chooseFinish(x.key)}
+                className={`shrink-0 rounded-full border-2 px-3.5 py-1.5 text-sm font-bold transition ${finish === x.key ? "border-ink bg-ink text-background" : "border-ink/20 bg-card hover:border-ink"}`}
+              >
+                {x.label} <span className={finish === x.key ? "opacity-80" : "text-muted-foreground"}>{x.count}</span>
+              </button>
+            ))}
+          </div>
+        )}
+        {loadingMore && visible.length === 0 && <p className="py-10 text-center text-sm text-muted-foreground">Loading designs…</p>}
         <div className="grid grid-cols-2 gap-2 sm:gap-4 md:grid-cols-3 lg:grid-cols-4">
-          {cards.map((product) => (
+          {visible.map((product) => (
             <ProductCard
               key={product._id}
               product={product}
@@ -104,7 +205,19 @@ export function SeoProductsSection({ data, heading }: { data: SeoPageData | unde
             />
           ))}
         </div>
-        {data.total > data.products.length && (
+        {(data.more?.length || 0) > 0 && left > 0 && (
+          <div className="mt-8 text-center">
+            <button
+              type="button"
+              onClick={showMore}
+              disabled={loadingMore}
+              className="sticker sticker-press inline-flex h-12 items-center rounded-2xl border-2 border-ink bg-sunny px-6 font-extrabold text-ink disabled:opacity-60"
+            >
+              {loadingMore ? "Loading..." : `Show more designs (${left} more)`}
+            </button>
+          </div>
+        )}
+        {data.total > data.products.length && !((data.more?.length || 0) > 0 && left > 0) && (
           <div className="mt-8 text-center">
             <Link
               to={data.listing}
@@ -116,6 +229,7 @@ export function SeoProductsSection({ data, heading }: { data: SeoPageData | unde
         )}
       </div>
     </section>
+    </>
   );
 }
 

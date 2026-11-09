@@ -20,9 +20,11 @@ import { SeoModelsSection, SeoProductsSection } from "./seo-sections.tsx";
 interface KeywordPageLayoutProps {
   page: Doc<"seoPages">;
   data?: SeoPageData;
+  /** A top model's page with the buy box: the buy box carries the H1, the tall hero goes. */
+  buyBoxPage?: boolean;
 }
 
-export default function KeywordPageLayout({ page, data }: KeywordPageLayoutProps) {
+export default function KeywordPageLayout({ page, data, buyBoxPage = false }: KeywordPageLayoutProps) {
   
   // Fetch template for this page type to determine section order and visibility
   const template = useQuery(api.seoTemplates.getTemplateByType, { pageType: "keyword" });
@@ -55,7 +57,7 @@ export default function KeywordPageLayout({ page, data }: KeywordPageLayoutProps
     .sort((a: Section, b: Section) => a.order - b.order);
   // The products are the point of the page: always on, and straight after the
   // hero rather than below the generated copy, where the templates had them.
-  const rest = configured.filter((s) => s.id !== "products");
+  const rest = configured.filter((s) => s.id !== "products" && !(buyBoxPage && s.id === "hero"));
   const heroFirst = rest[0]?.id === "hero";
   const productsSection: Section = { id: "products", enabled: true, order: 0 };
   const enabledSections: Section[] = heroFirst
@@ -140,7 +142,7 @@ export default function KeywordPageLayout({ page, data }: KeywordPageLayoutProps
       case "products":
         return (
           <div key={sectionId}>
-            <SeoProductsSection data={data} heading={page.h1Heading} />
+            <SeoProductsSection data={data} heading={page.h1Heading} h1={buyBoxPage ? page.h1Heading : undefined} intro={page.metaDescription || data?.description} />
             {data && ["brand", "family", "unlisted"].includes(data.target.kind) && <SeoModelsSection data={data} />}
           </div>
         );

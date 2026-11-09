@@ -20,6 +20,17 @@ export interface SeoPageData {
   /** This brand's other gadget pages — the hub row. Absent on themes. */
   brandGadgets?: Array<{ gadget: string; count: number; slug: string | null; href: string }>;
   products: Product[];
+  /** Buy-box pages: the in-stock designs past the grid's 48, as [productId, mockupUrl?]. */
+  more?: Array<[string, string?]>;
+  /** The top models' buy box (scripts/prerender.mjs buyBoxFor). */
+  buyBox?: {
+    name: string;
+    designs: Array<{ _id: string; slug: string; title: string; design: string | null; mockupUrl: string; price: number; finish?: string | null }>;
+    /** "Best sellers" first, then one per finish: how many designs it has here, and which to show. */
+    tabs?: Array<{ key: string; label: string; count: number; slugs: string[] }>;
+    rating: { value: number; count: number } | null;
+    schema: Record<string, unknown>;
+  };
 }
 
 type Page = { slug: string; pageType?: string; h1Heading?: string; metaTitle?: string; metaDescription?: string };

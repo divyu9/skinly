@@ -1244,9 +1244,31 @@ function seoPage(s, info, knownPaths, themes = []) {
   // The same copy, with its headings, lists and internal links intact.
   const richText = clipHtml(safeHtml(s.contentHTML, knownPaths), 12000);
   const empty = info && info.total === 0;
+  /*
+   * This phone's own pictures, where we have them.
+   *
+   * A model page whose device has mockups still told Google og-default.jpg and
+   * carried no <img> at all, so the result showed whatever product photos the
+   * crawler picked: generic phones, not the Nothing Phone 4a Pro the page is
+   * about (9 Nov 2026). The build already matched each design to its mockup;
+   * the first ones now become og:image, the CollectionPage image, image
+   * sitemap entries and real <img> tags in the summary (lazy, so a browser
+   * that hides the summary never fetches them).
+   */
+  const deviceName = t.kind === "model" ? `${t.brand} ${t.model}` : "";
+  const mockupImages = t.kind === "model"
+    ? [...new Set((info?.products || []).map((p) => p.mockupUrl).filter(liveImage).map(publicImage))]
+    : [];
+  if (mockupImages.length) jsonLdList[0].image = mockupImages.slice(0, 6);
+  if (info?.buyBox?.schema) jsonLdList.push(info.buyBox.schema);
   const productLinks = (info?.products || [])
     .slice(0, 24)
-    .map((p) => `<li><a href="${SITE}/products/${esc(p.slug)}">${esc(p.title)}</a></li>`)
+    .map((p) => {
+      const img = p.mockupUrl && liveImage(p.mockupUrl)
+        ? `<img src="${esc(publicImage(p.mockupUrl))}" alt="${esc(`${deviceName} skin: ${p.title}`)}" loading="lazy" width="400" height="400" /> `
+        : "";
+      return `<li><a href="${SITE}/products/${esc(p.slug)}">${img}${esc(p.title)}</a></li>`;
+    })
     .join("");
   /*
    * The models this page covers, as links.
@@ -1307,7 +1329,7 @@ function seoPage(s, info, knownPaths, themes = []) {
       // the words in every page for nobody to read.
       page: Object.fromEntries(Object.entries(s).filter(([k]) =>
         !["generationLog", "aiPrompt", "rawResponse", "embedding", "previousContentHTML", "previousFaqs",
-          "qualityIssues", "rewriteIssues", "rewriteTriedAt"].includes(k))),
+          "qualityIssues", "rewriteIssues", "rewriteTriedAt"].includes(k)).concat(info?.buyBox ? [["_buyBox", true]] : [])),
     },
     title: info?.title || s.metaTitle || `${h1} | GoSkinly`,
     description: info?.description || s.metaDescription || clip(text, 155),
@@ -1315,13 +1337,22 @@ function seoPage(s, info, knownPaths, themes = []) {
     robots: empty || unresolved || unlisted ? "noindex, follow" : undefined,
     empty: empty || unresolved || unlisted,
     canonical: url,
-    image: liveImage(s.heroImageUrl) ? s.heroImageUrl : undefined,
+    image: mockupImages[0] || (liveImage(s.heroImageUrl) ? s.heroImageUrl : undefined),
+    images: mockupImages.slice(0, 3),
     jsonLd: jsonLdList,
     lastmod: s.updatedAt,
     priority: s.pageType === "device" || s.pageType === "brand" ? "0.8" : "0.7",
     body:
       crumbLinks(trail) +
       `<h1>${esc(h1)}</h1>` +
+      // The buy box's facts in words, matching the ProductGroup above.
+      (info?.buyBox
+        ? `<p>${esc(info.buyBox.name)}: ${info.buyBox.tabs[0].count} designs in stock for this phone` +
+          (info.buyBox.tabs.length > 1 ? ` (${info.buyBox.tabs.slice(1).map((t) => `${t.count} ${esc(t.label)}`).join(", ")})` : "") +
+          `, from ₹${Math.min(...info.buyBox.designs.map((d) => d.price))}` +
+          (info.buyBox.rating ? `, rated ${info.buyBox.rating.value} out of 5 from ${info.buyBox.rating.count} review${info.buyBox.rating.count === 1 ? "" : "s"}` : "") +
+          `.</p>`
+        : "") +
       (richText || (text ? `<p>${esc(clip(text, 3000))}</p>` : "")) +
       (productLinks ? `<ul>${productLinks}</ul>` : "") +
       (gadgetLinks ? `<h2>More from ${esc(info?.target?.brand || "this brand")}</h2><ul>${gadgetLinks}</ul>` : "") +
@@ -1375,7 +1406,14 @@ const SITEMAP_CHUNK = 500;
 
 async function writeSitemaps(pagesList, productList) {
   const now = new Date().toISOString();
-  const files = [["sitemap-pages.xml", urlset(pagesList, false)]];
+  // Landing pages carry up to three pictures of their own device (seoPage);
+  // chunked like products so no file outgrows what the origin hands over.
+  const files = [];
+  for (let i = 0; i < pagesList.length; i += SITEMAP_CHUNK) {
+    const n = Math.floor(i / SITEMAP_CHUNK) + 1;
+    files.push([n === 1 ? "sitemap-pages.xml" : `sitemap-pages-${n}.xml`, urlset(pagesList.slice(i, i + SITEMAP_CHUNK), true)]);
+  }
+  if (!files.length) files.push(["sitemap-pages.xml", urlset([], true)]);
   for (let i = 0; i < productList.length; i += SITEMAP_CHUNK) {
     const part = productList.slice(i, i + SITEMAP_CHUNK);
     const n = Math.floor(i / SITEMAP_CHUNK) + 1;
@@ -2165,6 +2203,97 @@ function categoryPages(products, variantsByProduct, themes = []) {
  * dist/seo-data/<slug>.json, which the page loads instead of reading the whole
  * catalogue from Firestore on every visit.
  */
+/*
+ * The buy box on a top model's page: pick a design, see it on this phone, add
+ * to cart, without leaving the page (src/pages/seo/_components/model-buy-box.tsx).
+ *
+ * Only for the 100 models settings/buyBoxModels names (best sellers and most
+ * searched, nightly) and only where at least twelve in-stock designs have a
+ * photo on this phone. The page stays what it was for search: same URL, H1,
+ * copy, FAQ and grid. What it adds is a ProductGroup in its structured data:
+ * the designs offered here as variants, each with its real price, stock,
+ * shipping and returns, and a rating only from approved reviews of those very
+ * designs or of this phone. Built once here and shipped in seo-data, so the
+ * page's Helmet renders exactly the object the prerendered HTML carries.
+ */
+const keyOf = (s) => String(s || "").toLowerCase().replace(/\(5g\)|\b5g\b|\b4g\b/g, "").replace(/[^a-z0-9]/g, "");
+const FINISH_TABS = [
+  ["matte", "Matte"], ["embossed", "3D Textured"], ["transparent", "Tranzy"], ["premium-leather", "Leather"], ["sparkling", "Sparkling"],
+];
+function buyBoxFor(s, target, copy, products, allDesigns, data) {
+  const wanted = new Set(((data.buyBoxModels && data.buyBoxModels.models) || []).map((m) => keyOf(m.brand) + "|" + keyOf(m.model)));
+  if (!wanted.has(keyOf(target.brand) + "|" + keyOf(target.model)) || products.length < 12) return null;
+  const sold = new Map(((data.homeRankings && data.homeRankings.bestsellers) || []).map((b) => [b.productId, Number(b.qty) || 0]));
+  const priceOf = (p) => {
+    const live = (p.variants || []).filter((v) => v.available && Number(v.price) > 0).map((v) => Number(v.price));
+    return live.length ? Math.min(...live) : 0;
+  };
+  const ranked = products
+    .filter((p) => p.mockupUrl && priceOf(p) > 0)
+    .map((p, i) => ({ p, i }))
+    .sort((a, b) => (sold.get(b.p._id) || 0) - (sold.get(a.p._id) || 0) || a.i - b.i)
+    .map(({ p }) => ({ _id: p._id, slug: p.slug, title: p.title, design: p.design || null, mockupUrl: p.mockupUrl, price: priceOf(p), finish: p.finishType || null }));
+  const designs = ranked.slice(0, 30);
+  if (designs.length < 12) return null;
+  /*
+   * Finish tabs, so nobody takes the first rows for the whole range: each tab
+   * says how many designs that finish has for this phone (all of them, in the
+   * grid and the listing) and shows its best sellers that have a photo here.
+   */
+  const inStock = allDesigns.filter((p) => (p.variants || []).some((v) => v.available));
+  const tabs = [{ key: "best", label: "Best sellers", count: inStock.length, slugs: designs.map((d) => d.slug) }];
+  const extra = [];
+  for (const [key, label] of FINISH_TABS) {
+    const list = ranked.filter((d) => d.finish === key).slice(0, 23);
+    if (list.length < 4) continue;
+    tabs.push({ key, label, count: inStock.filter((p) => p.finishType === key).length, slugs: list.map((d) => d.slug) });
+    extra.push(...list);
+  }
+  const shown = [...new Map([...designs, ...extra].map((d) => [d.slug, d])).values()];
+
+  const ids = new Set(designs.map((d) => d._id));
+  const phone = keyOf(target.brand + " " + target.model), phoneModel = keyOf(target.model);
+  const reviews = (data.reviews || []).filter((r) => (!r.status || r.status === "approved") && Number(r.rating) >= 1 && Number(r.rating) <= 5
+    && (ids.has(r.productId) || (r.device && [phone, phoneModel].includes(keyOf(r.device)))));
+  const rating = reviews.length
+    ? { value: Math.round((reviews.reduce((n, r) => n + Number(r.rating), 0) / reviews.length) * 10) / 10, count: reviews.length }
+    : null;
+
+  const url = `${SITE}/${s.slug}`;
+  const name = `${target.brand} ${target.model} Skins`;
+  const schema = {
+    "@context": "https://schema.org",
+    "@type": "ProductGroup",
+    name,
+    description: copy.description,
+    url,
+    productGroupID: s.slug,
+    brand: { "@type": "Brand", name: "GoSkinly" },
+    material: "Vinyl",
+    image: designs.slice(0, 6).map((d) => publicImage(d.mockupUrl)),
+    variesBy: ["https://schema.org/pattern"],
+    ...(rating ? { aggregateRating: { "@type": "AggregateRating", ratingValue: rating.value, reviewCount: rating.count, bestRating: 5, worstRating: 1 } } : {}),
+    hasVariant: designs.map((d) => ({
+      "@type": "Product",
+      name: `${target.brand} ${target.model} Skin - ${d.title}`,
+      ...(d.design ? { sku: `${d.design}-${keyOf(target.brand + target.model)}`.toUpperCase() } : {}),
+      image: publicImage(d.mockupUrl),
+      pattern: d.title,
+      offers: {
+        "@type": "Offer",
+        url: `${url}?design=${encodeURIComponent(d.slug)}`,
+        price: d.price,
+        priceCurrency: "INR",
+        availability: "https://schema.org/InStock",
+        itemCondition: "https://schema.org/NewCondition",
+        seller: { "@type": "Organization", name: "GoSkinly" },
+        ...offerShippingAndReturns(d.price, data.shipping),
+      },
+    })),
+  };
+  return { name, designs: shown, tabs, rating, schema };
+}
+
 async function seoPageData(project, seoDocs, data, variantsByProduct) {
   const collectionName = new Map(data.collections.map((c) => [c._id, c.name]));
   const collectionsByProduct = new Map();
@@ -2207,9 +2336,19 @@ async function seoPageData(project, seoDocs, data, variantsByProduct) {
      */
     let products = oneRowPerDesign(sel.products, target.brand).slice(0, 48);
     let mockups = 0;
+    // Every design of this page with a photo on this phone, not just the 48
+    // the grid shows: the buy box's finish tabs choose from these.
+    let pictured = [];
+    let allDesigns = [];
     if (target.kind === "model") {
       try {
         const rows = (await readMockups(project, target.brand, target.model)).filter((m) => mockupUrl(m));
+        allDesigns = oneRowPerDesign(sel.products, target.brand);
+        pictured = allDesigns.map((p) => {
+          const sku = p.variants[0]?.sku;
+          const m = sku && rows.find((r) => skuMatches(r.sku, sku));
+          return m ? { ...p, mockupUrl: mockupUrl(m) } : null;
+        }).filter(Boolean);
         products = products.map((p) => {
           const sku = p.variants[0]?.sku;
           const m = sku && rows.find((r) => skuMatches(r.sku, sku));
@@ -2274,7 +2413,28 @@ async function seoPageData(project, seoDocs, data, variantsByProduct) {
           .sort((a, b) => b.count - a.count)
       : [];
 
+    const buyBox = target.kind === "model" ? buyBoxFor(s, target, copy, pictured, allDesigns, data) : null;
+
+    /*
+     * The rest of this phone's in-stock designs, past the 48 the grid shows, as
+     * ids (the page already loads catalogue.json for the products) and the
+     * photo on this phone where we have one. The grid's "Show more" draws them
+     * in place, so the buy box's "+281 more" can scroll down instead of
+     * sending the shopper to another page. Buy-box pages only.
+     */
+    const shownIds = new Set(products.map((p) => p._id));
+    const photoOf = new Map(pictured.map((p) => [p._id, p.mockupUrl]));
+    const more = buyBox
+      ? allDesigns
+          .filter((p) => !shownIds.has(p._id) && (p.variants || []).some((v) => v.available))
+          .map((p, i) => ({ p, i }))
+          .sort((a, b) => Number(photoOf.has(b.p._id)) - Number(photoOf.has(a.p._id)) || a.i - b.i)
+          .map(({ p }) => (photoOf.has(p._id) ? [p._id, photoOf.get(p._id)] : [p._id]))
+      : null;
+
     const info = {
+      ...(buyBox ? { buyBox } : {}),
+      ...(more && more.length ? { more } : {}),
       slug: s.slug,
       target: { ...target, models: undefined },
       brandGadgets,
@@ -2348,6 +2508,8 @@ async function main() {
       homepageSettings: Array.isArray(homepageSettings) ? homepageSettings.find((r) => r._id === "default") || null : undefined,
       shipping: settingsRows.find((r) => r._id === "shipping") || null,
       homeRankings: settingsRows.find((r) => r._id === "homeRankings") || null,
+      // The model pages that get the buy box (functions/src/mockupTodo.ts).
+      buyBoxModels: settingsRows.find((r) => r._id === "buyBoxModels") || null,
     };
   } catch (err) {
     log(`Firestore unreachable (${err?.message || err}); writing static pages only`);
