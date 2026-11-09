@@ -303,3 +303,49 @@ export function SeoBrandGadgetsSection({ data }: { data: SeoPageData | undefined
     </section>
   );
 }
+
+/**
+ * A model page without a buy box: a compact hero with that phone's own
+ * mockup on the right, instead of a text-only block that filled a phone's
+ * whole first screen. The H1 and intro are the page's own, unchanged.
+ * `image` comes from the build (scripts/prerender.mjs marks the seed), so the
+ * photo has its place on the first frame and nothing moves when data arrives.
+ */
+export function ModelHero({ h1, intro, image, alt, gridHref }: {
+  h1: string; intro?: string; image: string; alt: string; gridHref: string;
+}) {
+  const toGrid = (e: React.MouseEvent) => {
+    const el = document.getElementById("all-designs");
+    if (!el) return;
+    e.preventDefault();
+    el.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+  return (
+    <section className="relative overflow-hidden border-b-2 border-ink/10 bg-gradient-to-br from-sunny/25 via-background to-brand/10">
+      <div className="container mx-auto grid max-w-6xl grid-cols-[minmax(0,1fr)_40%] items-center gap-3 px-3 py-5 sm:px-4 md:grid-cols-[minmax(0,1fr)_340px] md:gap-10 md:py-10">
+        <div className="min-w-0">
+          <h1 className="text-[1.6rem] font-extrabold leading-[1.1] text-balance sm:text-4xl md:text-5xl">{h1}</h1>
+          {intro && <p className="mt-2 line-clamp-3 text-[13px] text-muted-foreground sm:text-base md:mt-4 md:line-clamp-none md:text-lg">{intro}</p>}
+          <div className="mt-3 flex flex-wrap gap-2 md:mt-6 md:gap-3">
+            <a href={gridHref} onClick={toGrid}
+              className="sticker sticker-press inline-flex h-10 items-center rounded-2xl border-2 border-ink bg-brand px-4 text-sm font-extrabold text-brand-foreground md:h-12 md:px-6 md:text-base">
+              Shop designs ↓
+            </a>
+            <Link to="/devices"
+              className="hidden h-12 items-center rounded-2xl border-2 border-ink/20 bg-card px-6 font-bold md:inline-flex">
+              Find your device
+            </Link>
+          </div>
+        </div>
+        <img
+          src={image}
+          alt={alt}
+          width={900}
+          height={972}
+          fetchPriority="high"
+          className="mx-auto h-[210px] w-auto max-w-full object-contain mix-blend-multiply md:h-[380px] dark:mix-blend-normal"
+        />
+      </div>
+    </section>
+  );
+}

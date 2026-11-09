@@ -51,6 +51,10 @@ export default function SEOPage() {
   // Known from the build before the page's data arrives, so the hero never
   // shows and then vanishes (scripts/prerender.mjs seoPage marks the seed).
   const buyBoxPage = !!(data ? data.buyBox : seeded?.page?._buyBox);
+  // A model page without a buy box shows the phone's own back photo (official
+  // render, public/phones) in a compact hero; the build puts it in the seed.
+  const heroMockup: string | undefined = buyBoxPage ? undefined
+    : seeded?.page?._heroPhone || data?.heroPhone;
 
   // Loading state
   if (page === undefined || product === undefined) {
@@ -192,9 +196,9 @@ export default function SEOPage() {
       </Helmet>
 
       {/* Render appropriate layout based on page type */}
-      {page.pageType === "keyword" && <KeywordPageLayout page={page} data={data} buyBoxPage={buyBoxPage} />}
-      {page.pageType === "device" && <DevicePageLayout page={page} data={data} buyBoxPage={buyBoxPage} />}
-      {page.pageType === "brand" && <BrandPageLayout page={page} data={data} buyBoxPage={buyBoxPage} />}
+      {page.pageType === "keyword" && <KeywordPageLayout page={page} data={data} buyBoxPage={buyBoxPage} heroMockup={heroMockup} />}
+      {page.pageType === "device" && <DevicePageLayout page={page} data={data} buyBoxPage={buyBoxPage} heroMockup={heroMockup} />}
+      {page.pageType === "brand" && <BrandPageLayout page={page} data={data} buyBoxPage={buyBoxPage} heroMockup={heroMockup} />}
       {page.pageType === "skin-type" && <SkinTypePageLayout page={page} data={data} />}
       {page.pageType === "product" && <ProductPageLayout page={page} />}
     </>

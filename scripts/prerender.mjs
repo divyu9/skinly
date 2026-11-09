@@ -26,6 +26,7 @@
  */
 
 import fs from "node:fs/promises";
+import { readFileSync } from "node:fs";
 import path from "node:path";
 import { offerShippingAndReturns, productMaterial } from "../src/lib/merchant-schema.mjs";
 import { resolveSeoTarget, selectSeoProducts, seoCopy, brandGadgetLabel, gadgetLabel, oneRowPerDesign, slugify, productSeoTitle } from "../src/lib/seo-pages.mjs";
@@ -1329,7 +1330,8 @@ function seoPage(s, info, knownPaths, themes = []) {
       // the words in every page for nobody to read.
       page: Object.fromEntries(Object.entries(s).filter(([k]) =>
         !["generationLog", "aiPrompt", "rawResponse", "embedding", "previousContentHTML", "previousFaqs",
-          "qualityIssues", "rewriteIssues", "rewriteTriedAt"].includes(k)).concat(info?.buyBox ? [["_buyBox", true]] : [])),
+          "qualityIssues", "rewriteIssues", "rewriteTriedAt"].includes(k)).concat(info?.buyBox ? [["_buyBox", true]] : [])
+        .concat(!info?.buyBox && info?.heroPhone ? [["_heroPhone", info.heroPhone]] : [])),
     },
     title: info?.title || s.metaTitle || `${h1} | GoSkinly`,
     description: info?.description || s.metaDescription || clip(text, 155),
@@ -2207,22 +2209,25 @@ function categoryPages(products, variantsByProduct, themes = []) {
  * The buy box on a top model's page: pick a design, see it on this phone, add
  * to cart, without leaving the page (src/pages/seo/_components/model-buy-box.tsx).
  *
- * Only for the 100 models settings/buyBoxModels names (best sellers and most
- * searched, nightly) and only where at least twelve in-stock designs have a
- * photo on this phone. The page stays what it was for search: same URL, H1,
+ * On every model page where at least twelve in-stock designs have a photo on
+ * this phone (it began on the 100 that settings/buyBoxModels names). The page stays what it was for search: same URL, H1,
  * copy, FAQ and grid. What it adds is a ProductGroup in its structured data:
  * the designs offered here as variants, each with its real price, stock,
  * shipping and returns, and a rating only from approved reviews of those very
  * designs or of this phone. Built once here and shipped in seo-data, so the
  * page's Helmet renders exactly the object the prerendered HTML carries.
  */
+/** Official back photos of phones, "Brand|Model" -> /phones/<file>.webp (public/phones/manifest.json). */
+const PHONE_PHOTOS = (() => {
+  try { return JSON.parse(readFileSync(new URL("../public/phones/manifest.json", import.meta.url), "utf8")); } catch { return {}; }
+})();
 const keyOf = (s) => String(s || "").toLowerCase().replace(/\(5g\)|\b5g\b|\b4g\b/g, "").replace(/[^a-z0-9]/g, "");
 const FINISH_TABS = [
   ["matte", "Matte"], ["embossed", "3D Textured"], ["transparent", "Tranzy"], ["premium-leather", "Leather"], ["sparkling", "Sparkling"],
 ];
 function buyBoxFor(s, target, copy, products, allDesigns, data) {
-  const wanted = new Set(((data.buyBoxModels && data.buyBoxModels.models) || []).map((m) => keyOf(m.brand) + "|" + keyOf(m.model)));
-  if (!wanted.has(keyOf(target.brand) + "|" + keyOf(target.model)) || products.length < 12) return null;
+  // Every model page with mockups gets it (owner, 9 Nov 2026; it began on the top 100).
+  if (products.length < 12) return null;
   const sold = new Map(((data.homeRankings && data.homeRankings.bestsellers) || []).map((b) => [b.productId, Number(b.qty) || 0]));
   const priceOf = (p) => {
     const live = (p.variants || []).filter((v) => v.available && Number(v.price) > 0).map((v) => Number(v.price));
@@ -2432,8 +2437,12 @@ async function seoPageData(project, seoDocs, data, variantsByProduct) {
           .map(({ p }) => (photoOf.has(p._id) ? [p._id, photoOf.get(p._id)] : [p._id]))
       : null;
 
+    // The phone's own back photo (public/phones/manifest.json, official renders on white) for the compact hero.
+    const heroPhone = target.kind === "model" ? PHONE_PHOTOS[`${target.brand}|${target.model}`] : undefined;
+
     const info = {
       ...(buyBox ? { buyBox } : {}),
+      ...(heroPhone ? { heroPhone } : {}),
       ...(more && more.length ? { more } : {}),
       slug: s.slug,
       target: { ...target, models: undefined },

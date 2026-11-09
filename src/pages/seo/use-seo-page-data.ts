@@ -20,6 +20,8 @@ export interface SeoPageData {
   /** This brand's other gadget pages — the hub row. Absent on themes. */
   brandGadgets?: Array<{ gadget: string; count: number; slug: string | null; href: string }>;
   products: Product[];
+  /** The phone's own back photo (public/phones), for the compact hero. */
+  heroPhone?: string;
   /** Buy-box pages: the in-stock designs past the grid's 48, as [productId, mockupUrl?]. */
   more?: Array<[string, string?]>;
   /** The top models' buy box (scripts/prerender.mjs buyBoxFor). */

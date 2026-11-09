@@ -14,7 +14,7 @@ import { DeviceSelectorDialog } from "@/pages/_components/device-selector-dialog
 import { useState, useRef } from "react";
 import { sanitizeHtml } from "@/lib/sanitize-html";
 import type { SeoPageData } from "../use-seo-page-data";
-import { SeoBrandGadgetsSection, SeoModelsSection, SeoProductsSection } from "./seo-sections.tsx";
+import { SeoBrandGadgetsSection, SeoModelsSection, SeoProductsSection, ModelHero } from "./seo-sections.tsx";
 
 
 interface BrandPageLayoutProps {
@@ -22,9 +22,11 @@ interface BrandPageLayoutProps {
   data?: SeoPageData;
   /** A top model's page with the buy box: the buy box carries the H1, the tall hero goes. */
   buyBoxPage?: boolean;
+  /** A model page without a buy box: the phone's own back photo, for the compact hero. */
+  heroMockup?: string;
 }
 
-export default function BrandPageLayout({ page, data, buyBoxPage = false }: BrandPageLayoutProps) {
+export default function BrandPageLayout({ page, data, buyBoxPage = false, heroMockup }: BrandPageLayoutProps) {
   const template = useQuery(api.seoTemplates.getTemplateByType, { pageType: "brand" });
   
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -48,7 +50,9 @@ export default function BrandPageLayout({ page, data, buyBoxPage = false }: Bran
 
 
   // Section renderers
-  const renderHero = () => (
+  const renderHero = () => heroMockup ? (
+    <ModelHero h1={page.h1Heading} intro={page.metaDescription || data?.description} image={heroMockup} gridHref="#all-designs" alt={`${page.h1Heading}: the phone itself`} />
+  ) : (
     <section className="relative border-b overflow-hidden">
       {/* Hero Background - Image or Gradient */}
       {page.heroImageUrl ? (

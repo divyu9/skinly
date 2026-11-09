@@ -14,7 +14,7 @@ import { DeviceSelectorDialog } from "@/pages/_components/device-selector-dialog
 import { useState, useRef } from "react";
 import { sanitizeHtml } from "@/lib/sanitize-html";
 import type { SeoPageData } from "../use-seo-page-data";
-import { SeoModelsSection, SeoProductsSection } from "./seo-sections.tsx";
+import { SeoModelsSection, SeoProductsSection, ModelHero } from "./seo-sections.tsx";
 
 
 interface KeywordPageLayoutProps {
@@ -22,9 +22,11 @@ interface KeywordPageLayoutProps {
   data?: SeoPageData;
   /** A top model's page with the buy box: the buy box carries the H1, the tall hero goes. */
   buyBoxPage?: boolean;
+  /** A model page without a buy box: the phone's own back photo, for the compact hero. */
+  heroMockup?: string;
 }
 
-export default function KeywordPageLayout({ page, data, buyBoxPage = false }: KeywordPageLayoutProps) {
+export default function KeywordPageLayout({ page, data, buyBoxPage = false, heroMockup }: KeywordPageLayoutProps) {
   
   // Fetch template for this page type to determine section order and visibility
   const template = useQuery(api.seoTemplates.getTemplateByType, { pageType: "keyword" });
@@ -73,6 +75,7 @@ export default function KeywordPageLayout({ page, data, buyBoxPage = false }: Ke
   const renderSection = (sectionId: string) => {
     switch (sectionId) {
       case "hero":
+        if (heroMockup) return <div key={sectionId}><ModelHero h1={page.h1Heading} intro={page.metaDescription || data?.description} image={heroMockup} gridHref="#all-designs" alt={`${page.h1Heading}: the phone itself`} /></div>;
         return (
           <section key={sectionId} className="relative border-b overflow-hidden">
             {/* Hero Background - Image or Gradient */}
