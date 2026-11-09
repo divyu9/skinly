@@ -2420,14 +2420,14 @@ async function seoPageData(project, seoDocs, data, variantsByProduct) {
       : [];
 
     /*
-     * MacBooks, iPads and Mac minis have no per-model mockups, but every model
+     * MacBooks, iPads, Mac minis, cameras and lenses have no per-model mockups, but every model
      * of one kind takes the same designs and the listing photo already shows
      * the design on that kind of device. Those photos stand in, so these pages
      * sell from the first screen too (owner, 9 Nov 2026); the box says the
      * photo is a preview and the skin is cut for the exact model.
      */
     let genericPhotos = false;
-    if (target.kind === "model" && ["laptop", "tablet", "mac-mini"].includes(target.gadget) && pictured.length < 12) {
+    if (target.kind === "model" && ["laptop", "tablet", "mac-mini", "camera", "lens"].includes(target.gadget) && pictured.length < 12) {
       if (!allDesigns.length) allDesigns = oneRowPerDesign(sel.products, target.brand);
       pictured = allDesigns.map((p) => {
         const img = (p.images || []).map((i) => (typeof i === "string" ? i : i?.url)).find(liveImage);
