@@ -2227,13 +2227,21 @@ export async function runQuery(c: QueryCtx) {
           }
         }
         else if (path === 'supportedModels.getModelInfo') {
+          // Exact name first; then the brand's models compared without case, so a
+          // link or saved device spelled the old way ("MACBOOK AIR 13 INCH M3 2024")
+          // still finds the model after its name was tidied ("MacBook Air 13 inch M3 2024").
           const q = query(collection(db, 'supportedModels'), where('brandName', '==', args.brand), where('modelName', '==', args.model), limit(1));
           c.unsubscribe = onSnapshot(q, (snap) => {
             if (!snap.empty) {
               setData({ _id: snap.docs[0].id, ...snap.docs[0].data() });
-            } else {
-              setData(null);
+              return;
             }
+            const want = String(args.model || '').toLowerCase().trim();
+            getDocs(query(collection(db, 'supportedModels'), where('brandName', '==', args.brand))).then((all) => {
+              if (!c.isActive()) return;
+              const hit = all.docs.find((d) => String(d.data().modelName || '').toLowerCase().trim() === want);
+              setData(hit ? { _id: hit.id, ...hit.data() } : null);
+            }).catch(() => { if (c.isActive()) setData(null); });
           });
         }
         else if (path === 'gadgetTypes.getByCategory') {
