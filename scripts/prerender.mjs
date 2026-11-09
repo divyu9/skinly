@@ -2664,6 +2664,26 @@ async function main() {
     ...seoDocs.map((d) => `/${d.slug}`),
     ...active.map((p) => `/products/${p.slug}`),
   ]);
+  /*
+   * Each phone's own landing page, for the buy box's "change model": picking
+   * another phone there opens that phone's page, not a product page. Fetched
+   * only when someone changes the model. Where two pages name one model, the
+   * one with a buy box (or more designs) wins.
+   */
+  {
+    const pages = {};
+    const weight = (i) => (i.buyBox ? 1e6 : 0) + (i.total || 0);
+    for (const info of seoInfo.values()) {
+      const t = info?.target;
+      if (!info || t?.kind !== "model" || !t.brand || !t.model || !(info.total > 0)) continue;
+      const key = `${t.brand}|${t.model}`;
+      const cur = pages[key] && seoInfo.get(pages[key]);
+      if (!cur || weight(info) > weight(cur)) pages[key] = info.slug;
+    }
+    await fs.mkdir(path.join(DIST, "data"), { recursive: true });
+    await fs.writeFile(path.join(DIST, "data", "model-pages.json"), JSON.stringify(pages));
+    log(`model pages index: ${Object.keys(pages).length} phones`);
+  }
   const themes = themeIndex(seoDocs, seoInfo);
   if (themes.length) log(`themes: ${themes.length} style pages, now linked from /skins and from every gadget page`);
   const seo = seoDocs.map((s) => seoPage(s, seoInfo.get(s.slug), knownPaths, themes));

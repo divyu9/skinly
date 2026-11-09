@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { StarIcon, CheckIcon } from "lucide-react";
+import { StarIcon, CheckIcon, ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
 import { QuickBuyBody } from "@/components/home/quick-buy.tsx";
 import { responsiveImg } from "@/lib/image-cdn";
 import type { SeoPageData } from "../use-seo-page-data";
@@ -42,6 +42,25 @@ export default function ModelBuyBox({ data, hasH1 = false, onSeeAll }: {
     else document.getElementById("all-designs")?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
+  const touchX = useRef<number | null>(null);
+  const photo = useRef<HTMLDivElement>(null);
+  // On a short phone the photo can still be above the fold when a thumb is
+  // tapped: bring it back just under the header so the change is seen.
+  const showPhoto = () => {
+    const el = photo.current;
+    if (!el || window.innerWidth >= 768) return;
+    const top = el.getBoundingClientRect().top;
+    if (top < 64) window.scrollBy({ top: top - 72, behavior: "smooth" });
+  };
+
+  // Swipe or arrow: the next design in the thumbnails below (which follow), round the end.
+  const step = (dir: 1 | -1) => {
+    const list = swatches.map((x) => x.slug);
+    if (!list.length) return;
+    const at = list.indexOf(d.slug);
+    pick(list[(at + dir + list.length) % list.length]);
+  };
+
   const pick = (next: string) => {
     setSlug(next);
     const q = new URLSearchParams(params);
@@ -52,10 +71,21 @@ export default function ModelBuyBox({ data, hasH1 = false, onSeeAll }: {
   return (
     <section className="border-b-2 border-ink/10 bg-background" aria-label={`Buy ${box.name}`}>
       <div className={`container mx-auto max-w-6xl px-3 sm:px-4 ${hasH1 ? "pb-8 pt-4 md:pb-12 md:pt-6" : "py-8 md:py-12"}`}>
-        <div className="grid gap-6 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] md:gap-10">
+        <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] md:gap-10">
           {/* The design on this phone */}
           <div>
-            <div className="sticker overflow-hidden rounded-3xl border-2 border-ink bg-card">
+            {/* Full size: the photo is what sells (owner). Swipe or the arrows change the design; the thumbnails follow. */}
+            <div
+              ref={photo}
+              className="sticker relative overflow-hidden rounded-3xl border-2 border-ink bg-card"
+              onTouchStart={(e) => { touchX.current = e.touches[0].clientX; }}
+              onTouchEnd={(e) => {
+                const dx = e.changedTouches[0].clientX - (touchX.current ?? e.changedTouches[0].clientX);
+                touchX.current = null;
+                if (Math.abs(dx) < 40) return;
+                step(dx < 0 ? 1 : -1);
+              }}
+            >
               <img
                 key={d.mockupUrl}
                 {...responsiveImg(d.mockupUrl, [480, 720, 960], "(min-width: 768px) 560px, calc(100vw - 24px)")}
@@ -63,10 +93,26 @@ export default function ModelBuyBox({ data, hasH1 = false, onSeeAll }: {
                 width={960}
                 height={960}
                 className="aspect-square w-full object-contain"
+                draggable={false}
               />
+              {swatches.length > 1 && (
+                <>
+                  <button type="button" onClick={() => step(-1)} aria-label="Previous design"
+                    className="absolute left-2 top-1/2 inline-flex size-9 -translate-y-1/2 items-center justify-center rounded-full border-2 border-ink bg-background/90 text-ink shadow">
+                    <ChevronLeftIcon className="size-5" strokeWidth={2.5} />
+                  </button>
+                  <button type="button" onClick={() => step(1)} aria-label="Next design"
+                    className="absolute right-2 top-1/2 inline-flex size-9 -translate-y-1/2 items-center justify-center rounded-full border-2 border-ink bg-background/90 text-ink shadow">
+                    <ChevronRightIcon className="size-5" strokeWidth={2.5} />
+                  </button>
+                  <span className="absolute bottom-2 left-1/2 -translate-x-1/2 rounded-full bg-ink/80 px-2 py-0.5 text-[11px] font-bold text-background">
+                    {Math.max(1, swatches.findIndex((x) => x.slug === d.slug) + 1)} / {swatches.length}
+                  </span>
+                </>
+              )}
             </div>
             {/* One line, always: a long title wrapping to two moved everything below it. */}
-            <p className="mt-2 truncate text-center text-xs text-muted-foreground" title={`${d.title} on the ${t.brand} ${t.model}`}>
+            <p className="mt-2 hidden truncate text-center text-xs text-muted-foreground md:block" title={`${d.title} on the ${t.brand} ${t.model}`}>
               On the {t.brand} {t.model}
             </p>
           </div>
@@ -111,12 +157,13 @@ export default function ModelBuyBox({ data, hasH1 = false, onSeeAll }: {
             <p className="mt-3 truncate text-sm font-bold" title={d.title}>
               Design: <span className="font-semibold text-muted-foreground">{d.title}</span>
             </p>
+            {/* Three rows of six with "+N more" last: the size of the range is visible at a glance (owner, 9 Nov 2026). */}
             <div className="mt-2 grid grid-cols-6 gap-1.5 sm:gap-2">
               {swatches.map((x) => (
                 <button
                   key={x.slug}
                   type="button"
-                  onClick={() => pick(x.slug)}
+                  onClick={() => { pick(x.slug); showPhoto(); }}
                   aria-label={x.title}
                   aria-pressed={x.slug === d.slug}
                   className={`relative aspect-square overflow-hidden rounded-xl border-2 bg-card transition ${x.slug === d.slug ? "border-ink ring-2 ring-brand" : "border-ink/15 hover:border-ink"}`}

@@ -75,9 +75,20 @@ export function QuickBuyBody({ slug, onDone, fixedDevice, hideThumb = false }: {
   const navigate = useNavigate();
   const onSelect = useCallback((model: string, brand: string) => {
     writeActiveDevice(brand, model, deviceCategory);
-    // On a model page the phone is the page: another phone opens this design's page cut for it.
+    // On a model page the phone is the page: another phone opens that phone's
+    // own page on this design (scripts/prerender.mjs writes the index), or this
+    // design's product page cut for it when the phone has no page.
     if (fixedDevice && product?.slug) {
-      navigate(`/products/${product.slug}?${new URLSearchParams({ brand, model })}`);
+      const slug = product.slug;
+      fetch("/data/model-pages.json", { headers: { accept: "application/json" } })
+        .then((r) => (r.ok ? r.json() : {}))
+        .catch(() => ({}))
+        .then((pages: Record<string, string>) => {
+          const page = pages[`${brand}|${model}`];
+          navigate(page
+            ? `/${page}?${new URLSearchParams({ design: slug })}`
+            : `/products/${slug}?${new URLSearchParams({ brand, model })}`);
+        });
       return;
     }
     setDevice({ brand, model });
