@@ -1,11 +1,11 @@
 // Add a phone's official back photo for its model page hero.
-//   node scripts/phones/add_photo.cjs "<image url>" "<Brand>" "<Model>"
+//   node scripts/phones/add_photo.cjs "<image url or local file>" "<Brand>" "<Model>"
 // Brand and Model must be exactly as on the site (supportedModels brandName / modelName,
 // the same text the page's data uses). Downloads the image, puts it on white, trims the
 // margins, scales to 900px tall with a little air, writes public/phones/<slug>.webp and
 // adds "Brand|Model" to public/phones/manifest.json. Prints the output path so the
 // result can be looked at before it ships.
-// Only official sources (the brand's own site or press kit): see docs in the commit.
+// Any public source the owner accepts (9 Nov 2026): exact model, back view, no watermark, case or other shop's logo.
 const fs = require("fs"), path = require("path");
 const sharp = require(path.join(__dirname, "../../functions/node_modules/sharp"));
 
@@ -18,9 +18,15 @@ const DIR = path.join(__dirname, "../../public/phones");
 const slug = `${brand} ${model}`.toLowerCase().replace(/\(.*?\)/g, (m) => m.replace(/[()]/g, "")).replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 
 (async () => {
-  const res = await fetch(url, { headers: { "user-agent": "Mozilla/5.0 (Macintosh) GoSkinly phone photo" } });
-  if (!res.ok) throw new Error(`download failed: ${res.status}`);
-  const buf = Buffer.from(await res.arrayBuffer());
+  // A URL, or a local file (a back cropped out of a front+back image first).
+  let buf;
+  if (/^https?:\/\//i.test(url)) {
+    const res = await fetch(url, { headers: { "user-agent": "Mozilla/5.0 (Macintosh) GoSkinly phone photo" } });
+    if (!res.ok) throw new Error(`download failed: ${res.status}`);
+    buf = Buffer.from(await res.arrayBuffer());
+  } else {
+    buf = fs.readFileSync(url.replace(/^file:\/\//, ""));
+  }
   const trimmed = await sharp(buf).flatten({ background: "#ffffff" }).trim({ threshold: 12 }).toBuffer();
   const meta = await sharp(trimmed).metadata();
   if (!meta.width || !meta.height || meta.height < 300) throw new Error(`image too small after trim: ${meta.width}x${meta.height}`);

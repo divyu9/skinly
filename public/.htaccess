@@ -128,6 +128,11 @@ RewriteRule ^pages/(returns|return-policy|refund-policy)$ https://goskinly.com/p
 RewriteRule ^pages/(shipping|shipping-policy)$ https://goskinly.com/policies/shipping [R=301,L]
 RewriteRule ^pages/privacy-policy$ https://goskinly.com/policies/privacy [R=301,L]
 RewriteRule ^pages/(terms-of-service|terms)$ https://goskinly.com/policies/terms [R=301,L]
+# Shopify's own policy paths (Search Console 404s, 9 Nov 2026)
+RewriteRule ^policies/terms-of-service$ https://goskinly.com/policies/terms [R=301,L]
+RewriteRule ^policies/(refund-policy|return-policy)$ https://goskinly.com/policies/returns [R=301,L]
+RewriteRule ^policies/shipping-policy$ https://goskinly.com/policies/shipping [R=301,L]
+RewriteRule ^policies/privacy-policy$ https://goskinly.com/policies/privacy [R=301,L]
 RewriteRule ^pages/(shop|store)$ https://goskinly.com/products [R=301,L]
 RewriteRule ^pages(/.*)?$ https://goskinly.com/ [R=301,L]
 RewriteRule ^account/(login|register|signup)$ https://goskinly.com/account [R=301,L]
