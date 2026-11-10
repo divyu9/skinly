@@ -50,6 +50,21 @@ function ledgerTrigger(collection: "rollInventory" | "cutoutInventory") {
       ...(move?.orderId ? { orderId: move.orderId, orderNumber } : {}),
       at: Date.now(),
     });
+    /*
+     * Recount the listings this stock backs, whatever changed it. A roll edited
+     * on the admin Rolls page (1 m to 0.4 m) left its MacBook and camera
+     * variants "in stock" until an order or a manual sync happened to come by
+     * (owner, 10 Nov 2026). Orders already recount; doing it again is harmless.
+     */
+    const code = String(kind === "cutout" ? doc?.cutoutNumber : doc?.rNumber || "").trim().toUpperCase();
+    if (code) {
+      try {
+        const { syncStockForDesign } = await import("./materials");
+        await syncStockForDesign(admin.firestore(), [code]);
+      } catch (e: any) {
+        console.error("[stock] recount after change failed", code, e?.message || e);
+      }
+    }
     return null;
   });
 }
