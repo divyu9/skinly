@@ -7,8 +7,8 @@ import * as fs from "fs";
  * Shipmozo hands back a plain PNG: no shop logo, no courier mark (owner,
  * 10 Nov 2026). This adds a white header band with the Skinly logo across the
  * top, and the courier's logo (Delhivery, Blue Dart, DTDC: the three Shipmozo
- * uses for us) under the order-id barcode in the right column, where the
- * label leaves empty space. The barcode is found in the image itself, so a
+ * uses for us) in the right column's empty space above the "Courier:" line and
+ * AWB barcode. The barcode is found in the image itself, so a
  * different label size still works; when it cannot be found the courier logo
  * goes into the header instead. Anything going wrong returns the label as it
  * came: a plain label beats no label.
@@ -52,19 +52,26 @@ function findSlot(gray: Buffer, w: number, h: number) {
     if (e - y + 1 >= minRun) bars.push([y, e]);
     y = e;
   }
-  if (bars.length < 2) return null;  // the AWB barcode, then the order-id barcode
-  const last = bars[bars.length - 1];
-  // Past the barcode: the text line under it, then white.
-  let y = last[1] + 1;
-  const gap = Math.max(12, Math.round(h * 0.018));  // air between the Reference ID line and the logo
+  if (!bars.length) return null;
+  // Above the first barcode (the AWB): its "Courier: …" line, and above that
+  // the white space beside the address. The logo sits at the bottom of that
+  // space, just over the courier line (owner, 10 Nov 2026).
+  const first = bars[0];
+  const gap = Math.max(12, Math.round(h * 0.018));
   const blank = (yy: number) => ink[yy] === 0;
-  while (y < h && blank(y)) y++;            // white between barcode and its text
-  while (y < h && !blank(y)) y++;           // the "Reference ID" line
-  let top = y; while (top < h && blank(top) && top - y < gap) top++;
-  let end = top; while (end < h && blank(end)) end++;
-  const room = end - top - gap;
+  let y = first[0] - 1;
+  while (y > 0 && blank(y)) y--;            // white between the courier line and the barcode
+  while (y > 0 && !blank(y)) y--;           // the "Courier: …" line
+  const bottom = y - gap;
+  let topY = bottom; while (topY > 0 && blank(topY)) topY--;
+  const room = bottom - topY - gap;
   if (room < h * 0.04) return null;
-  return { top, room, left: x0, width: x1 - x0 };
+  const height = Math.min(room, Math.round(h * 0.07));
+  // Line the logo up with the barcode's left edge, as the text under it is.
+  let edge = x1;
+  for (let yy = first[0]; yy <= first[1]; yy++) for (let x = x0; x < edge; x++) if (dark(x, yy)) { edge = x; break; }
+  const left = edge < x1 ? edge : x0;
+  return { top: bottom - height, room: height, left, width: x1 - left };
 }
 
 export async function brandShipmozoLabel(dataUrl: string, courierName: string): Promise<string> {
@@ -85,10 +92,10 @@ export async function brandShipmozoLabel(dataUrl: string, courierName: string): 
       const gray = await sharp(label).greyscale().raw().toBuffer();
       const slot = findSlot(gray, w, h);
       if (slot) {
-        const maxH = Math.min(slot.room, Math.round(h * 0.07));
+        const maxH = slot.room;
         const logo = await sharp(courierFile).resize({ width: Math.round(slot.width * 0.62), height: maxH, fit: "inside" }).png().toBuffer();
         const lm = await sharp(logo).metadata();
-        layers.push({ input: logo, top: slot.top, left: slot.left + Math.round(Math.max(0, slot.width * 0.62 - (lm.width || 0)) / 2) });
+        layers.push({ input: logo, top: slot.top + Math.max(0, slot.room - (lm.height || 0)), left: slot.left });
       } else {
         courierInHeader = true;
       }
