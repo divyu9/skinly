@@ -44,6 +44,7 @@ export default function ProductsPage() {
    * there; one already narrowed by finish, search or collection stays here.
    */
   const navigateTo = useNavigate();
+  const [modelPagePath, setModelPagePath] = useState<string | null>(null);
   useEffect(() => {
     const q = new URLSearchParams(window.location.search);
     const brand = q.get("brand"), model = q.get("model");
@@ -55,7 +56,11 @@ export default function ProductsPage() {
     let gone = false;
     loadModelPages().then(({ pages, buyBox }) => {
       const key = `${brand}|${model}`;
-      if (!gone && buyBox.has(key) && pages[key]) navigateTo(`/${pages[key]}`, { replace: true });
+      const lower = key.toLowerCase();
+      const hit = pages[key] ? key : Object.keys(pages).find((k) => k.toLowerCase() === lower);
+      if (gone || !hit) return;
+      if (buyBox.has(hit)) navigateTo(`/${pages[hit]}`, { replace: true });
+      else setModelPagePath(`/${pages[hit]}`);
     });
     return () => { gone = true; };
   }, [navigateTo]);
@@ -424,7 +429,14 @@ export default function ProductsPage() {
   
   // The listing's canonical follows its category (and, for skins, gadget), so
   // /products?productType=case-cover declares /cases-covers.
-  const listingCanonical = canonicalListingPath(filters.productCategory, filters.gadgetFilter);
+  /*
+   * One phone's skins: that phone's own landing page is the canonical. Google
+   * ignored /phone-skins as the canonical of a listing narrowed to one model
+   * (different products) and indexed ~2,500 /products?brand=&model= URLs
+   * (Search Console, 10 Nov 2026) that compete with the model pages for the
+   * same searches. Pointing them at the model page puts the ranking on one URL.
+   */
+  const listingCanonical = modelPagePath || canonicalListingPath(filters.productCategory, filters.gadgetFilter);
   const categoryPage = filters.productCategory ? CATEGORY_PAGES[filters.productCategory] : undefined;
   const listingSeo = categoryPage && listingCanonical === categoryPage.path
     ? { title: categoryPage.title, description: categoryPage.description, canonicalPath: listingCanonical }
