@@ -102,7 +102,8 @@ export async function brandShipmozoLabel(dataUrl: string, courierName: string): 
       const slot = findSlot(gray, w, h);
       if (slot) {
         const maxH = slot.room;
-        const logo = await sharp(courierFile).resize({ width: Math.round(slot.width * 0.62), height: maxH, fit: "inside" }).png().toBuffer();
+        // One size on every label (owner, 10 Nov 2026), smaller only if the column is narrower.
+        const logo = await sharp(courierFile).resize({ width: Math.round(Math.min(w * 0.28, slot.width * 0.95)), height: maxH, fit: "inside" }).png().toBuffer();
         const lm = await sharp(logo).metadata();
         layers.push({ input: logo, top: slot.top + Math.max(0, slot.room - (lm.height || 0)), left: slot.left });
       } else {
