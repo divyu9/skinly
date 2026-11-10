@@ -5,6 +5,7 @@ import { brandInScope } from "@/lib/device-fit";
 import { searchModels } from "@/lib/laptop-body";
 import { siblingListingFor, type ListingLike } from "@/lib/listing-siblings";
 import { brandKey, loadCatalogue } from "@/lib/catalogue";
+import { modelPageFor } from "@/lib/model-pages";
 import { useSearchParams, useNavigate, useParams } from "react-router-dom";
 import { recordWhatsAppOptIn } from "@/components/whatsapp-opt-in.tsx";
 import { toast } from "sonner";
@@ -174,6 +175,14 @@ export function useModelSelector(
     if (opts.onSelect) {
       opts.onSelect(model, brand);
       setSelectorState({ dialogOpen: false, selectedBrand: "", searchQuery: "" });
+      return;
+    }
+
+    // A model with its own buy-box page: open that page, on this design.
+    const page = await modelPageFor(brand, model, productSlug).catch(() => null);
+    if (page) {
+      setSelectorState({ dialogOpen: false, selectedBrand: "", searchQuery: "" });
+      navigate(page);
       return;
     }
 
