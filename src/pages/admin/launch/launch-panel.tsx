@@ -12,11 +12,14 @@ import { Label } from "@/components/ui/label.tsx";
 import { Switch } from "@/components/ui/switch.tsx";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select.tsx";
 import { AlertTriangleIcon, CheckCircle2Icon, CircleDashedIcon, Loader2Icon, RocketIcon, RotateCcwIcon, XCircleIcon } from "lucide-react";
-import { DEFAULT_BLOCKS, PHASE_1_LISTINGS, type MockupShot, type SharedBlocks, type CutOrientation } from "@/lib/ai-mockup-shots.ts";
+import { DEFAULT_BLOCKS, PHASE_1_LISTINGS, STARTER_SHOTS, type MockupShot, type SharedBlocks, type CutOrientation } from "@/lib/ai-mockup-shots.ts";
 import { IMAGE_MODELS, formatInr } from "@/lib/ai-mockup-models.ts";
 import { buildLaunchPlan, type LaunchDesign, type LaunchPlan } from "@/lib/launch-plan.ts";
 import { loadDesignListings } from "@/lib/launch-plan-data.ts";
 import { useTemplates, templateRows, templateForShot, usesTemplate } from "@/pages/admin/ai-mockups/templates.tsx";
+
+/** Gadgets a launch can be limited to: the ones the built-in shots know. */
+const LAUNCH_GADGETS = [...new Set(STARTER_SHOTS.map((s) => s.gadget))].sort();
 
 /**
  * Plans a design launch, shows exactly what it will do, and hands it to the
@@ -69,6 +72,8 @@ export function LaunchPanel({ design, themes, onLaunched, onReview }: {
     return pref("launch_templates", "1") === "1" ? "templates" : "model";
   });
   const [regenerate, setRegenerate] = useState(false);
+  // "" = every listing the design should have; a gadget = only that gadget's.
+  const [onlyGadget, setOnlyGadget] = useState("");
   const [rewriteCopy, setRewriteCopy] = useState(false);
   const [modelId, setModelId] = useState(pref("launch_model", cheapest.id));
   const [orientation, setOrientation] = useState<CutOrientation | "both">((pref("launch_orient", "lengthwise") as any) || "lengthwise");
@@ -82,7 +87,7 @@ export function LaunchPanel({ design, themes, onLaunched, onReview }: {
   const ready = shots !== undefined && settings !== undefined && gadgetTypes !== undefined && templates !== undefined;
 
   // Any change to the options makes the shown plan stale.
-  useEffect(() => { setPlan(null); }, [phaseOnly, publishNow, pictures, regenerate, rewriteCopy, modelId, orientation, design.code, design.finish, design.name, design.rawImageUrl, design.flatImageUrl]);
+  useEffect(() => { setPlan(null); }, [onlyGadget, phaseOnly, publishNow, pictures, regenerate, rewriteCopy, modelId, orientation, design.code, design.finish, design.name, design.rawImageUrl, design.flatImageUrl]);
 
   const makePlan = async () => {
     setPlanning(true);
@@ -125,6 +130,7 @@ export function LaunchPanel({ design, themes, onLaunched, onReview }: {
         jobs: jobSnap.docs.map((d) => d.data() as any),
         options: {
           phaseOnly, publishNow, pictures, regenerateImages: regenerate, rewriteCopy, model, aspect: "1:1",
+          onlyGadget: onlyGadget || undefined,
           orientations: orientation === "both" ? ["lengthwise", "widthwise"] : [orientation],
         },
       });
@@ -150,7 +156,7 @@ export function LaunchPanel({ design, themes, onLaunched, onReview }: {
         flat: design.flatImageUrl
           ? { url: design.flatImageUrl, pxPerCm: design.flatPxPerCm || 40, widthCm: design.flatWidthCm || 29.5, lengthCm: design.flatLengthCm || 0 }
           : null,
-        options: { phaseOnly, publishNow, pictures, regenerate, rewriteCopy, model: pictures === "model" ? model.label : "Template" },
+        options: { phaseOnly, publishNow, pictures, regenerate, rewriteCopy, model: pictures === "model" ? model.label : "Template", ...(onlyGadget ? { onlyGadget } : {}) },
         summary: plan.summary,
         warnings: plan.warnings,
         steps: plan.steps,
@@ -209,6 +215,19 @@ export function LaunchPanel({ design, themes, onLaunched, onReview }: {
         {toggle("Publish new listings now", publishNow, setPublishNow, "launch_publish", "Off: new listings wait in draft for their first approved picture.")}
         {toggle("Make pictures again", regenerate, setRegenerate, undefined, "Off: pictures this design already has are skipped.")}
         {toggle("Rewrite titles & descriptions", rewriteCopy, setRewriteCopy, undefined, "Also for listings already made; links (slugs) stay the same.")}
+        <div className="flex flex-wrap items-center gap-2 text-sm">
+          <Label className="text-xs">Listings for</Label>
+          <Select value={onlyGadget || "all"} onValueChange={(v) => setOnlyGadget(v === "all" ? "" : v)}>
+            <SelectTrigger className="h-8 w-[220px]"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Every gadget</SelectItem>
+              {LAUNCH_GADGETS.map((g) => <SelectItem key={g} value={g}>Only {g}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          <span className="block w-full text-xs text-muted-foreground">
+            One gadget: only its listings are made or changed, the design's other listings are left as they are.
+          </span>
+        </div>
       </div>
 
       {/* One source for the pictures, chosen outright — see LaunchOptions. */}

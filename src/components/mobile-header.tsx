@@ -96,6 +96,7 @@ export function MobileHeader({ onMenuClick, onRequestModelClick }: MobileHeaderP
         model.category === "phone" ? "Phones" :
         model.category === "camera" ? "Cameras" :
         model.category === "action-camera" ? "Action Cameras" :
+        model.category === "pocket-camera" ? "DJI Osmo Pocket" :
         model.category === "laptop" ? "Laptops" :
         model.category === "gimbals" ? "Gimbals" :
         model.category === "controller" ? "Controllers" :
@@ -110,6 +111,7 @@ export function MobileHeader({ onMenuClick, onRequestModelClick }: MobileHeaderP
         model.category === "phone" ? "📱" :
         model.category === "camera" ? "📷" :
         model.category === "action-camera" ? "🎥" :
+        model.category === "pocket-camera" ? "🎥" :
         model.category === "laptop" ? "💻" :
         model.category === "gimbals" ? "🎬" :
         model.category === "controller" ? "🕹️" :

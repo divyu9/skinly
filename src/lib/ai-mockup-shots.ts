@@ -1515,6 +1515,21 @@ const ACTION_BRANDS: BrandListing[] = [
   { listing: "Insta360", code: "INS", brands: ["Insta360"], device: "An Insta360 X3 360-degree camera, a slim upright bar with a round lens on each face" },
 ];
 
+/*
+ * DJI Osmo Pocket: a handheld gimbal camera, not an action camera. A slim
+ * upright handle with a three-axis head on top, nothing like the boxy Osmo
+ * Action, so it has a gadget type and a listing of its own and the shopper
+ * sees a Pocket in the photo (owner, 10 Nov 2026). Pocket, Pocket 2 and
+ * Pocket 4 now; Pocket 3 once its cutting file is in.
+ */
+const POCKET_BRANDS: BrandListing[] = [
+  {
+    listing: "DJI Osmo Pocket", code: "DJP", brands: ["DJI"],
+    device: "A DJI Osmo Pocket 4 handheld gimbal camera: a slim black upright handle with a small touchscreen "
+      + "on its front and a compact three-axis gimbal head carrying the lens on top",
+  },
+];
+
 const allBrandsOf = (list: BrandListing[]) => list.flatMap((b) => b.brands || []);
 const scopeOf = (b: BrandListing, list: BrandListing[]) =>
   b.brands ? { modelBrands: b.brands } : { modelBrandsExclude: allBrandsOf(list) };
@@ -1533,6 +1548,7 @@ const PRESET_BUILDERS: Array<[BrandListing[], (b: BrandListing) => PresetVariant
   [LENS_BRANDS, (b) => [{ tail: b.code, title: "Lens Skin", price: 299, price3d: 349, materialMultiplier: 1 }]],
   [GIMBAL_BRANDS, (b) => [{ tail: b.code, title: "Gimbal Skin", price: 399, materialMultiplier: 1 }]],
   [ACTION_BRANDS, (b) => [{ tail: b.code, title: "Full Body Skin", price: 399, price3d: 499, materialMultiplier: 1 }]],
+  [POCKET_BRANDS, (b) => [{ tail: b.code, title: "Full Body Skin", price: 399, price3d: 499, materialMultiplier: 1 }]],
 ];
 for (const [list, build] of PRESET_BUILDERS) {
   for (const b of list) {
@@ -1750,6 +1766,23 @@ const actionShot = (b: BrandListing): Omit<MockupShot, "_id"> => ({
     + "stopping cleanly at their edges. No people and no hands anywhere in the frame. " + REAL + "{{staging}} ",
 });
 
+const pocketShot = (b: BrandListing): Omit<MockupShot, "_id"> => ({
+  label: `${b.listing} — standing`,
+  gadget: "pocket-camera",
+  suffix: `pocket-${slug(b.listing)}`,
+  listing: b.listing,
+  skuCodes: [b.code],
+  matchSingleVariant: true,
+  order: 0,
+  isActive: true,
+  prompt:
+    `${b.device}, standing upright on a light oak desk, photographed close up from a front three-quarter angle `
+    + "at handle height so the camera fills most of the frame and its front, one side and the gimbal head read "
+    + "clearly. A vinyl skin covers the flat faces of the handle. {{fidelity}} The gimbal head and its motors, "
+    + "the lens and its glass, the touchscreen, the buttons, the microphone holes and the port stay uncovered, "
+    + "the vinyl stopping cleanly at their edges. No people and no hands anywhere in the frame. " + REAL + "{{staging}} ",
+});
+
 /**
  * The catch-all Android listing's second picture: the brands it covers, laid
  * out together in one design, so a shopper on a Realme or a Vivo can see their
@@ -1794,6 +1827,7 @@ STARTER_SHOTS.push(
   ...LENS_BRANDS.filter((b) => b.device).map(lensShot),
   ...GIMBAL_BRANDS.filter((b) => b.device).map(gimbalShot),
   ...ACTION_BRANDS.filter((b) => b.device).map(actionShot),
+  ...POCKET_BRANDS.filter((b) => b.device).map(pocketShot),
 );
 
 /* ------------------------------------------------------------------ phases */
@@ -1820,7 +1854,7 @@ export const PHASE_1_LISTINGS = new Set([
   "sony camera", "canon camera", "nikon camera",
   "sony lens", "canon lens", "nikon lens", "sigma lens", "tamron lens", "fujifilm lens", "camera lens",
   "dji gimbal", "zhiyun gimbal", "gimbal",
-  "gopro", "dji osmo", "insta360",
+  "gopro", "dji osmo", "insta360", "dji osmo pocket",
   "apple charger", "samsung charger", "oneplus charger", "realme charger", "oppo charger",
   "vivo charger", "xiaomi charger", "charger",
   "mac mini", "tablet",
@@ -1847,7 +1881,7 @@ export const isPhase1 = (listing: string) => PHASE_1_LISTINGS.has(String(listing
  */
 export const TEMPLATE_GADGETS = new Set([
   "phone", "laptop", "tablet", "mac-mini",
-  "console", "controller", "drone", "camera", "lens", "gimbals", "charger", "action-camera",
+  "console", "controller", "drone", "camera", "lens", "gimbals", "charger", "action-camera", "pocket-camera",
 ]);
 
 /**
@@ -1877,6 +1911,8 @@ export const DEFAULT_SURFACE_CM: Record<string, [number, number]> = {
   charger: [6.0, 6.0],
   // A GoPro's front face; an Osmo Action's is about the same.
   "action-camera": [7.1, 5.1],
+  // The front of a Pocket 4's handle (44 mm wide), under the gimbal head.
+  "pocket-camera": [4.4, 9.5],
 };
 
 export { slug as listingSlug };

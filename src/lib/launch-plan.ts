@@ -62,6 +62,14 @@ export interface LaunchOptions {
    * without any pictures.
    */
   pictures: "templates" | "model" | "none";
+  /**
+   * One gadget only: the run makes, updates and retires that gadget's
+   * listings and leaves every other listing of the design as it is. For
+   * adding a new gadget to designs already launched, e.g. the DJI Osmo Pocket
+   * on the ten best sellers (owner, 10 Nov 2026), without the run also
+   * making whatever else those designs happen to be missing.
+   */
+  onlyGadget?: string;
   regenerateImages: boolean;
   /** Rewrite the title, description and SEO of listings the studio already made. */
   rewriteCopy?: boolean;
@@ -251,7 +259,9 @@ export function buildLaunchPlan(input: {
   jobs: Array<{ suffix: string; status: string; attempt?: number; url?: string }>;
   options: LaunchOptions;
 }): LaunchPlan {
-  const { design, existing, shots, blocks, readyTemplates, sharedPictures, gadgetTypeIds, jobs, options } = input;
+  const { design, shots, blocks, readyTemplates, sharedPictures, gadgetTypeIds, jobs, options } = input;
+  const only = options.onlyGadget || "";
+  const existing = only ? input.existing.filter((l) => l.gadget === only) : input.existing;
   const code = design.code.toUpperCase();
   const warnings: string[] = [];
   const creates: PlanStep[] = [];
@@ -266,6 +276,7 @@ export function buildLaunchPlan(input: {
     const info = KIND_INFO.get(kind);
     if (!info) return false;
     if (design.usableFor?.length && !design.usableFor.includes(info.gadget)) return false;
+    if (only) return info.gadget === only;
     return !options.phaseOnly || PHASE_1_LISTINGS.has(kind);
   };
   const scopeFields = (kind: string) => {

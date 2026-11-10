@@ -57,7 +57,7 @@ function useMyDevice() {
 
 const GADGET: Record<string, string> = {
   phone: "Phone", laptop: "Laptop", tablet: "Tablet", charger: "Charger", controller: "Controller", console: "Console",
-  "mac-mini": "Mac mini", camera: "Camera", "action-camera": "Action cam", drone: "Drone", gimbals: "Gimbal", lens: "Lens",
+  "mac-mini": "Mac mini", camera: "Camera", "action-camera": "Action cam", "pocket-camera": "Osmo Pocket", drone: "Drone", gimbals: "Gimbal", lens: "Lens",
 };
 const FINISH: Record<string, string> = { matte: "Matte", embossed: "3D Textured", "3d": "3D Textured", transparent: "Tranzy", glossy: "Gloss", leather: "Leather" };
 

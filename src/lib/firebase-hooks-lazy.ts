@@ -4502,7 +4502,7 @@ export async function runMutation(path: string, args?: any) {
           ? { col: 'gadgetTypes', key: 'name', rows: [
               ['phone','Phone'],['laptop','Laptop'],['tablet','Tablet'],['camera','Camera'],['lens','Lens'],
               ['console','Console'],['controller','Controller'],['drone','Drone'],['charger','Charger'],
-              ['mac-mini','Mac Mini'],['gimbals','Gimbals'],['action-camera','Action Camera'],['accessory','Accessory'],
+              ['mac-mini','Mac Mini'],['gimbals','Gimbals'],['action-camera','Action Camera'],['pocket-camera','Pocket Camera'],['accessory','Accessory'],
             ] }
           : path === 'finishTypes.seedInitialFinishTypes'
           ? { col: 'finishTypes', key: 'name', rows: [
@@ -5050,7 +5050,7 @@ export async function runAction(path: string, args?: any) {
       const GADGET_WORD: Record<string, string> = {
         phone: 'phone', laptop: 'laptop', tablet: 'tablet', camera: 'camera', lens: 'lens',
         drone: 'drone', charger: 'charger', console: 'console', controller: 'controller',
-        gimbals: 'gimbal', 'mac-mini': 'Mac mini', 'action-camera': 'action camera',
+        gimbals: 'gimbal', 'mac-mini': 'Mac mini', 'action-camera': 'action camera', 'pocket-camera': 'Osmo Pocket',
       };
       const FINISH_WORD: Record<string, string> = {
         matte: 'Matte', embossed: '3D textured', transparent: 'Transparent', 'premium-leather': 'Leather',

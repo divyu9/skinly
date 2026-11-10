@@ -58,7 +58,7 @@ function ModelSearch({ gadget, value, onPick }: { gadget: string; value: string;
   );
 }
 
-const GADGETS = ["phone", "laptop", "tablet", "camera", "lens", "console", "controller", "drone", "action-camera", "gimbals", "charger", "mac-mini"];
+const GADGETS = ["phone", "laptop", "tablet", "camera", "lens", "console", "controller", "drone", "action-camera", "pocket-camera", "gimbals", "charger", "mac-mini"];
 
 /**
  * Add pieces to the clearance page: an existing listing (draft or unlisted

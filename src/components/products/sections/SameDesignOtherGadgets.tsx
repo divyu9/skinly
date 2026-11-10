@@ -18,10 +18,10 @@ import { ScrollNavButtons } from "@/components/ui/scroll-nav-buttons.tsx";
  * brand where the page knows it.
  */
 
-const ORDER = ["laptop", "tablet", "charger", "phone", "controller", "console", "mac-mini", "camera", "action-camera", "drone", "gimbals", "lens"];
+const ORDER = ["laptop", "tablet", "charger", "phone", "controller", "console", "mac-mini", "camera", "action-camera", "pocket-camera", "drone", "gimbals", "lens"];
 const LABEL: Record<string, string> = {
   phone: "Phone", laptop: "Laptop", tablet: "Tablet", charger: "Charger", controller: "Controller", console: "Console",
-  "mac-mini": "Mac mini", camera: "Camera", "action-camera": "Action camera", drone: "Drone", gimbals: "Gimbal", lens: "Lens",
+  "mac-mini": "Mac mini", camera: "Camera", "action-camera": "Action camera", "pocket-camera": "Osmo Pocket", drone: "Drone", gimbals: "Gimbal", lens: "Lens",
 };
 
 export function SameDesignOtherGadgets({ productId, brand }: { productId: string; brand?: string | null }) {

@@ -2272,7 +2272,7 @@ export async function runQuery(c: QueryCtx) {
             // in Firestore id order — which is why the picker opened on
             // Controller. Fall back to the order customers actually shop in.
             const RANK: Record<string, number> = {
-              phone: 1, laptop: 2, 'mac-mini': 3, camera: 4, 'action-camera': 4.5, tablet: 5,
+              phone: 1, laptop: 2, 'mac-mini': 3, camera: 4, 'action-camera': 4.5, 'pocket-camera': 4.6, tablet: 5,
               console: 6, lens: 7, drone: 8, controller: 9, charger: 10,
               gimbals: 11, accessory: 12,
             };

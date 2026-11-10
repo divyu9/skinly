@@ -68,6 +68,7 @@ const gadgetIcons: Record<string, LucideIcon> = {
   "controller": JoystickIcon,
   "gimbals": VideoIcon,
   "action-camera": ApertureIcon,
+  "pocket-camera": VideoIcon,
   "accessory": HeadphonesIcon,
 };
 

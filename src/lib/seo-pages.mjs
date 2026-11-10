@@ -35,7 +35,7 @@ const GADGET_WORDS = {
   console: "console", ps4: "console", ps5: "console", playstation: "console", xbox: "console", nintendo: "console", switch: "console",
   controller: "controller", gimbal: "gimbals", gimbals: "gimbals",
 };
-const MULTI_WORD_GADGETS = [["mac", "mini", "mac-mini"], ["mac", "studio", "mac-mini"], ["action", "camera", "action-camera"], ["action", "cameras", "action-camera"]];
+const MULTI_WORD_GADGETS = [["mac", "mini", "mac-mini"], ["mac", "studio", "mac-mini"], ["action", "camera", "action-camera"], ["action", "cameras", "action-camera"], ["osmo", "pocket", "pocket-camera"], ["dji", "pocket", "pocket-camera"]];
 
 /** Words that name a finish, mapped to finishType. */
 const FINISH_WORDS = {
@@ -79,7 +79,7 @@ const TITLE_WORDS = {
 const GADGET_LABEL = {
   phone: "Phone", laptop: "Laptop", tablet: "Tablet", camera: "Camera", lens: "Lens",
   drone: "Drone", charger: "Charger", console: "Console", controller: "Controller",
-  gimbals: "Gimbal", "mac-mini": "Mac Mini", "action-camera": "Action Camera",
+  gimbals: "Gimbal", "mac-mini": "Mac Mini", "action-camera": "Action Camera", "pocket-camera": "Osmo Pocket",
 };
 
 const FINISH_LABEL = { matte: "matte", embossed: "3D textured", transparent: "transparent", "premium-leather": "leather" };
@@ -504,6 +504,7 @@ const PLAIN_GADGETS = {
   console: ["Console", "Consoles"], drone: ["Drone", "Drones"], charger: ["Charger", "Chargers"],
   gimbals: ["Gimbal", "Gimbals"], gimbal: ["Gimbal", "Gimbals"], "mac-mini": ["Mac mini", "Mac mini"],
   "action-camera": ["Action Camera", "Action Cameras"],
+  "pocket-camera": ["Osmo Pocket", "Osmo Pocket"],
 };
 
 /**

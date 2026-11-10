@@ -93,6 +93,7 @@ const GADGET_NAMES: Record<string, string> = {
   lens: "Lens", controller: "Controller", console: "Console", drone: "Drone",
   charger: "Charger", gimbals: "Gimbal", gimbal: "Gimbal", "mac-mini": "Mac mini",
   "action-camera": "Action Camera",
+  "pocket-camera": "DJI Osmo Pocket",
 };
 
 /**

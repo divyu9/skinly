@@ -2427,7 +2427,7 @@ async function seoPageData(project, seoDocs, data, variantsByProduct) {
      * photo is a preview and the skin is cut for the exact model.
      */
     let genericPhotos = false;
-    if (target.kind === "model" && ["laptop", "tablet", "mac-mini", "camera", "lens"].includes(target.gadget) && pictured.length < 12) {
+    if (target.kind === "model" && ["laptop", "tablet", "mac-mini", "camera", "lens", "action-camera", "pocket-camera"].includes(target.gadget) && pictured.length < 12) {
       if (!allDesigns.length) allDesigns = oneRowPerDesign(sel.products, target.brand);
       pictured = allDesigns.map((p) => {
         const img = (p.images || []).map((i) => (typeof i === "string" ? i : i?.url)).find(liveImage);
