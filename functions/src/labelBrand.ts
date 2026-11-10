@@ -8,7 +8,7 @@ import * as fs from "fs";
  * 10 Nov 2026). This adds a white header band with the Skinly logo across the
  * top, and the courier's logo (Delhivery, Blue Dart, DTDC: the three Shipmozo
  * uses for us) in the right column's empty space above the "Courier:" line and
- * AWB barcode. The barcode is found in the image itself, so a
+ * AWB barcode, and www.goskinly.com in a footer band. The barcode is found in the image itself, so a
  * different label size still works; when it cannot be found the courier logo
  * goes into the header instead. Anything going wrong returns the label as it
  * came: a plain label beats no label.
@@ -130,8 +130,26 @@ export async function brandShipmozoLabel(dataUrl: string, courierName: string): 
     headerLayers.push({ input: { create: { width: Math.round(w * 0.92), height: rule, channels: 3, background: "#111111" } }, top: band - rule, left: Math.round(w * 0.04) });
 
     const withCourier = layers.length ? await sharp(label).composite(layers).png().toBuffer() : label;
-    const out = await sharp({ create: { width: w, height: h + band, channels: 3, background: "#ffffff" } })
-      .composite([...headerLayers, { input: withCourier, top: band, left: 0 }])
+    // Footer band: the website in large type, for whoever handles the parcel
+    // and for the buyer's next order (owner, 10 Nov 2026). The text is a
+    // pre-rendered image: the functions server has no fonts to draw it with.
+    const foot = Math.round(w * 0.1);
+    // Shipmozo leaves white space at the bottom of its label: use it when it is
+    // there, so the label keeps its proportions on a 4x6 sheet.
+    const g2 = await sharp(withCourier).greyscale().raw().toBuffer();
+    let lastInk = h - 1;
+    rows: for (; lastInk > 0; lastInk--) { for (let x = Math.round(w * 0.03); x < w - Math.round(w * 0.03); x++) if (g2[lastInk * w + x] < 110) break rows; }
+    const inside = h - lastInk > foot * 1.25;
+    const footTop = inside ? band + h - foot : band + h;
+    const url = await sharp(path.join(ASSETS, "footer-url.png"))
+      .resize({ width: Math.round(w * 0.72), height: Math.round(foot * 0.62), fit: "inside" }).png().toBuffer();
+    const um = await sharp(url).metadata();
+    const footerLayers = [
+      { input: { create: { width: Math.round(w * 0.92), height: rule, channels: 3 as const, background: "#111111" } }, top: footTop, left: Math.round(w * 0.04) },
+      { input: url, top: footTop + Math.round((foot - (um.height || 0)) / 2), left: Math.round((w - (um.width || 0)) / 2) },
+    ];
+    const out = await sharp({ create: { width: w, height: h + band + (inside ? 0 : foot), channels: 3, background: "#ffffff" } })
+      .composite([...headerLayers, { input: withCourier, top: band, left: 0 }, ...footerLayers])
       .png()
       .toBuffer();
     return `data:image/png;base64,${out.toString("base64")}`;
