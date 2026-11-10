@@ -53,24 +53,33 @@ function findSlot(gray: Buffer, w: number, h: number) {
     y = e;
   }
   if (!bars.length) return null;
-  // Above the first barcode (the AWB): its "Courier: …" line, and above that
+  // Above the first barcode (the AWB): its "Courier: …" text, and above that
   // the white space beside the address. The logo sits at the bottom of that
-  // space, just over the courier line (owner, 10 Nov 2026).
+  // space, just over the courier text (owner, 10 Nov 2026).
   const first = bars[0];
+  // The right column starts where the barcode does; ink is measured only from
+  // there, so a long address line on the left does not fill the space.
+  let edge = x1;
+  for (let yy = first[0]; yy <= first[1]; yy++) for (let x = x0; x < edge; x++) if (dark(x, yy)) { edge = x; break; }
+  const left = edge < x1 ? edge : x0;
+  const colInk = (yy: number) => { let n = 0; for (let x = Math.max(x0, left - 4); x < x1; x++) if (dark(x, yy)) n++; return n; };
+  const blank = (yy: number) => colInk(yy) === 0;
   const gap = Math.max(12, Math.round(h * 0.018));
-  const blank = (yy: number) => ink[yy] === 0;
+  const lineGap = Math.max(6, Math.round(h * 0.012));  // white between lines of one wrapped text
   let y = first[0] - 1;
-  while (y > 0 && blank(y)) y--;            // white between the courier line and the barcode
-  while (y > 0 && !blank(y)) y--;           // the "Courier: …" line
+  while (y > 0 && blank(y)) y--;            // white between the courier text and the barcode
+  // The courier text, however many lines it wraps to ("Delhivery Surface / 0.5Kg").
+  for (;;) {
+    while (y > 0 && !blank(y)) y--;
+    let k = y; while (k > 0 && blank(k) && y - k < lineGap) k--;
+    if (k > 0 && !blank(k) && y - k < lineGap) { y = k; continue; }
+    break;
+  }
   const bottom = y - gap;
   let topY = bottom; while (topY > 0 && blank(topY)) topY--;
   const room = bottom - topY - gap;
   if (room < h * 0.04) return null;
   const height = Math.min(room, Math.round(h * 0.07));
-  // Line the logo up with the barcode's left edge, as the text under it is.
-  let edge = x1;
-  for (let yy = first[0]; yy <= first[1]; yy++) for (let x = x0; x < edge; x++) if (dark(x, yy)) { edge = x; break; }
-  const left = edge < x1 ? edge : x0;
   return { top: bottom - height, room: height, left, width: x1 - left };
 }
 
