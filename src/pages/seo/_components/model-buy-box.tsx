@@ -1,4 +1,5 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useLiveInStock } from "@/lib/live-stock";
 import { Link, useSearchParams } from "react-router-dom";
 import { StarIcon, CheckIcon, ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
 import { QuickBuyBody } from "@/components/home/quick-buy.tsx";
@@ -32,8 +33,23 @@ export default function ModelBuyBox({ data, hasH1 = false, onSeeAll }: {
   const tabs = box.tabs?.length ? box.tabs : [{ key: "best", label: "Best sellers", count: data.total, slugs: box.designs.map((x) => x.slug) }];
   const [tabKey, setTabKey] = useState(tabs[0].key);
   const tab = tabs.find((x) => x.key === tabKey) || tabs[0];
+  /*
+   * Stock as it is now, not as the night's build saw it: a design sold out (or
+   * its roll recounted) today leaves the swatches, so the first screen only
+   * offers what can be bought (owner, 10 Nov 2026). It stays in the grid below,
+   * at the end. Until the read comes back, the build's list is shown.
+   */
+  const live = useLiveInStock(box.designs.map((x) => x._id));
+  const soldOut = (x: { _id: string }) => live?.get(x._id) === false;
   const SHOW = 17;  // three rows of six on desktop, the last tile is "+N more"
-  const swatches = tab.slugs.slice(0, SHOW).map((x) => bySlug.get(x)).filter(Boolean) as typeof box.designs;
+  const swatches = tab.slugs.map((x) => bySlug.get(x)).filter((x) => x && !soldOut(x)).slice(0, SHOW) as typeof box.designs;
+  // Opened without a chosen design: once stock is known, start on one that is in stock.
+  const chosenByLink = bySlug.has(params.get("design") || "");
+  useEffect(() => {
+    if (!live || chosenByLink || !soldOut(d)) return;
+    const first = swatches[0];
+    if (first) setSlug(first.slug);
+  }, [live]); // eslint-disable-line react-hooks/exhaustive-deps
   const more = Math.max(0, tab.count - swatches.length);
   // Every design is on this page, in the grid below (with its "Show more").
   const toGrid = (e: React.MouseEvent) => {
@@ -128,9 +144,15 @@ export default function ModelBuyBox({ data, hasH1 = false, onSeeAll }: {
                   {box.rating.value} · {box.rating.count} review{box.rating.count === 1 ? "" : "s"}
                 </Link>
               )}
-              <span className="inline-flex items-center gap-1 font-semibold text-emerald-700 dark:text-emerald-400">
-                <span className="size-2 rounded-full bg-emerald-600" /> In stock
-              </span>
+              {soldOut(d) ? (
+                <span className="inline-flex items-center gap-1 font-semibold text-red-700 dark:text-red-400">
+                  <span className="size-2 rounded-full bg-red-600" /> This design is out of stock
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 font-semibold text-emerald-700 dark:text-emerald-400">
+                  <span className="size-2 rounded-full bg-emerald-600" /> In stock
+                </span>
+              )}
               <span className="text-muted-foreground">from ₹{minPrice}</span>
             </div>
 

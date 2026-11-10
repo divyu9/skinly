@@ -1,5 +1,6 @@
 import { lazy, Suspense, useState } from "react";
 import { loadCatalogue } from "@/lib/catalogue";
+import { useLiveInStock } from "@/lib/live-stock";
 import { Link } from "react-router-dom";
 import { useDeviceDetection } from "@/hooks/useDeviceDetection";
 import { brandGadgetLabel, oneRowPerDesign } from "@/lib/seo-pages.mjs";
@@ -47,6 +48,8 @@ export function SeoProductsSection({ data, heading, h1, intro }: {
   const [loadingMore, setLoadingMore] = useState(false);
   const [finish, setFinish] = useState<string | null>(null);
   const [limit, setLimit] = useState(48);
+  // Today's stock for the designs the build put on the page (the first 48).
+  const liveStock = useLiveInStock(data?.target?.kind === "model" ? (data.products || []).map((p: any) => p._id) : []);
   const ensureRest = async () => {
     if (rest || !data?.more?.length) return;
     setLoadingMore(true);
@@ -128,7 +131,20 @@ export function SeoProductsSection({ data, heading, h1, intro }: {
    */
   const cards = oneRowPerDesign(data.products as any[], forBrand) as typeof data.products;
   const finishTabs = (data.buyBox?.tabs || []).filter((x) => x.key !== "best");
-  const pool = [...cards, ...(rest || [])] as typeof data.products;
+  /*
+   * Sold-out designs go to the very end of the grid, by today's stock where it
+   * has been read (the first 48) and the build's flags for the rest (owner,
+   * 10 Nov 2026). The order is otherwise the build's: best sellers first.
+   */
+  const inStockNow = (p: any) => {
+    const known = liveStock?.get(p._id);
+    if (known !== undefined) return known;
+    return (p.variants || []).some((v: any) => v.available || Number(v.inventory_quantity ?? v.inventoryQuantity ?? 0) > 0);
+  };
+  const pool = [...cards, ...(rest || [])]
+    .map((p, i) => ({ p, i, ok: inStockNow(p) }))
+    .sort((a, b) => Number(b.ok) - Number(a.ok) || a.i - b.i)
+    .map((x) => x.p) as typeof data.products;
   const matching = finish ? pool.filter((p: any) => p.finishType === finish) : pool;
   const visible = matching.slice(0, limit);
   // How many this view has in all, loaded or not: the tab's count once a finish is chosen.
