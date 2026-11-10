@@ -757,7 +757,7 @@ export const bulkFetchLabels = onCall(async (data: any, context: any) => {
     if (order.shippingProvider === "shipmozo" && order.awbNumber) {
       try {
         const { shipmozoLabelData } = await import("./shipmozo");
-        const dataUrl = await shipmozoLabelData(String(order.awbNumber));
+        const dataUrl = await shipmozoLabelData(String(order.awbNumber), String(order.courierName || ""));
         labels.push({ orderId: snap.id, orderNumber: label, pngBase64: dataUrl.replace(/^data:image\/\w+;base64,/, "") });
       } catch (e: any) {
         errors.push({ orderId: snap.id, orderNumber: label, error: e?.message || "Shipmozo label failed" });
