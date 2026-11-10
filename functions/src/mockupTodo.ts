@@ -88,15 +88,41 @@ export async function computeMockupTodo(db: admin.firestore.Firestore) {
   const coveredAt = Math.max(1, Math.floor(need * 0.9));
 
   const orders365 = new Map<string, number>(), orders90 = new Map<string, number>();
-  (await db.collection("orders").select("createdAt", "items").get()).forEach((d) => {
+  // Orders left unpaid or cancelled in the last 30 days: a sale that slipped away
+  // for this phone (owner, 10 Nov 2026: a Pova 5 order stopped at payment).
+  const lost = new Map<string, number>();
+  const LOST = new Set(["pending_payment", "payment_failed", "cancelled", "abandoned"]);  // not "pending": live COD orders start there
+  (await db.collection("orders").select("createdAt", "items", "status").get()).forEach((d) => {
     const o = d.data() as any;
     const t = o.createdAt && o.createdAt.toMillis ? o.createdAt.toMillis() : Number(o.createdAt || 0);
     if (!t || t < now - 365 * DAY) return;
+    const slipped = t >= now - 30 * DAY && LOST.has(String(o.status || ""));
     for (const it of (o.items || []) as any[]) {
       const id = it.phoneModel ? find(it.phoneBrand, it.phoneModel) : null;
       if (!id) continue;
       orders365.set(id, (orders365.get(id) || 0) + 1);
       if (t >= now - 90 * DAY) orders90.set(id, (orders90.get(id) || 0) + 1);
+      if (slipped) lost.set(id, (lost.get(id) || 0) + 1);
+    }
+  });
+
+  /*
+   * Carts that did not become orders (cartSnapshots, last 90 days): somebody
+   * picked this phone and left. A cart that reached checkout weighs more than
+   * one that only had an item added. Owner, 10 Nov 2026: a Pova 5 checkout was
+   * abandoned and the model had no mockups.
+   */
+  const carts = new Map<string, number>(), cartPoints = new Map<string, number>();
+  (await db.collection("cartSnapshots").where("updatedAt", ">=", now - 90 * DAY).select("items", "stage").get()).forEach((d) => {
+    const stage = String(d.get("stage") || "cart");
+    if (stage === "ordered") return;
+    const seen = new Set<string>();
+    for (const it of (d.get("items") || []) as any[]) {
+      const id = it?.phoneModel ? find(it.phoneBrand, it.phoneModel) : null;
+      if (!id || seen.has(id)) continue;
+      seen.add(id);
+      carts.set(id, (carts.get(id) || 0) + 1);
+      cartPoints.set(id, (cartPoints.get(id) || 0) + (stage === "checkout" ? 3 : 1));
     }
   });
 
@@ -133,8 +159,12 @@ export async function computeMockupTodo(db: admin.firestore.Firestore) {
     const major = MAJOR.has(norm(m.brand));
     const search = gsc.rows.get("/" + modelSlug(m.brand, m.model)) || { impressions: 0, clicks: 0 };
     // Search: a click is worth an order's weight; impressions in hundreds — a page shown 300 times a month is worth 3 points.
-    let score = o365 * 5 + o90 * 5 + req * 4 + search.clicks * 5 + Math.round(search.impressions / 100);
+    const slipped = lost.get(m.id) || 0;
+    let score = o365 * 5 + o90 * 5 + slipped * 10 + req * 4 + (cartPoints.get(m.id) || 0) + search.clicks * 5 + Math.round(search.impressions / 100);
     const reasons: string[] = [];
+    if (slipped) reasons.push(`${slipped} order${slipped > 1 ? "s" : ""} left unpaid or cancelled in 30 days`);
+    const left = carts.get(m.id) || 0;
+    if (left) reasons.push(`${left} abandoned cart${left > 1 ? "s" : ""} in 90 days`);
     if (o365) reasons.push(`${o365} order${o365 > 1 ? "s" : ""} in a year${o90 ? ` (${o90} in 90 days)` : ""}`);
     if (req) reasons.push(`${req} customer request${req > 1 ? "s" : ""}`);
     if (search.impressions || search.clicks) reasons.push(`Google: ${search.impressions} impressions, ${search.clicks} click${search.clicks === 1 ? "" : "s"} in 28 days`);
