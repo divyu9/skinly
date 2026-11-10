@@ -313,7 +313,7 @@ export const placeOrder = functions
     const shipSnap = await db.collection("settings").doc("shipping").get();
     const ship = shipSnap.exists ? (shipSnap.data() as any) : {};
     // Same defaults as src/lib/shipping-config.mjs (SHIPPING_DEFAULTS).
-    const freeShippingThreshold = Number(ship.freeShippingThreshold ?? 500);
+    const freeShippingThreshold = Number(ship.freeShippingThreshold ?? 299);
     const flatShippingFee = Number(ship.flatShippingFee ?? 70);
     const shippingFee = itemsTotal >= freeShippingThreshold ? 0 : Math.max(0, flatShippingFee);
 

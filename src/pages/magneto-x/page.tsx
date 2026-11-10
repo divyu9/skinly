@@ -101,7 +101,7 @@ function Hero({ fromPrice, buyHref }: { fromPrice: number | null; buyHref: strin
                 {fromPrice ? `Buy — ₹${fromPrice.toLocaleString("en-IN")}` : "Buy now"}
                 <ArrowRightIcon className="size-4" />
               </Link>
-              <span className="text-xs text-white/40">Free shipping over ₹499</span>
+              <span className="text-xs text-white/40">Free shipping from ₹299</span>
             </div>
           </div>
 

@@ -66,7 +66,7 @@ export default function AboutPage() {
 
         <h2 className={h2}>Buying from us</h2>
         <ul className="mt-3 list-disc space-y-1.5 pl-5 text-foreground/85">
-          <li>Free shipping above ₹499 within India.</li>
+          <li>Free shipping from ₹299 within India.</li>
           <li>Returns within 48 hours of delivery for a wrong, missing or damaged item.</li>
           <li>Every review on the site comes from a delivered order.</li>
         </ul>

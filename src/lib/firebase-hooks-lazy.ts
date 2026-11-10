@@ -5073,8 +5073,8 @@ export async function runAction(path: string, args?: any) {
         const from = price ? ` from ₹${price}` : '';
         const metaDescription = fit(
           isSkin
-            ? `${title}, printed and cut for your exact ${gadget} model.${finish ? ` ${finish} finish` : ''}${from}. Free shipping above ₹499.`
-            : `${title}${from}. Ships across India; free shipping above ₹499.`,
+            ? `${title}, printed and cut for your exact ${gadget} model.${finish ? ` ${finish} finish` : ''}${from}. Free shipping from ₹299.`
+            : `${title}${from}. Ships across India; free shipping from ₹299.`,
           160,
         );
         return { metaTitle, metaDescription };
@@ -5083,7 +5083,7 @@ export async function runAction(path: string, args?: any) {
         const h2Match = data.contentHTML?.match(/<h2[^>]*>([\s\S]*?)<\/h2>/i);
         const metaTitle = (h2Match?.[1]?.replace(/<[^>]*>/g, '') || `${title} Skin | GoSkinly`).substring(0, 60);
         const pMatch = data.contentHTML?.match(/<p[^>]*>([\s\S]*?)<\/p>/i);
-        const metaDescription = (pMatch?.[1]?.replace(/<[^>]*>/g, '') || `${title} at GoSkinly. Free shipping above ₹499.`).substring(0, 160);
+        const metaDescription = (pMatch?.[1]?.replace(/<[^>]*>/g, '') || `${title} at GoSkinly. Free shipping from ₹299.`).substring(0, 160);
         const tags: string[] = (data.imageAltTexts || [])
           .slice(0, 8)
           .map((t: string) => t.split(' ').filter((w: string) => w.length > 3).slice(0, 3).join(' '))

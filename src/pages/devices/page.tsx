@@ -374,7 +374,7 @@ export default function DevicesPage() {
     <div className="halftone min-h-screen">
       <Helmet>
         <title>Supported Devices & Models | GoSkinly</title>
-        <meta name="description" content="Browse all phone, laptop, tablet, and gadget models supported by GoSkinly. Find your device and shop custom-cut vinyl skins starting ₹149. Free shipping above ₹499." />
+        <meta name="description" content="Browse all phone, laptop, tablet, and gadget models supported by GoSkinly. Find your device and shop custom-cut vinyl skins starting ₹149. Free shipping from ₹299." />
         <link rel="canonical" href="https://goskinly.com/devices" />
         <meta property="og:type" content="website" />
         <meta property="og:title" content="Supported Devices & Models | GoSkinly" />

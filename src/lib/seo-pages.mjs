@@ -428,7 +428,7 @@ export function seoCopy(page, targetIn, stats) {
     description =
       `${plural(n)} skin designs printed and cut for the ${target.brand} ${target.model}` +
       (finishText ? ` in ${finishText} finishes` : "") +
-      `${stats.minPrice ? `, from ₹${stats.minPrice}` : ""}. Exact cutouts for camera and ports. Free shipping above ₹499.`;
+      `${stats.minPrice ? `, from ₹${stats.minPrice}` : ""}. Exact cutouts for camera and ports. Free shipping from ₹299.`;
     params.set("brand", target.brand);
     params.set("model", target.model);
   } else if (target.kind === "brand" && n) {
@@ -437,13 +437,13 @@ export function seoCopy(page, targetIn, stats) {
     description =
       `Skins for ${plural(count)} ${target.brand} ${gadgetWord}s, each printed and cut to fit. ` +
       `${plural(n)} designs` + (finishText ? ` in ${finishText}` : "") +
-      `${stats.minPrice ? ` from ₹${stats.minPrice}` : ""}. Free shipping above ₹499.`;
+      `${stats.minPrice ? ` from ₹${stats.minPrice}` : ""}. Free shipping from ₹299.`;
   } else if (n && target.kind !== "unlisted") {
     title = `${heading || "Skins"} – ${plural(n)} Designs, Custom Cut${from}`;
     description =
       `${plural(n)} ${heading ? heading.toLowerCase() : "skin"} designs, printed and cut for your exact ${gadgetWord}` +
       (finishText ? ` in ${finishText} finishes` : "") +
-      `${stats.minPrice ? `, from ₹${stats.minPrice}` : ""}. Free shipping above ₹499.`;
+      `${stats.minPrice ? `, from ₹${stats.minPrice}` : ""}. Free shipping from ₹299.`;
   }
 
   if (title && title.length + " | GoSkinly".length <= 70) title += " | GoSkinly";

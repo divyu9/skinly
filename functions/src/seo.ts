@@ -100,7 +100,7 @@ BRAND FACTS (always accurate):
 - Products: vinyl skins/wraps for phones, laptops, tablets, cameras, drones, chargers, gaming consoles, Mac Mini
 - Prices: never state one. Prices change (sales, cashback) and the page shows the live price itself.
 - Ordering: every skin is printed and cut to order for the exact model chosen, so orders are paid online (UPI, cards, netbanking) when placed. Never mention cash on delivery.
-- Shipping: delivery across India; free shipping on orders of ₹500 and above
+- Shipping: delivery across India; free shipping on orders of ₹299 and above
 - Models supported: 3,600+ models from 55 brands; 340+ designs
 - Finish types: matte, 3D textured/embossed, transparent
 - Popular design themes: anime, 3D textured, carbon fiber, marble, camouflage, god/religious, gaming, abstract
@@ -210,7 +210,7 @@ CONTENT RULES:
      "vinyl wrap", "matte finish skin", "scratch protection", "no residue removal"
 
 4. INDIA CONTEXT — MANDATORY:
-   - Never state a price; the only ₹ figure allowed is "free shipping on orders of ₹500 and above"
+   - Never state a price; the only ₹ figure allowed is "free shipping on orders of ₹299 and above"
    - Never mention cash on delivery; skins are made to order and paid online
    - Use ₹ symbol (not $ or Rs)
 

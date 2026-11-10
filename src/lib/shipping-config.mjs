@@ -13,7 +13,7 @@
 
 export const SHIPPING_DEFAULTS = {
   flatShippingFee: 70,
-  freeShippingThreshold: 500,
+  freeShippingThreshold: 299,
 };
 
 /** The rule in force: the settings document's numbers, or the defaults. */

@@ -767,7 +767,7 @@ function staticPages(hub, home = null, stats = null) {
       route: "/devices",
       title: "Supported Devices & Models | GoSkinly",
       description:
-        "Browse all phone, laptop, tablet, and gadget models supported by GoSkinly. Find your device and shop custom-cut vinyl skins starting ₹149. Free shipping above ₹499.",
+        "Browse all phone, laptop, tablet, and gadget models supported by GoSkinly. Find your device and shop custom-cut vinyl skins starting ₹149. Free shipping from ₹299.",
       canonical: `${SITE}/devices`,
       priority: "0.9",
       body:
@@ -875,7 +875,7 @@ function staticPages(hub, home = null, stats = null) {
         `<h2>What a skin does — and doesn't</h2>` +
         `<p>A skin changes how your device looks and protects the surface from scratches and scuffs. It is a thin wrap, so it does not protect against drops. It peels off cleanly without residue.</p>` +
         `<h2>Finishes</h2><p>Matte, 3D textured, embossed and transparent (Tranzy) finishes; full body wraps for phones cover the back and sides.</p>` +
-        `<h2>Buying from us</h2><ul><li>Free shipping above ₹499 within India.</li><li>Claims for a wrong, missing or damaged item within 48 hours of delivery, with one uncut unboxing video showing the label — every parcel is packed on camera.</li><li>Every review on the site comes from a delivered order.</li></ul>` +
+        `<h2>Buying from us</h2><ul><li>Free shipping from ₹299 within India.</li><li>Claims for a wrong, missing or damaged item within 48 hours of delivery, with one uncut unboxing video showing the label — every parcel is packed on camera.</li><li>Every review on the site comes from a delivered order.</li></ul>` +
         `<h2>Contact</h2><p>WhatsApp +91 97610 11121 · prgoskinly@gmail.com · Agra, Uttar Pradesh 282003, India.</p>` +
         `<p><a href="${SITE}/how-to-apply">How to apply a skin</a> · <a href="${SITE}/real-photos">Real photos</a> · <a href="${SITE}/reviews">Customer reviews</a> · <a href="${SITE}/products">Shop</a></p>`,
     },
@@ -896,7 +896,7 @@ function staticPages(hub, home = null, stats = null) {
     policy("terms", "Terms of Service | GoSkinly",
       "Read GoSkinly's terms of service. Understand your rights and our policies when shopping for vinyl device skins."),
     policy("shipping", "Shipping Policy | GoSkinly",
-      "GoSkinly shipping policy — delivery across India, free shipping above ₹499. Learn about delivery times and order tracking."),
+      "GoSkinly shipping policy — delivery across India, free shipping from ₹299. Learn about delivery times and order tracking."),
     policy("returns", "Returns & Refund Policy | GoSkinly",
       "GoSkinly returns and refund policy. Easy returns, hassle-free refunds on vinyl device skins."),
   ];
@@ -912,7 +912,7 @@ function magnetoPage(products, variantsByProduct) {
   const description =
     `Magneto X — a Type-C SSD enclosure that takes M.2 NVMe drives up to 4TB.` +
     (from ? ` From ₹${from}.` : "") +
-    " Free shipping above ₹499.";
+    " Free shipping from ₹299.";
   // The page's own facts (src/pages/magneto-x/page.tsx: hero, specs, features, in the box),
   // in the HTML before JavaScript runs — it held one sentence, too thin for search or AI answers.
   const facts = [
@@ -1773,7 +1773,7 @@ async function writeLlmsTxt({ statics, categories, seo, seoDocs, seoInfo, stats 
     "Key facts:",
     "- What a skin is: a thin printed vinyl wrap for the back (and optionally sides) of a device — it changes the look and guards against scratches, not drops.",
     "- Fit: cut for one exact model from its own template, with openings for cameras, ports and buttons.",
-    "- Shipping: India only; free above ₹499, otherwise a flat fee; dispatched in 2–3 business days, 4–6 days in transit.",
+    "- Shipping: India only; free from ₹299, otherwise a flat fee; dispatched in 2–3 business days, 4–6 days in transit.",
     "- Claims: a wrong, missing or damaged item is claimed within 48 hours of delivery, with one complete, uncut unboxing video that shows the sealed parcel and its label (name and AWB). Every parcel is packed on camera; a parcel that looks opened or tampered with should be refused at the door. No claim is accepted without the uncut video.",
     "- Payment: online (UPI, cards) and cash on delivery where available.",
     "- Support: WhatsApp +91 97610 11121, email prgoskinly@gmail.com.",
@@ -1811,7 +1811,7 @@ async function writeLlmsTxt({ statics, categories, seo, seoDocs, seoInfo, stats 
  * schema does (cheapest in-stock variant, else cheapest priced one), because
  * Merchant Center compares the feed with the page and disapproves items that
  * disagree. Listings without a live picture or a price are left out; Google
- * rejects those anyway. Shipping (free above ₹499) is set in the Merchant
+ * rejects those anyway. Shipping (free from ₹299) is set in the Merchant
  * Center account, not here.
  */
 /** "matte", "3D textured"… from the listing's finish or title, for the feed's material line. */

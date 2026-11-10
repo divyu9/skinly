@@ -59,7 +59,7 @@ export function homeMeta(stats) {
   const c = catalogueClaims(stats);
   return {
     title: `Mobile Back Skins & Device Skins for ${claim(c.models)} Models | GoSkinly`,
-    description: `Mobile, laptop, tablet, console & camera skins cut for ${claim(c.models)} models across ${c.brands} brands. ${claim(c.designs)} designs in matte & 3D textured finishes. Free shipping above ₹499.`,
+    description: `Mobile, laptop, tablet, console & camera skins cut for ${claim(c.models)} models across ${c.brands} brands. ${claim(c.designs)} designs in matte & 3D textured finishes. Free shipping from ₹299.`,
     heading: "GoSkinly — mobile skins and device skins cut for your exact model",
   };
 }
@@ -107,7 +107,7 @@ export const ORGANIZATION_LD = {
 
 export const PRODUCTS_META = {
   title: "Shop Mobile Skins, Laptop Skins & Gadget Accessories | GoSkinly",
-  description: `Browse ${claim(C.designs)} skin designs for ${claim(C.models)} phones, laptops, tablets, consoles and cameras, plus cases and accessories. Free shipping above ₹499.`,
+  description: `Browse ${claim(C.designs)} skin designs for ${claim(C.models)} phones, laptops, tablets, consoles and cameras, plus cases and accessories. Free shipping from ₹299.`,
 };
 
 export const CATEGORY_PAGES = {
@@ -115,35 +115,35 @@ export const CATEGORY_PAGES = {
     path: "/skins",
     title: `Device & Mobile Skins – ${claim(CATALOGUE_CLAIMS.designs)} Designs, ${claim(CATALOGUE_CLAIMS.models)} Models | GoSkinly`,
     description:
-      "Vinyl skins for phones, laptops, consoles, cameras and more, each printed and cut for your exact model. Matte, 3D textured and transparent finishes from ₹149. Free shipping above ₹499.",
+      "Vinyl skins for phones, laptops, consoles, cameras and more, each printed and cut for your exact model. Matte, 3D textured and transparent finishes from ₹149. Free shipping from ₹299.",
     heading: "Skins",
   },
   "case-cover": {
     path: "/cases-covers",
     title: "Phone Cases & Covers – MagSafe & Clear Cases | GoSkinly",
     description:
-      "MagSafe, transparent and titanium-finish cases for iPhone and Samsung models. Pick your phone for an exact fit. Free shipping above ₹499.",
+      "MagSafe, transparent and titanium-finish cases for iPhone and Samsung models. Pick your phone for an exact fit. Free shipping from ₹299.",
     heading: "Cases & Covers",
   },
   "camera-ring": {
     path: "/camera-rings",
     title: "Camera Lens Rings for iPhone & Samsung | GoSkinly",
     description:
-      "Camera lens protector rings for iPhone and Samsung models, in multiple colours. Pick your phone for an exact fit. Free shipping above ₹499.",
+      "Camera lens protector rings for iPhone and Samsung models, in multiple colours. Pick your phone for an exact fit. Free shipping from ₹299.",
     heading: "Camera Rings",
   },
   glass: {
     path: "/screen-protectors",
     title: "Screen Protectors – AutoApply Tempered Glass | GoSkinly",
     description:
-      "AutoApply tempered glass screen guards with a bubble-free applicator, cut for your exact phone model. Free shipping above ₹499.",
+      "AutoApply tempered glass screen guards with a bubble-free applicator, cut for your exact phone model. Free shipping from ₹299.",
     heading: "Screen Protectors",
   },
   accessory: {
     path: "/accessories",
     title: "Gadget Accessories | GoSkinly",
     description:
-      "Membranes, open-box review gadgets and accessories for your devices, shipped across India. Free shipping above ₹499.",
+      "Membranes, open-box review gadgets and accessories for your devices, shipped across India. Free shipping from ₹299.",
     heading: "Accessories",
   },
 };
@@ -206,7 +206,7 @@ export const HOME_FAQS = [
   },
   {
     question: "How long does delivery take?",
-    answer: "Orders are dispatched in 2–3 business days and take about 4–6 days in transit across India. Shipping is free above ₹499; below that a flat fee applies.",
+    answer: "Orders are dispatched in 2–3 business days and take about 4–6 days in transit across India. Shipping is free from ₹299; below that a flat fee applies.",
   },
   {
     question: "Is cash on delivery available?",
