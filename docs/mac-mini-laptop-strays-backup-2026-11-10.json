@@ -1,0 +1,26 @@
+{
+ "d451c08IgR9wAU1gQf4p": {
+  "brandName": "Apple",
+  "category": "laptop",
+  "isActive": true,
+  "source": "plotter",
+  "createdAt": 1790342704314,
+  "_creationTime": 1790342704314,
+  "gadgetTypeId": "r57b2v1tm7882tq292yrw03cy17xkewm",
+  "modelName": "Mac mini M1 2021",
+  "renamedFrom": "MAC MINI M1 2021",
+  "updatedAt": 1794222311343
+ },
+ "uRHi5Y2G7syBhdPccW36": {
+  "brandName": "Apple",
+  "category": "laptop",
+  "isActive": true,
+  "source": "plotter",
+  "createdAt": 1790342701087,
+  "_creationTime": 1790342701087,
+  "gadgetTypeId": "r57b2v1tm7882tq292yrw03cy17xkewm",
+  "modelName": "Mac mini M4 2024",
+  "renamedFrom": "MAC MINI M4 2024",
+  "updatedAt": 1794222311344
+ }
+}
