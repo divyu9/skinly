@@ -53,7 +53,7 @@ function walk(v) {
   if (!changes.length) { console.log("nothing to change: the copy already says ₹299"); return; }
   if (!WRITE) { console.log(`dry run: ${changes.length} documents would change. Add --write to apply.`); return; }
   // Old text first, so nothing is written without a way back.
-  fs.writeFileSync(path.join(__dirname, "../../docs/free-shipping-299-copy-backup-${Date.now()}.json"), JSON.stringify(backup));
+  fs.writeFileSync(path.join(__dirname, `../../docs/free-shipping-299-copy-backup-${Date.now()}.json`), JSON.stringify(backup));
   for (let i = 0; i < changes.length; i += 400) {
     const b = db.batch();
     changes.slice(i, i + 400).forEach(([ref, upd]) => b.update(ref, upd));
