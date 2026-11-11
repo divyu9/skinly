@@ -263,6 +263,8 @@ service cloud.firestore {
     match /backups/{id}                 { allow read: if isAdmin(); allow write: if false; }
     match /emailUsecaseTemplates/{id}   { allow read, write: if isAdmin(); }
     match /mediaLibrary/{id}            { allow read, write: if isAdmin(); }
+    // Admin › Resources: printable guides uploaded for packing.
+    match /adminResources/{id}          { allow read, write: if isAdmin(); }
     match /uploadJobs/{id}              { allow read, write: if isAdmin(); }
     match /googleDriveImportJobs/{id}   { allow read, write: if isAdmin(); }
     match /rollInventory/{id}           { allow read, write: if isAdmin(); }

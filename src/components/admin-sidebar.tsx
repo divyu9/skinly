@@ -33,7 +33,7 @@ import {
   FileText,
   Layout,
   Sparkles,
-  Tags, Tag, WandSparkles, LayoutDashboard,
+  Tags, Tag, WandSparkles, LayoutDashboard, FolderDown,
 } from "lucide-react";
 import { useSidebar } from "./admin-sidebar-context.tsx";
 import { useState, useEffect } from "react";
@@ -120,6 +120,7 @@ export function AdminSidebar() {
       icon: ShoppingCart,
       items: [
         { path: "/backend-skinly/orders", label: "Orders", icon: ShoppingCart },
+        { path: "/backend-skinly/resources", label: "Resources", icon: FolderDown },
         { path: "/backend-skinly/customers", label: "Customers", icon: Users },
         { path: "/backend-skinly/abandoned-carts", label: "Abandoned Carts", icon: ShoppingBag },
         { path: "/backend-skinly/stock-notifications", label: "Stock Alerts", icon: Bell },

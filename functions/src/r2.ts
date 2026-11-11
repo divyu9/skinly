@@ -146,7 +146,9 @@ export const generateUploadUrl = onCall(async (data: any, context: any) => {
   if (!fileName || !contentType) {
     throw new HttpsError("invalid-argument", "Missing file details");
   }
-  if (typeof contentType !== "string" || !/^(image|video)\//.test(contentType)) {
+  // PDFs only into resources/ (Admin › Resources: printable packing guides).
+  const pdf = contentType === "application/pdf" && typeof fileName === "string" && fileName.startsWith("resources/");
+  if (typeof contentType !== "string" || (!pdf && !/^(image|video)\//.test(contentType))) {
     throw new HttpsError("invalid-argument", `Unsupported content type: ${contentType}`);
   }
   validateKey(fileName);

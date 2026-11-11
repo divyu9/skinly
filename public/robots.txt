@@ -16,5 +16,6 @@ Disallow: /pay/
 Disallow: /review/
 Disallow: /c/
 Disallow: /mock-payment
+Disallow: /resources/
 
 Sitemap: https://goskinly.com/sitemap.xml
