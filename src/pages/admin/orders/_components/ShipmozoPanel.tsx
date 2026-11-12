@@ -27,10 +27,15 @@ export function ShipmozoPanel({ order }: { order: any }) {
       const r = await call<{ label: string; awb: string }>("shipmozoLabel", { orderId });
       if (w) {
         w.document.title = `Label ${r.awb}`;
-        w.document.body.style.margin = "0";
+        // One 4×6 page: no browser margins (they print the date and "about:blank"),
+        // and the picture is fitted to the page height so its bottom line
+        // (www.goskinly.com) doesn't spill onto a second page.
+        const style = w.document.createElement("style");
+        style.textContent = "@page{size:4in 6in;margin:0}html,body{margin:0;padding:0;height:100%}"
+          + "img{display:block;width:100%;height:100vh;object-fit:contain;page-break-inside:avoid;break-inside:avoid}";
+        w.document.head.appendChild(style);
         const img = w.document.createElement("img");
         img.src = r.label;
-        img.style.width = "100%";
         img.onload = () => setTimeout(() => w.print(), 200);
         w.document.body.appendChild(img);
       }
