@@ -44,6 +44,7 @@ const REDIRECTED_SLUGS = new Set([
   "samsung-galaxy-s23-skins-1",
   "samsung-galaxy-s24-skins-1",
   "mac-mini-skins-1",
+  "one-plus-nord-ce-5-skins",
   "master-skins",
   // Slugs that stuttered; .htaccess sends each to the page it duplicated.
   "lens-skins-skins",

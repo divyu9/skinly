@@ -176,6 +176,8 @@ RewriteRule ^(samsung-azx1-skins|samsung-skins-skins)$ https://goskinly.com/sams
 RewriteRule ^samsung-galaxy-s23-skins-1$ https://goskinly.com/samsung-galaxy-s23-skins [R=301,L]
 RewriteRule ^samsung-galaxy-s24-skins-1$ https://goskinly.com/samsung-galaxy-s24-skins [R=301,L]
 RewriteRule ^mac-mini-skins-1$ https://goskinly.com/mac-mini-skins [R=301,L]
+# "Nord CE 5" was a second entry for the Nord CE5 5G (merged 12 Nov 2026).
+RewriteRule ^one-plus-nord-ce-5-skins$ https://goskinly.com/one-plus-nord-ce5-5g-skins [R=301,L]
 RewriteRule ^master-skins$ https://goskinly.com/products [R=301,L]
 
 # Slugs that stuttered: the generator appended "-skins" and the gadget word to
