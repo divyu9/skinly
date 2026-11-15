@@ -59,6 +59,10 @@ service cloud.firestore {
     match /ugcVideos/{id}                { allow read: if true; allow write: if isAdmin(); }
     match /seoPages/{id}                 { allow read: if true; allow write: if isAdmin(); }
     match /seoPageTemplates/{id}         { allow read: if true; allow write: if isAdmin(); }
+    // Articles at /guides (functions/src/guidesAuto.ts): the build reads the
+    // published ones; drafts and the writer's notes stay with the admin.
+    match /guides/{id}                   { allow read: if resource.data.status == "published" || isAdmin(); allow write: if isAdmin(); }
+    match /guidesAutoStatus/{id}         { allow read, write: if isAdmin(); }
     // Photos of real skins taken while packing (src/lib/real-photos.ts): design and phone only, no customer.
     match /realPhotos/{id}               { allow read: if true; allow write: if isAdmin(); }
     // Read is public because the storefront needs the shipping fee, the Meta

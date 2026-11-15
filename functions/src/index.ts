@@ -18,6 +18,7 @@ export * from "./orderSweeps";
 export * from "./reviewRequests";
 export * from "./dailyDigest";
 export * from "./seoAuto";
+export * from "./guidesAuto";
 export * from "./trackOrder";
 export * from "./orderNotifications";
 export * from "./loginOtp";

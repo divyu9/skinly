@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { CheckIcon } from "lucide-react";
 
 interface CoverageSelectorProps {
@@ -18,7 +19,12 @@ const OPTIONS = [
 export function CoverageSelector({ selectedCoverage, onCoverageChange }: CoverageSelectorProps) {
   return (
     <div className="space-y-2">
-      <label className="text-sm font-bold">Select Coverage</label>
+      <div className="flex items-baseline justify-between gap-2">
+        <label className="text-sm font-bold">Select Coverage</label>
+        <Link to="/guides/full-body-wrap-vs-only-back" className="text-xs font-semibold text-muted-foreground underline underline-offset-2 hover:text-ink">
+          Which one should I pick?
+        </Link>
+      </div>
       <div className="grid grid-cols-2 gap-3" role="radiogroup" aria-label="Coverage">
         {OPTIONS.map((o) => {
           const on = selectedCoverage === o.key;

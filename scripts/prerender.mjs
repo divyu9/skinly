@@ -30,6 +30,8 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { offerShippingAndReturns, productMaterial } from "../src/lib/merchant-schema.mjs";
 import { resolveSeoTarget, selectSeoProducts, seoCopy, brandGadgetLabel, gadgetLabel, oneRowPerDesign, slugify, productSeoTitle } from "../src/lib/seo-pages.mjs";
+import { GUIDES } from "../src/content/guides.mjs";
+import { GUIDES_META, GUIDE_CLUSTERS, guideBodyHtml, guideJsonLd, guideLinks, guideIssues, imageOf } from "../src/lib/guides.mjs";
 import { CATEGORY_PAGES, GADGET_PAGES, homeMeta, PRODUCTS_META, CATALOGUE_CLAIMS, ORGANIZATION_LD, HOME_FAQS, HOME_FAQ_LD } from "../src/lib/category-paths.mjs";
 
 const SITE = "https://goskinly.com";
@@ -63,7 +65,7 @@ const RESERVED = new Set([
   "", "account", "auth", "backend-skinly", "admin", "cart", "checkout", "orders",
   "payment", "mock-payment", "products", "devices", "policies", "magneto-x",
   "assets", "magneto", "app", "404", "index", "sitemap", "robots", "seo-data",
-  "skins", "cases-covers", "camera-rings", "screen-protectors", "accessories",
+  "skins", "cases-covers", "camera-rings", "screen-protectors", "accessories", "guides",
 ]);
 
 const CATEGORY_FALLBACK = {
@@ -284,6 +286,35 @@ async function readApprovedReviews(project) {
   });
   return (Array.isArray(rows) ? rows : []).filter((r) => r.document)
     .map((r) => ({ _id: r.document.name.split("/").pop(), ...unwrap({ mapValue: { fields: r.document.fields || {} } }) }));
+}
+
+/**
+ * The guides the writer published (functions/src/guidesAuto.ts). Each is
+ * stored whole as JSON in `guide` (tables are arrays of arrays, which
+ * Firestore can't hold as fields). Only published ones are readable
+ * (firestore.rules), so the query asks for exactly those.
+ */
+async function readPublishedGuides(project) {
+  const url = `https://firestore.googleapis.com/v1/projects/${project}/databases/(default)/documents:runQuery`;
+  const rows = await getJson(url, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ structuredQuery: {
+      from: [{ collectionId: "guides" }],
+      where: { fieldFilter: { field: { fieldPath: "status" }, op: "EQUAL", value: { stringValue: "published" } } },
+      limit: 1000,
+    } }),
+  });
+  const out = [];
+  for (const r of Array.isArray(rows) ? rows : []) {
+    if (!r.document) continue;
+    const d = unwrap({ mapValue: { fields: r.document.fields || {} } });
+    try {
+      const g = JSON.parse(String(d.guide || ""));
+      if (g?.slug && Array.isArray(g.sections)) out.push({ ...g, auto: true });
+    } catch { /* a row that doesn't parse is skipped, not shipped */ }
+  }
+  return out;
 }
 
 /** Every mockup row for one device (the storefront asks the same question). */
@@ -688,7 +719,61 @@ function siteHub(active, models, seoSlugs) {
 
 const hubList = (items) => items.length ? `<ul>${items.join("")}</ul>` : "";
 
-function staticPages(hub, home = null, stats = null) {
+/*
+ * /guides and every article on it: the hand-written ones (src/content/guides.mjs)
+ * and the published ones the writer made (functions/src/guidesAuto.ts). The
+ * whole article goes into the HTML, with Article, FAQPage and BreadcrumbList,
+ * so a crawler or an AI reader gets everything a person sees.
+ */
+function guidePages(guides) {
+  const bySlug = new Map(guides.map((g) => [g.slug, g]));
+  const hub = {
+    route: "/guides",
+    title: GUIDES_META.title,
+    description: GUIDES_META.description,
+    canonical: `${SITE}/guides`,
+    priority: "0.7",
+    jsonLd: [{
+      "@context": "https://schema.org",
+      "@type": "CollectionPage",
+      name: "GoSkinly skin guides",
+      url: `${SITE}/guides`,
+      hasPart: guides.map((g) => ({ "@type": "Article", headline: g.title, url: `${SITE}/guides/${g.slug}` })),
+    }],
+    body:
+      `<h1>Everything about device skins</h1><p>${esc(GUIDES_META.description)}</p>` +
+      GUIDE_CLUSTERS.map((c) => {
+        const items = guides.filter((g) => g.cluster === c.id);
+        return items.length
+          ? `<h2>${esc(c.name)}</h2><p>${esc(c.blurb)}</p><ul>${items.map((g) => `<li><a href="${SITE}/guides/${esc(g.slug)}">${esc(g.title)}</a> — ${esc(g.description)}</li>`).join("")}</ul>`
+          : "";
+      }).join(""),
+  };
+  const articles = guides.map((g) => {
+    const cover = g.cover ? imageOf(g, g.cover) : null;
+    return {
+      route: `/guides/${g.slug}`,
+      title: g.metaTitle || `${g.title} | GoSkinly`,
+      description: g.description,
+      canonical: `${SITE}/guides/${g.slug}`,
+      priority: "0.6",
+      ogType: "article",
+      ...(cover ? { image: `${SITE}${cover.src}` } : {}),
+      extraMeta: [["article:modified_time", g.updated]],
+      jsonLd: guideJsonLd(g),
+      body: guideBodyHtml(g, bySlug),
+    };
+  });
+  return [hub, ...articles];
+}
+
+/** Hand-written guides first; a generated one never replaces one of them. */
+function allGuides(auto = []) {
+  const own = new Set(GUIDES.map((g) => g.slug));
+  return [...GUIDES, ...auto.filter((g) => g?.slug && !own.has(g.slug))];
+}
+
+function staticPages(hub, home = null, stats = null, guides = GUIDES) {
   // The live counts (catalogueStats), the same ones the homepage seed carries.
   const HOME_META = homeMeta(stats);
   const homeDescription = HOME_META.description;
@@ -742,7 +827,7 @@ function staticPages(hub, home = null, stats = null) {
                 ? `<li><a href="${SITE}${esc(b.href)}">${esc(b.brand)} skins</a> <span>(${b.models} models)</span></li>`
                 : `<li>${esc(b.brand)} <span>(${b.models} models)</span></li>`))
           : "") +
-        `<p><a href="${SITE}/products">Shop all skins</a> · <a href="${SITE}/devices">Supported devices</a></p>` +
+        `<p><a href="${SITE}/products">Shop all skins</a> · <a href="${SITE}/devices">Supported devices</a> · <a href="${SITE}/guides">Skin guides</a></p>` +
         `<h2>Questions people ask</h2>` +
         HOME_FAQS.map((f) => `<h3>${esc(f.question)}</h3><p>${esc(f.answer)}</p>`).join(""),
     },
@@ -843,7 +928,7 @@ function staticPages(hub, home = null, stats = null) {
         `<h1>How to apply your Skinly skin</h1>` +
         `<p>A few minutes, no bubbles, with the install kit in your box: wet and dry wipes, a dust absorber, a squeegee and a microfiber cloth.</p>` +
         `<ol><li>Clean with the wet and dry wipes.</li><li>Lift the dust with the dust absorber.</li><li>Start at the bottom: line up the ports and speakers.</li><li>Press it flat with the squeegee.</li><li>Fine-tune around the camera.</li><li>Fold and press the sides.</li><li>Full body wrap: set the corners with a little heat.</li><li>Final wipe with the microfiber cloth.</li></ol>` +
-        `<p><a href="https://www.youtube.com/watch?v=kP2ywckzWXA">Watch the video guide</a> · <a href="${SITE}/products">Shop skins</a></p>`,
+        `<p><a href="https://www.youtube.com/watch?v=kP2ywckzWXA">Watch the video guide</a> · <a href="${SITE}/guides/skin-care-cleaning-and-removal">Care and removal</a> · <a href="${SITE}/guides">All skin guides</a> · <a href="${SITE}/products">Shop skins</a></p>`,
     },
     {
       // Who is behind the shop (src/pages/about/page.tsx): what AI answers and
@@ -878,7 +963,7 @@ function staticPages(hub, home = null, stats = null) {
         `<h2>Finishes</h2><p>Matte, 3D textured, embossed and transparent (Tranzy) finishes; full body wraps for phones cover the back and sides.</p>` +
         `<h2>Buying from us</h2><ul><li>Free shipping from ₹299 within India.</li><li>Claims for a wrong, missing or damaged item within 48 hours of delivery, with one uncut unboxing video showing the label — every parcel is packed on camera.</li><li>Every review on the site comes from a delivered order.</li></ul>` +
         `<h2>Contact</h2><p>WhatsApp +91 97610 11121 · prgoskinly@gmail.com · Agra, Uttar Pradesh 282003, India.</p>` +
-        `<p><a href="${SITE}/how-to-apply">How to apply a skin</a> · <a href="${SITE}/real-photos">Real photos</a> · <a href="${SITE}/reviews">Customer reviews</a> · <a href="${SITE}/products">Shop</a></p>`,
+        `<p><a href="${SITE}/how-to-apply">How to apply a skin</a> · <a href="${SITE}/guides">Skin guides</a> · <a href="${SITE}/real-photos">Real photos</a> · <a href="${SITE}/reviews">Customer reviews</a> · <a href="${SITE}/products">Shop</a></p>`,
     },
     {
       // Every approved review (src/pages/reviews/page.tsx).
@@ -892,6 +977,7 @@ function staticPages(hub, home = null, stats = null) {
         `<p>Every review here comes from a delivered GoSkinly order.</p>` +
         `<p><a href="${SITE}/products">Shop all skins</a> · <a href="${SITE}/real-photos">Real photos</a></p>`,
     },
+    ...guidePages(guides),
     policy("privacy", "Privacy Policy | GoSkinly",
       "Read GoSkinly's privacy policy. We are committed to protecting your personal information and data privacy."),
     policy("terms", "Terms of Service | GoSkinly",
@@ -2529,11 +2615,12 @@ async function main() {
     // Ratings for the Product markup. A separate read because a site with no
     // reviews yet must still build.
     const reviews = await readApprovedReviews(project).catch((e) => { log(`warning: reviews not read (${e?.message || e})`); return []; });
+    const autoGuides = await readPublishedGuides(project).catch((e) => { log(`warning: generated guides not read (${e?.message || e})`); return []; });
     // `shipping` above is every settings document; the pages want the shipping one,
     // and the homepage rows want the bestseller ranking (settings/homeRankings).
     const settingsRows = Array.isArray(shipping) ? shipping : [];
     data = {
-      products, variants, seoPages, categories, models, collections, memberships, sections, sectionCards, reviews, heroSlides,
+      products, variants, seoPages, categories, models, collections, memberships, sections, sectionCards, reviews, heroSlides, autoGuides,
       homepageSettings: Array.isArray(homepageSettings) ? homepageSettings.find((r) => r._id === "default") || null : undefined,
       shipping: settingsRows.find((r) => r._id === "shipping") || null,
       homeRankings: settingsRows.find((r) => r._id === "homeRankings") || null,
@@ -2661,7 +2748,12 @@ async function main() {
     tag(CATALOGUE_CLAIMS.models, modelsNow, "models");
     tag(CATALOGUE_CLAIMS.designs, designsNow, "designs");
   }
-  const statics = staticPages(siteHub(active, data.models, new Set(seoDocs.map((d) => d.slug))), home, catalogueStats);
+  const guides = allGuides(data.autoGuides);
+  const statics = staticPages(siteHub(active, data.models, new Set(seoDocs.map((d) => d.slug))), home, catalogueStats, guides);
+  // The generated guides for the app (src/lib/guides-feed.ts); the hand-written ones ship in its bundle.
+  await fs.mkdir(path.join(DIST, "data"), { recursive: true });
+  await fs.writeFile(path.join(DIST, "data", "guides-auto.json"), JSON.stringify({ guides: guides.filter((g) => g.auto) }));
+  log(`guides: ${guides.length} (${guides.filter((g) => g.auto).length} generated)`);
   /*
    * /reviews in the plain HTML: the reviews themselves, not one line about
    * them — what a reader without JavaScript (an AI crawler) can quote. No
@@ -2693,6 +2785,14 @@ async function main() {
     ...seoDocs.map((d) => `/${d.slug}`),
     ...active.map((p) => `/products/${p.slug}`),
   ]);
+  // A guide that links to a page this build doesn't write is a broken promise; say which.
+  const categoryPaths = new Set(Object.values(CATEGORY_PAGES).map((c) => c.path));
+  for (const g of guides) {
+    const dead = guideLinks(g).filter((l) => { const p = l.replace(/[?#].*$/, ""); return !knownPaths.has(p) && !categoryPaths.has(p); });
+    if (dead.length) log(`warning: guide ${g.slug} links to pages this build doesn't write: ${dead.join(", ")}`);
+    const issues = g.auto ? [] : guideIssues(g, { minWords: 500 });
+    if (issues.length) log(`warning: guide ${g.slug}: ${issues.join("; ")}`);
+  }
   /*
    * One landing page per phone. Some phones have two (samsung-galaxy-s24-ultra-skins
    * and …-5g-skins, one-plus-13-skins and oneplus-13-skins): the same products,

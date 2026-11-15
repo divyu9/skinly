@@ -152,6 +152,9 @@ export function SiteFooter() {
                     </Link>
                   </li>
                   <li>
+                    <Link to="/guides" className="text-muted-foreground hover:text-primary transition-colors">Skin Guides</Link>
+                  </li>
+                  <li>
                     <Link to="/about" className="text-muted-foreground hover:text-primary transition-colors">About us</Link>
                   </li>
                   <li>
