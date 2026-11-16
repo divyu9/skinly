@@ -18,7 +18,41 @@ type Event = {
   link: string;
   status?: string;
   reviewId?: string;
+  phone?: string;
+  name?: string;
+  items?: { title: string; image?: string; device?: string; coverage?: string; variant?: string; price: number; qty: number }[];
 };
+
+const firstName = (n?: string) => {
+  const f = String(n || "").trim().split(/\s+/)[0] || "";
+  return /^\d+$/.test(f) ? "" : f.charAt(0).toUpperCase() + f.slice(1).toLowerCase();
+};
+
+/** The ready-to-send WhatsApp message for this row (opens wa.me with it typed in). */
+function waMessage(e: Event): string {
+  const hi = `Hi${firstName(e.name) ? ` ${firstName(e.name)}` : ""}, Skinly se baat kar rahe hain 🙂`;
+  const what = (e.items || []).map((i) => `• ${i.title}${i.device ? ` — ${i.device}` : ""}${i.coverage ? ` (${i.coverage})` : ""}`).join("\n");
+  switch (e.kind) {
+    case "cart":
+      return `${hi}\n\nAapne ye checkout mein add kiya tha:\n${what}\n\nOrder complete karne mein koi dikkat aayi? Model, payment ya delivery ke baare mein kuch bhi poochna ho to yahin reply kariye — hum turant help kar denge.`;
+    case "order":
+      return `${hi}\n\nAapka order mil gaya hai, thank you!\n${what}\n\nKoi bhi sawaal ho to yahin message kariye.`;
+    case "model":
+      return `${hi}\n\nAapne ${e.title.replace(/^.*requested /, "")} ke skin ki request ki thi. Hum aapko update dete hain jaise hi ye ready hota hai.`;
+    case "stock":
+      return `${hi}\n\nAapne ${e.title.replace(/^.*wants /, "").replace(/ back in stock$/, "")} ke liye stock alert lagaya tha.`;
+    default:
+      return hi;
+  }
+}
+
+function WhatsAppIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden="true">
+      <path d="M17.47 14.38c-.3-.15-1.75-.86-2.02-.96-.27-.1-.47-.15-.67.15-.2.3-.77.96-.94 1.16-.17.2-.35.22-.64.07-.3-.15-1.25-.46-2.38-1.47-.88-.79-1.47-1.76-1.65-2.06-.17-.3-.02-.46.13-.6.13-.13.3-.35.45-.52.15-.17.2-.3.3-.5.1-.2.05-.37-.03-.52-.07-.15-.67-1.6-.92-2.2-.24-.58-.49-.5-.67-.5h-.57c-.2 0-.52.07-.79.37-.27.3-1.04 1.02-1.04 2.48s1.07 2.88 1.21 3.08c.15.2 2.1 3.2 5.08 4.49.71.31 1.26.49 1.69.62.71.23 1.36.2 1.87.12.57-.08 1.75-.72 2-1.41.25-.69.25-1.29.17-1.41-.07-.12-.27-.2-.57-.35M12.05 21.5h-.01a9.4 9.4 0 0 1-4.8-1.31l-.34-.2-3.57.93.95-3.48-.22-.36a9.4 9.4 0 0 1-1.44-5.02c0-5.2 4.24-9.44 9.45-9.44a9.4 9.4 0 0 1 6.68 2.77 9.38 9.38 0 0 1 2.76 6.68c0 5.21-4.24 9.44-9.45 9.44m8.04-17.48A11.3 11.3 0 0 0 12.05.7C5.78.7.68 5.8.68 12.06c0 2 .52 3.96 1.52 5.68L.6 23.3l5.7-1.5a11.33 11.33 0 0 0 5.74 1.47h.01c6.27 0 11.37-5.1 11.37-11.37 0-3.04-1.18-5.9-3.33-8.04" />
+    </svg>
+  );
+}
 
 const KIND: Record<Event["kind"], { icon: ReactNode; tone: string }> = {
   order: { icon: <ShoppingBagIcon className="size-4" />, tone: "bg-brand text-brand-foreground" },
@@ -142,6 +176,24 @@ export function ActivityLog() {
                   <Link to={e.link} className="min-w-0 flex-1 after:absolute after:inset-0">
                     <p className="text-sm font-semibold leading-snug">{e.title}</p>
                     {e.sub && <p className="mt-0.5 truncate text-xs text-muted-foreground">{e.sub}</p>}
+                    {!!e.items?.length && (
+                      <div className="mt-1.5 flex flex-col gap-1.5">
+                        {e.items.slice(0, 3).map((i, n) => (
+                          <div key={n} className="flex items-center gap-2">
+                            {i.image
+                              ? <img src={i.image} alt="" loading="lazy" className="size-10 shrink-0 rounded-md border border-ink/10 bg-muted object-cover" />
+                              : <span className="size-10 shrink-0 rounded-md border border-ink/10 bg-muted" />}
+                            <div className="min-w-0 text-xs leading-tight">
+                              <p className="truncate font-medium">{i.title}</p>
+                              <p className="truncate text-muted-foreground">
+                                {[i.device, i.coverage || (i.variant && i.variant !== i.device ? i.variant : ""), `₹${i.price}${i.qty > 1 ? ` × ${i.qty}` : ""}`].filter(Boolean).join(" · ")}
+                              </p>
+                            </div>
+                          </div>
+                        ))}
+                        {e.items.length > 3 && <p className="text-[11px] text-muted-foreground">+{e.items.length - 3} more</p>}
+                      </div>
+                    )}
                     <p className="mt-0.5 text-[11px] text-muted-foreground">{ago(e.at)}</p>
                   </Link>
                   <div className="relative z-10 flex shrink-0 flex-col items-end gap-1.5">
@@ -169,6 +221,13 @@ export function ActivityLog() {
                     ) : e.kind === "review" ? (
                       <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-semibold text-muted-foreground">{e.status}</span>
                     ) : null}
+                    {e.phone && e.kind !== "review" && (
+                      <a href={`https://wa.me/91${e.phone}?text=${encodeURIComponent(waMessage(e))}`} target="_blank" rel="noopener noreferrer"
+                        onClick={(ev) => ev.stopPropagation()} title={`WhatsApp ${e.phone}`}
+                        className="flex items-center gap-1 rounded-md border-2 border-ink bg-[#25D366] px-2 py-1 text-[11px] font-bold text-ink hover:brightness-95">
+                        <WhatsAppIcon className="size-3.5" /> WhatsApp
+                      </a>
+                    )}
                     {e.kind !== "review" && <ChevronRightIcon className="size-4 text-muted-foreground group-hover:text-ink" />}
                   </div>
                 </li>

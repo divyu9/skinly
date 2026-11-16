@@ -26,7 +26,28 @@ type Event = {
   status?: string;
   /** Present when the event can be settled from the log itself. */
   reviewId?: string;
+  /** The customer's 10-digit number, for the WhatsApp button on the row. */
+  phone?: string;
+  name?: string;
+  /** What was in the order or the cart left, so the row shows it without opening. */
+  items?: EventItem[];
 };
+
+type EventItem = { title: string; image?: string; device?: string; coverage?: string; variant?: string; price: number; qty: number };
+
+/** The few fields a row needs from an order or cart line (cart lines and order items share these names). */
+function rowItems(raw: unknown): EventItem[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.slice(0, 6).map((i: any) => ({
+    title: String(i?.productTitle || i?.title || "").slice(0, 120),
+    image: String(i?.productImage || i?.image || "").slice(0, 500) || undefined,
+    device: deviceName(i?.phoneBrand, i?.phoneModel) || undefined,
+    coverage: i?.coverage === "full_body_wrap" ? "Full body wrap" : i?.coverage === "only_back" ? "Only back" : undefined,
+    variant: String(i?.variant || "").slice(0, 80) || undefined,
+    price: Math.round(Number(i?.price) || 0),
+    qty: Math.max(1, Number(i?.quantity) || 1),
+  })).filter((i) => i.title);
+}
 
 const inr = (n: unknown) => `₹${Math.round(Number(n) || 0).toLocaleString("en-IN")}`;
 const num = (...v: unknown[]) => v.map(Number).find((x) => Number.isFinite(x) && x > 0) || 0;
@@ -81,6 +102,9 @@ export async function adminActivityEvents(db: admin.firestore.Firestore, limit =
       sub: [o.shippingAddress?.fullName || o.customerName, `${n} item${n === 1 ? "" : "s"}`,
         String(o.paymentMethod || "").toLowerCase() === "cod" ? "COD" : "Prepaid", o.source === "manual" ? "manual" : ""].filter(Boolean).join(" · "),
       link: `/backend-skinly/orders/${d.id}`, status: String(o.status || ""),
+      phone: phone10(o.shippingAddress?.phone || o.phone) || undefined,
+      name: o.shippingAddress?.fullName || o.customerName || undefined,
+      items: rowItems(items),
     });
   }
 
@@ -114,6 +138,7 @@ export async function adminActivityEvents(db: admin.firestore.Firestore, limit =
       title: `${phone10(r.whatsappPhone) || "Someone"} requested ${deviceName(r.brandName, r.modelName)}`,
       sub: [r.category, r.requestNumber ? `#${r.requestNumber}` : ""].filter(Boolean).join(" · "),
       link: "/backend-skinly/models?tab=requests", status: String(r.status || "pending"),
+      phone: phone10(r.whatsappPhone) || undefined,
     });
   }
 
@@ -136,12 +161,14 @@ export async function adminActivityEvents(db: admin.firestore.Firestore, limit =
       title: `${phone10(s.phoneNumber) || "Someone"} wants ${s.productTitle || "a product"} back in stock`,
       sub: [s.variantTitle, s.sku].filter(Boolean).join(" · "),
       link: "/backend-skinly/stock-notifications", status: String(s.status || "waiting"),
+      phone: phone10(s.phoneNumber) || undefined,
     });
   }
 
   for (const d of carts) {
     const c = d.data() as any;
-    if (c.stage !== "checkout" || !c.phone) continue;
+    // A checkout whose cart was emptied (it ended in an order, or was cleared) has nothing to chase.
+    if (c.stage !== "checkout" || !c.phone || !(c.items || []).length) continue;
     const left = num(c.checkoutAt, c.updatedAt);
     if ((orderedAt.get(phone10(c.phone)) || 0) > left - 3600_000) continue;
     out.push({
@@ -149,6 +176,7 @@ export async function adminActivityEvents(db: admin.firestore.Firestore, limit =
       title: `Checkout left by ${c.name || c.phone} for ${inr(c.total)}`,
       sub: [`${c.itemCount || (c.items || []).length} item${(c.itemCount || 0) === 1 ? "" : "s"}`, c.phoneVerified ? "number verified" : "", c.phone].filter(Boolean).join(" · "),
       link: `/backend-skinly/abandoned-carts?checkout=${encodeURIComponent(d.id)}`,
+      phone: phone10(c.phone), name: c.name || undefined, items: rowItems(c.items),
     });
   }
 
