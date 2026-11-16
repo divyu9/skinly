@@ -30,7 +30,7 @@ const firstName = (n?: string) => {
 
 /** The ready-to-send WhatsApp message for this row (opens wa.me with it typed in). */
 function waMessage(e: Event): string {
-  const hi = `Hi${firstName(e.name) ? ` ${firstName(e.name)}` : ""}, Skinly se baat kar rahe hain 🙂`;
+  const hi = `Hi${firstName(e.name) ? ` ${firstName(e.name)}` : ""}, Skinly se baat kar rahe hain.`;
   const what = (e.items || []).map((i) => `• ${i.title}${i.device ? ` — ${i.device}` : ""}${i.coverage ? ` (${i.coverage})` : ""}`).join("\n");
   switch (e.kind) {
     case "cart":
