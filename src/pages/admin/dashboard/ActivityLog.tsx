@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { openWhatsApp, waUrl } from "@/lib/wa-link.ts";
 import { Link } from "react-router-dom";
 import { getFunctions, httpsCallable } from "firebase/functions";
 import { toast } from "sonner";
@@ -28,7 +29,7 @@ const firstName = (n?: string) => {
   return /^\d+$/.test(f) ? "" : f.charAt(0).toUpperCase() + f.slice(1).toLowerCase();
 };
 
-/** The ready-to-send WhatsApp message for this row (opens wa.me with it typed in). */
+/** The ready-to-send WhatsApp message for this row (opens the chat with it typed in; see wa-link.ts). */
 function waMessage(e: Event): string {
   const hi = `Hi${firstName(e.name) ? ` ${firstName(e.name)}` : ""}, Skinly se baat kar rahe hain.`;
   const what = (e.items || []).map((i) => `• ${i.title}${i.device ? ` — ${i.device}` : ""}${i.coverage ? ` (${i.coverage})` : ""}`).join("\n");
@@ -280,8 +281,8 @@ export function ActivityLog() {
                       <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-semibold text-muted-foreground">{e.status}</span>
                     ) : null}
                     {e.phone && e.kind !== "review" && (
-                      <a href={`https://wa.me/91${e.phone}?text=${encodeURIComponent(waMessage(e))}`} target="_blank" rel="noopener noreferrer"
-                        onClick={(ev) => ev.stopPropagation()} title={`WhatsApp ${e.phone}`}
+                      <a href={waUrl(e.phone, waMessage(e))} target="_blank" rel="noopener noreferrer"
+                        onClick={(ev) => openWhatsApp(ev, e.phone!, waMessage(e))} title={`WhatsApp ${e.phone}`}
                         className="flex items-center gap-1 rounded-md border-2 border-ink bg-[#25D366] px-2 py-1 text-[11px] font-bold text-ink hover:brightness-95">
                         <WhatsAppIcon className="size-3.5" /> WhatsApp
                       </a>

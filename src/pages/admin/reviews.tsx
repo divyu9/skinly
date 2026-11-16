@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { openWhatsApp, waUrl } from "@/lib/wa-link.ts";
 import { collection, deleteDoc, doc, getDoc, onSnapshot, setDoc } from "firebase/firestore";
 import { getFunctions, httpsCallable } from "firebase/functions";
 import { Link } from "react-router-dom";
@@ -114,7 +115,8 @@ export default function AdminReviews() {
     if (!phone) { toast.error("No phone number on this order"); return; }
     const name = String(o?.shippingAddress?.fullName || r.userName || "").split(/\s+/)[0];
     const msg = `Hi ${name}, this is GoSkinly. Sorry the ${r.productTitle || "skin"} from order ${o?.orderNumber || ""} wasn't right. Tell us what happened and we'll fix it for you.`;
-    window.open(`https://wa.me/91${phone}?text=${encodeURIComponent(msg)}`, "_blank", "noopener,noreferrer");
+    openWhatsApp({ preventDefault() {}, stopPropagation() {} }, phone, msg);
+    if (window.matchMedia?.("(pointer: coarse)").matches) window.open(waUrl(phone, msg), "_blank", "noopener,noreferrer");
   };
   const markFollowedUp = async (r: Review) => {
     try { await setDoc(doc(db, "reviews", r._id), { followedUpAt: Date.now() }, { merge: true }); toast.success("Marked as followed up"); }

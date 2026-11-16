@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { openWhatsApp, waUrl } from "@/lib/wa-link.ts";
 import { useQuery, useMutation } from "@/lib/firebase-hooks";
 import { api } from "@/lib/firebase-api";
 import type { Id } from "@/lib/firebase-api";
@@ -971,7 +972,8 @@ export default function AdminModelsPage() {
                         </TableCell>
                         <TableCell>
                           <a 
-                            href={`https://wa.me/${request.whatsappPhone.replace(/[^\d]/g, '')}`}
+                            href={waUrl(request.whatsappPhone)}
+                            onClick={(ev) => openWhatsApp(ev, request.whatsappPhone)}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="text-primary hover:underline"

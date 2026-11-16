@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { openWhatsApp, waUrl } from "@/lib/wa-link.ts";
 import { Link } from "react-router-dom";
 import { useQuery } from "@/lib/firebase-hooks";
 import { api } from "@/lib/firebase-api";
@@ -172,7 +173,8 @@ function CustomersPageInner() {
                           <span className="text-sm font-medium">{c.name || "—"}</span>
                           {c.phone && (
                             <a
-                              href={`https://wa.me/91${c.phone}`}
+                              href={waUrl(c.phone)}
+                              onClick={(ev) => openWhatsApp(ev, c.phone)}
                               target="_blank"
                               rel="noopener noreferrer"
                               title="Message on WhatsApp"

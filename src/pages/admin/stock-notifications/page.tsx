@@ -1,4 +1,5 @@
 import { useQuery, useMutation } from "@/lib/firebase-hooks";
+import { openWhatsApp, waUrl } from "@/lib/wa-link.ts";
 import { api } from "@/lib/firebase-api";
 import { Button } from "@/components/ui/button.tsx";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card.tsx";
@@ -89,7 +90,7 @@ function AllRequestsTable({ stats, order }: { stats: ProductStat[]; order: "late
                 <td className="px-4 py-2"><span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${ageTone(r.createdAt)}`}>{ageOf(r.createdAt) || "—"}</span></td>
                 <td className="whitespace-nowrap px-4 py-2 tabular-nums text-muted-foreground">{formatWhen(r.createdAt)}</td>
                 <td className="whitespace-nowrap px-4 py-2 font-mono tabular-nums">
-                  <a href={`https://wa.me/91${r.phoneNumber}`} target="_blank" rel="noreferrer" className="hover:underline">+91 {r.phoneNumber}</a>
+                  <a href={waUrl(r.phoneNumber)} onClick={(ev) => openWhatsApp(ev, r.phoneNumber)} target="_blank" rel="noreferrer" className="hover:underline">+91 {r.phoneNumber}</a>
                 </td>
                 <td className="px-4 py-2">{p.productTitle}</td>
                 <td className="px-4 py-2 text-muted-foreground">{v.variantTitle}{v.sku ? <> · <span className="font-mono">{v.sku}</span></> : null}</td>
@@ -273,7 +274,8 @@ function AdminStockNotificationsPageInner() {
                             <tr key={r._id} className="border-t">
                               <td className="px-4 py-2 font-mono tabular-nums">
                                 <a
-                                  href={`https://wa.me/91${r.phoneNumber}`}
+                                  href={waUrl(r.phoneNumber)}
+                                  onClick={(ev) => openWhatsApp(ev, r.phoneNumber)}
                                   target="_blank"
                                   rel="noreferrer"
                                   className="hover:underline"

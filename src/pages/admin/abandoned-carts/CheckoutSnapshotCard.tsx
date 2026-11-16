@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { openWhatsApp, waUrl } from "@/lib/wa-link.ts";
 import { useSearchParams } from "react-router-dom";
 import { MapPinIcon, MessageSquareIcon, PhoneIcon, XIcon } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card.tsx";
@@ -116,7 +117,7 @@ export function CheckoutSnapshotCard() {
               </Button>
               {snap.phone && (
                 <Button asChild size="sm" variant="outline">
-                  <a href={`https://wa.me/91${snap.phone}?text=${encodeURIComponent(waText)}`} target="_blank" rel="noopener noreferrer">
+                  <a href={waUrl(snap.phone, waText)} onClick={(ev) => openWhatsApp(ev, snap.phone, waText)} target="_blank" rel="noopener noreferrer">
                     <MessageSquareIcon className="mr-1.5 size-4" /> Open WhatsApp chat
                   </a>
                 </Button>

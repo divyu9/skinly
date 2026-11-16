@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button.tsx";
+import { openWhatsApp, waUrl } from "@/lib/wa-link.ts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card.tsx";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog.tsx";
 import { Input } from "@/components/ui/input.tsx";
@@ -130,7 +131,8 @@ export function CustomerInfoCard({
                     <>
                       <Copy value={shippingAddress.phone} what="Phone" />
                       <a
-                        href={`https://wa.me/91${String(shippingAddress.phone).replace(/\D/g, "").slice(-10)}`}
+                        href={waUrl(String(shippingAddress.phone).replace(/\D/g, "").slice(-10))}
+                        onClick={(ev) => openWhatsApp(ev, String(shippingAddress.phone).replace(/\D/g, "").slice(-10))}
                         target="_blank"
                         rel="noopener noreferrer"
                         title="Message this customer on WhatsApp"
