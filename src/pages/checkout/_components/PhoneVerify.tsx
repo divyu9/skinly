@@ -37,7 +37,9 @@ export function PhoneVerify({ phone, isPhoneValid, verified, required, items, on
       </p>
     );
   }
-  if (!isPhoneValid) {
+  // Optional verification is not offered at checkout: a big "Verify" button read as one more
+  // step to clear before paying (Nov 2026: most checkouts left stopped at it). Payment proves the buyer.
+  if (!isPhoneValid || !required) {
     return <p className="mt-1 text-xs text-muted-foreground">{required ? "We'll verify this number on WhatsApp." : "For order updates on WhatsApp."}</p>;
   }
 
