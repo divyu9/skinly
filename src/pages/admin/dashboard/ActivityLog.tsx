@@ -88,8 +88,21 @@ const needsAction = (e: Event) =>
  * alerts, checkouts left. Each row opens the page to act on it; a pending
  * review can be approved or rejected right here. Refreshes every minute.
  */
+// The last list, for this tab only: a refresh shows it at once while the fresh one loads
+// (the call can take ~10s when the function is cold). sessionStorage, not localStorage,
+// so customer names and numbers don't stay on the machine after the tab closes.
+const CACHE_KEY = "skinly_admin_activity";
+function cached(limit: number): { events: Event[]; at: number } | null {
+  try {
+    const c = JSON.parse(sessionStorage.getItem(CACHE_KEY) || "null");
+    return c && c.limit === limit && Array.isArray(c.events) ? c : null;
+  } catch { return null; }
+}
+
 export function ActivityLog() {
-  const [events, setEvents] = useState<Event[] | null>(null);
+  const [events, setEvents] = useState<Event[] | null>(() => cached(20)?.events ?? null);
+  const [loadedAt, setLoadedAt] = useState<number>(() => cached(20)?.at ?? 0);
+  const [waited, setWaited] = useState(0);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [onlyAction, setOnlyAction] = useState(false);
@@ -102,8 +115,11 @@ export function ActivityLog() {
     setLoading(true);
     try {
       const res: any = await httpsCallable(getFunctions(), "adminActivity")({ limit });
-      setEvents(res.data?.events || []);
+      const list: Event[] = res.data?.events || [];
+      setEvents(list);
+      setLoadedAt(Date.now());
       setError("");
+      try { sessionStorage.setItem(CACHE_KEY, JSON.stringify({ limit, events: list, at: Date.now() })); } catch { /* storage full or blocked */ }
     } catch (e: any) {
       setError(e?.message || "Could not load activity");
     } finally {
@@ -120,6 +136,14 @@ export function ActivityLog() {
     window.addEventListener("focus", onFocus);
     return () => { if (t) clearInterval(t); clearInterval(relabel); window.removeEventListener("focus", onFocus); };
   }, [load, limit]);
+
+  // Seconds spent on the current load, so a slow first call reads as "still working", not stuck.
+  useEffect(() => {
+    if (!loading) { setWaited(0); return; }
+    const started = Date.now();
+    const t = setInterval(() => setWaited(Math.floor((Date.now() - started) / 1000)), 1000);
+    return () => clearInterval(t);
+  }, [loading]);
 
   const moderate = async (e: Event, action: "approve" | "reject") => {
     if (!e.reviewId) return;
@@ -144,7 +168,11 @@ export function ActivityLog() {
         <h2 className="flex items-center gap-2 text-sm font-bold tracking-tight">
           <ActivityIcon className="size-4 text-brand" />
           Activity
-          <span className="text-xs font-medium text-muted-foreground">last {limit} events</span>
+          <span className="text-xs font-medium text-muted-foreground">
+            {loading && events !== null
+              ? `updating…${waited >= 3 ? ` ${waited}s` : ""}`
+              : loadedAt ? `last ${limit} · ${ago(loadedAt)}` : `last ${limit} events`}
+          </span>
         </h2>
         <div className="flex items-center gap-2">
           <div className="flex rounded-lg border-2 border-ink/10 p-0.5 text-xs font-semibold">
@@ -158,11 +186,41 @@ export function ActivityLog() {
           </button>
         </div>
       </header>
+      {/* Thin running bar while a load is in flight. */}
+      <div className="relative h-0.5 overflow-hidden">
+        {loading && <div className="absolute inset-y-0 w-1/3 animate-[activitybar_1.2s_ease-in-out_infinite] bg-brand" />}
+      </div>
+      <style>{`@keyframes activitybar{0%{left:-33%}100%{left:100%}}`}</style>
 
       <div className="flex-1 p-2 sm:p-3">
-        {error && <p className="px-3 py-2 text-sm text-heart">{error}</p>}
+        {error && (
+          <p className="flex flex-wrap items-center gap-2 px-3 py-2 text-sm text-heart">
+            {events?.length ? "Couldn't refresh — showing the last list." : "Couldn't load activity."}
+            <span className="text-xs text-muted-foreground">{error}</span>
+            <button type="button" onClick={() => void load()} className="rounded-md border-2 border-ink/20 px-2 py-0.5 text-xs font-bold text-ink hover:border-ink/40">Try again</button>
+          </p>
+        )}
         {events === null && !error ? (
-          <p className="px-3 py-6 text-center text-sm text-muted-foreground">Loading…</p>
+          <div aria-busy="true" aria-label="Loading activity">
+            <p className="px-3 pb-1 pt-2 text-xs text-muted-foreground">
+              Loading activity{waited >= 3 ? ` · ${waited}s — the first load after a while can take up to ~15s` : "…"}
+            </p>
+            <ul className="divide-y divide-ink/5">
+              {Array.from({ length: 6 }, (_, n) => (
+                <li key={n} className="flex items-start gap-3 px-3 py-3">
+                  <span className="size-8 shrink-0 animate-pulse rounded-lg bg-muted" />
+                  <div className="flex-1 space-y-2">
+                    <div className="h-3.5 w-2/3 animate-pulse rounded bg-muted" />
+                    <div className="h-3 w-1/3 animate-pulse rounded bg-muted" />
+                    <div className="flex items-center gap-2">
+                      <span className="size-10 animate-pulse rounded-md bg-muted" />
+                      <div className="h-3 w-1/2 animate-pulse rounded bg-muted" />
+                    </div>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </div>
         ) : shown.length === 0 ? (
           <p className="px-3 py-6 text-center text-sm text-muted-foreground">{onlyAction ? "Nothing waiting on you." : "No activity yet."}</p>
         ) : (
