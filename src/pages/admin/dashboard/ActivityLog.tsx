@@ -282,7 +282,7 @@ export function ActivityLog() {
                     ) : null}
                     {e.phone && e.kind !== "review" && (
                       <a href={waUrl(e.phone, waMessage(e))} target="_blank" rel="noopener noreferrer"
-                        onClick={(ev) => openWhatsApp(ev, e.phone!, waMessage(e))} title={`WhatsApp ${e.phone}`}
+                        onClick={(ev) => openWhatsApp(ev, e.phone!, waMessage(e), e.items?.find((i) => i.image)?.image)} title={`WhatsApp ${e.phone}`}
                         className="flex items-center gap-1 rounded-md border-2 border-ink bg-[#25D366] px-2 py-1 text-[11px] font-bold text-ink hover:brightness-95">
                         <WhatsAppIcon className="size-3.5" /> WhatsApp
                       </a>
