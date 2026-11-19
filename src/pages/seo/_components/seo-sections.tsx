@@ -89,20 +89,26 @@ export function SeoProductsSection({ data, heading, h1, intro }: {
     </div>
   ) : null;
 
+  /*
+   * While the designs load, hold at least a screen of room. The loaded grid is
+   * thousands of pixels tall; a short placeholder let the next section ("What
+   * Needs a Makeover?") paint on screen and then get pushed far down when the
+   * grid arrived: 0.28 CLS on every model page, the "poor" in Search Console.
+   */
   if (data === undefined && h1) {
     return (
-      <>
+      <div className="min-h-screen">
         {h1Block}
         <div className="container mx-auto max-w-6xl px-3 py-5 sm:px-4">
           <Skeleton className="aspect-square w-full rounded-3xl md:aspect-[2/1]" />
         </div>
-      </>
+      </div>
     );
   }
 
   if (data === undefined) {
     return (
-      <section className="border-y-2 border-ink/10 bg-card/60">
+      <section className="min-h-screen border-y-2 border-ink/10 bg-card/60">
         <div className="container mx-auto px-3 py-10 sm:px-4 md:py-14">
           <Skeleton className="mx-auto mb-8 h-8 w-64" />
           <div className="grid grid-cols-2 gap-2 sm:gap-4 lg:grid-cols-4">
