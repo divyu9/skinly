@@ -23,7 +23,7 @@ const getR2Config = () => {
 
 /** One S3 client for the pipeline's own writes. */
 let pipelineClient: S3Client | null = null;
-const pipelineS3 = () => {
+export const pipelineS3 = () => {
   const config = getR2Config();
   pipelineClient ||= new S3Client({
     region: "auto",
@@ -63,6 +63,9 @@ export async function putR2Object(key: string, body: Buffer, contentType: string
     Bucket: config.bucketName, Key: key, Body: body, ContentType: contentType,
     CacheControl: cacheControlFor(key),
   }));
+  // Pictures the site shows get their ready-made sizes now (imageSizes.ts).
+  const sizes = await import("./imageSizes");
+  if (sizes.isSizable(key)) await sizes.makeSizedFrom(key, body).catch((e) => sizes.enqueueSized(key, String(e?.message || e)));
   return r2PublicUrl(key);
 }
 
@@ -172,6 +175,10 @@ export const generateUploadUrl = onCall(async (data: any, context: any) => {
     });
 
     const uploadUrl = await getSignedUrl(s3, command, { expiresIn: Number(process.env.R2_SIGNED_URL_TTL_SECONDS || 300) });
+    // The browser uploads straight to R2, so nothing here sees the bytes: the
+    // key is queued and processSizedQueue makes its sizes once it is there.
+    const sizes = await import("./imageSizes");
+    if (sizes.isSizable(fileName)) await sizes.enqueueSized(fileName).catch(() => undefined);
 
     return {
       success: true,
@@ -237,6 +244,8 @@ export const copyR2Object = onCall(async (data: any, context: any) => {
     throw new HttpsError("unavailable", `Could not copy the image (${code || err?.message || "storage error"}) — try again`);
   }
 
+  const sizes = await import("./imageSizes");
+  if (sizes.isSizable(toKey)) await sizes.enqueueSized(toKey).catch(() => undefined);
   return { success: true, key: toKey, url: `${config.publicUrl.replace(/\/$/, "")}/${toKey}` };
 });
 
@@ -277,27 +286,3 @@ export const deleteR2Object = onCall(async (data: any, context: any) => {
   return { success: true };
 });
 
-/**
- * A mockup's ready-made small copies: sized/480/<key> and sized/960/<key>.
- *
- * The storefront shows mockups from these instead of Cloudflare's per-request
- * resizing, whose free 5,000 a month ran out against ~140,000 mockups
- * (src/lib/image-cdn.ts). Written whenever a mockup is (mockupSizes.ts), and
- * once for the existing ones by scripts/mockups/make_sized.cjs.
- */
-export const SIZED_WIDTHS = [480, 960];
-export const sizedKey = (width: number, key: string) => `sized/${width}/${key}`;
-
-export async function makeSizedCopies(key: string): Promise<void> {
-  const { s3, config } = pipelineS3();
-  const obj = await s3.send(new GetObjectCommand({ Bucket: config.bucketName, Key: key }));
-  const original = Buffer.from(await (obj.Body as any).transformToByteArray());
-  const sharp = (await import("sharp")).default;
-  for (const width of SIZED_WIDTHS) {
-    const body = await sharp(original).resize({ width, withoutEnlargement: true }).webp({ quality: 75 }).toBuffer();
-    await s3.send(new PutObjectCommand({
-      Bucket: config.bucketName, Key: sizedKey(width, key), Body: body, ContentType: "image/webp",
-      CacheControl: cacheControlFor(key),
-    }));
-  }
-}

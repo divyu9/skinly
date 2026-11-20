@@ -1,14 +1,15 @@
 import * as functionsV1 from "firebase-functions/v1";
-import { makeSizedCopies } from "./r2";
+import { makeSizedCopies, enqueueSized } from "./imageSizes";
 
 /**
- * A mockup written or redone: make its 480 and 960 copies (r2.ts
- * makeSizedCopies), which is what the storefront shows.
+ * A mockup written or redone: make its sizes now (imageSizes.ts).
  *
- * Every way a mockup arrives ends in a `mockups` doc (the admin uploads,
- * scripts/mockups/bulk_upload.cjs), so this one trigger covers them all. An
- * alias row reuses another model's file, whose copies already exist. A picture
- * redone in place keeps its key, so a newer updatedAt also remakes the copies.
+ * scripts/mockups/bulk_upload.cjs writes to R2 directly, past every function,
+ * but it always ends in a `mockups` doc, as the admin's uploads do; so this
+ * trigger has the new mockup on the site in its small sizes within seconds
+ * rather than at the nightly sweep. An alias row reuses another model's file,
+ * whose sizes exist already. A picture redone in place keeps its key, so a
+ * newer updatedAt also remakes them.
  */
 export const onMockupSized = functionsV1
   .runWith({ memory: "1GB", timeoutSeconds: 120 })
@@ -23,8 +24,8 @@ export const onMockupSized = functionsV1
     try {
       await makeSizedCopies(key);
     } catch (e: any) {
-      // The site falls back to the original; the backfill script fills gaps.
-      console.error(`sized copies failed for ${key}: ${e?.message || e}`);
+      // The site shows the original meanwhile; the queue tries again.
+      await enqueueSized(key, String(e?.message || e)).catch(() => undefined);
     }
     return null;
   });

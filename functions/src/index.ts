@@ -30,6 +30,7 @@ export * from "./mockupCoverage";
 export * from "./mockupTodo";
 export * from "./mockupAlias";
 export * from "./mockupSizes";
+export * from "./imageSizes";
 export * from "./referrals";
 export * from "./brands";
 export * from "./whatsappWorker";

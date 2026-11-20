@@ -1,11 +1,11 @@
-// The mockups' small copies, made once for every mockup already in R2.
+// Ready-made sizes, made once for every picture already in R2 (mockups, real photos, reviews, banners …).
 //   node scripts/mockups/make_sized.cjs            dry run: how many are missing
 //   node scripts/mockups/make_sized.cjs --go       make them (re-runnable: skips ones already made)
 //   options: --limit N (first N only, to try it), --jobs N (parallel, default 12)
-// For each R2 object mockups/<Brand>/<Model>/<SKU>.webp it writes sized/480/<key> and sized/960/<key>
-// (WebP, quality 75), which the storefront shows instead of Cloudflare's per-request resizing
-// (src/lib/image-cdn.ts). A copy older than its original (the mockup was redone) is made again.
-// New mockups get theirs from the onMockupSized function; this is for the ones before it.
+// For each picture <key> it writes sized/<w>/<key> (WebP, quality 75) at 240/480/720/960, and 1600 for
+// non-mockups, which the storefront shows instead of Cloudflare's per-request resizing
+// (src/lib/image-cdn.ts). A copy older than its original (the picture was redone) is made again.
+// Same rules as functions/src/imageSizes.ts, which makes them for every upload from now on.
 // Credentials come from functions/.env (never printed).
 const fs = require("fs"), path = require("path");
 const F = path.join(__dirname, "../../functions");
@@ -17,7 +17,10 @@ const sharp = require(F + "/node_modules/sharp");
 const s3 = new S3Client({ region: "auto", endpoint: `https://${env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
   credentials: { accessKeyId: env.R2_ACCESS_KEY_ID, secretAccessKey: env.R2_SECRET_ACCESS_KEY } });
 const bucket = env.R2_BUCKET_NAME || "skinly";
-const WIDTHS = [480, 960];
+const SIZES = [240, 480, 720, 960, 1600];
+const SKIP = /^(sized|backups|resources|ai-mockups-pending|whatsapp|meesho|design-raw|design-pieces|mockup-templates|shot-references|packing)\//;
+const isSizable = (key) => /\.(webp|png|jpe?g|avif)$/i.test(key) && !SKIP.test(key);
+const widthsFor = (key) => (key.startsWith("mockups/") ? SIZES.slice(0, 4) : SIZES);
 const args = process.argv.slice(2);
 const GO = args.includes("--go");
 const opt = (name, dflt) => { const i = args.indexOf(name); return i >= 0 ? Number(args[i + 1]) : dflt; };
@@ -37,15 +40,18 @@ async function list(prefix) {
 }
 
 (async () => {
-  const originals = await list("mockups/");
-  const sized = await list("sized/");
+  const all = await list("");
   const todo = [];
-  for (const [key, mod] of originals) {
-    if (!/\.(webp|png|jpe?g)$/i.test(key)) continue;
-    const stale = WIDTHS.some((w) => { const t = sized.get(`sized/${w}/${key}`); return t === undefined || t < mod; });
+  let pictures = 0;
+  for (const [key, mod] of all) {
+    if (!isSizable(key)) continue;
+    pictures++;
+    const stale = widthsFor(key).some((w) => { const t = all.get(`sized/${w}/${key}`); return t === undefined || t < mod; });
     if (stale) todo.push(key);
   }
-  console.log(`${originals.size} mockups, ${todo.length} need small copies.`);
+  // Mockups last: the few hundred pictures elsewhere (banners, real photos) are done in the first minute.
+  todo.sort((a, b) => (a.startsWith("mockups/") ? 1 : 0) - (b.startsWith("mockups/") ? 1 : 0));
+  console.log(`${pictures} pictures, ${todo.length} need sizes.`);
   if (!GO) { console.log("Dry run. Add --go to make them."); return; }
 
   const work = todo.slice(0, LIMIT);
@@ -56,10 +62,11 @@ async function list(prefix) {
       try {
         const obj = await s3.send(new GetObjectCommand({ Bucket: bucket, Key: key }));
         const original = Buffer.from(await obj.Body.transformToByteArray());
-        for (const w of WIDTHS) {
-          const body = await sharp(original).resize({ width: w, withoutEnlargement: true }).webp({ quality: 75 }).toBuffer();
+        for (const w of widthsFor(key)) {
+          const body = await sharp(original, { failOn: "none" }).rotate()
+            .resize({ width: w, withoutEnlargement: true }).webp({ quality: 75 }).toBuffer();
           await s3.send(new PutObjectCommand({ Bucket: bucket, Key: `sized/${w}/${key}`, Body: body, ContentType: "image/webp",
-            CacheControl: "public, max-age=86400, stale-while-revalidate=604800" }));
+            CacheControl: /^media-library\//.test(key) ? "public, max-age=31536000, immutable" : "public, max-age=86400, stale-while-revalidate=604800" }));
         }
         done++; return;
       } catch (e) {

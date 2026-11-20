@@ -525,9 +525,13 @@ const r2KeyOf = (url) => !url ? null
   : url.startsWith(R2_PUBLIC) ? url.slice(R2_PUBLIC.length)
   : url.startsWith(CDN_HOST) && !url.startsWith(`${CDN_HOST}cdn-cgi/`) ? url.slice(CDN_HOST.length)
   : null;
-// Mockups have ready-made 480 and 960 copies (src/lib/image-cdn.ts sizedUrl):
-// the same mapping, so a preload is the very file the app asks for.
-const sizedMockup = (key, w) => key.startsWith("mockups/") ? `${CDN_HOST}sized/${w <= 640 ? 480 : 960}/${key}` : null;
+// Pictures have ready-made sizes (functions/src/imageSizes.ts); the same rules
+// as src/lib/image-cdn.ts, so a preload is the very file the app asks for.
+const SIZES = [240, 480, 720, 960, 1600];
+const SIZED_SKIP = /^(sized|backups|resources|ai-mockups-pending|whatsapp|meesho|design-raw|design-pieces|mockup-templates|shot-references|packing)\//;
+const sizedWidthOf = (key, w) => { const ws = key.startsWith("mockups/") ? SIZES.slice(0, 4) : SIZES; return ws.find((x) => x >= w) ?? ws[ws.length - 1]; };
+const sizedMockup = (key, w) => /\.(webp|png|jpe?g|avif)$/i.test(key) && !SIZED_SKIP.test(key)
+  ? `${CDN_HOST}sized/${sizedWidthOf(key, w)}/${key}` : null;
 
 function productImageUrl(url, width) {
   const key = r2KeyOf(url);
@@ -547,8 +551,10 @@ const BUY_BOX_SIZES = "(min-width: 768px) 560px, calc(100vw - 24px)";
 function buyBoxPhoto(url) {
   const key = r2KeyOf(url);
   if (!key) return null;
-  if (key.startsWith("mockups/")) {
-    return { srcset: [480, 960].map((w) => `${sizedMockup(key, w)} ${w}w`).join(", "), sizes: BUY_BOX_SIZES };
+  if (sizedMockup(key, 480)) {
+    // responsiveImg(url, [480, 720, 960]) in model-buy-box.tsx, through the same mapping.
+    const ws = [...new Set([480, 720, 960].map((w) => sizedWidthOf(key, w)))].sort((a, b) => a - b);
+    return { srcset: ws.map((w) => `${CDN_HOST}sized/${w}/${key} ${w}w`).join(", "), sizes: BUY_BOX_SIZES };
   }
   const at = (w) => `${CDN_HOST}cdn-cgi/image/width=${w},quality=75,format=auto,fit=scale-down,onerror=redirect/${key}`;
   return { srcset: [480, 720, 960].map((w) => `${at(w)} ${w}w`).join(", "), sizes: BUY_BOX_SIZES };
@@ -557,7 +563,7 @@ function buyBoxPhoto(url) {
 function productPhoto(url) {
   const small = url && productImageUrl(url, 640);
   if (!small) return null;
-  const smallW = small.startsWith(`${CDN_HOST}sized/`) ? 480 : 640;
+  const smallW = Number(small.match(/\/sized\/(\d+)\//)?.[1]) || 640;
   return { src: small, srcset: `${small} ${smallW}w, ${productImageUrl(url, 960)} 960w`, sizes: PRODUCT_MAIN_SIZES };
 }
 
