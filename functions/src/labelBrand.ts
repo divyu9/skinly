@@ -6,7 +6,7 @@ import * as fs from "fs";
  *
  * Shipmozo hands back a plain PNG: no shop logo, no courier mark (owner,
  * 10 Nov 2026). This adds a white header band with the Skinly logo across the
- * top, and the courier's logo (Delhivery, Blue Dart, DTDC: the three Shipmozo
+ * top, and the courier's logo (Delhivery, Blue Dart, DTDC, Shadowfax: the ones Shipmozo
  * uses for us) in the right column's empty space above the "Courier:" line and
  * AWB barcode, and www.goskinly.com in a footer band. The barcode is found in the image itself, so a
  * different label size still works; when it cannot be found the courier logo
@@ -19,6 +19,8 @@ const COURIERS: Array<[RegExp, string]> = [
   [/delhivery/i, "delhivery.png"],
   [/blue\s*dart/i, "bluedart.png"],
   [/dtdc/i, "dtdc.png"],
+  // Shipmozo started sending our parcels with Shadowfax too (owner, 20 Nov 2026).
+  [/shadow\s*fax/i, "shadowfax.png"],
 ];
 
 function courierLogoFile(courierName: string): string | null {
