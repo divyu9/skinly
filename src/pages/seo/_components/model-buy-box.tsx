@@ -108,6 +108,8 @@ export default function ModelBuyBox({ data, hasH1 = false, onSeeAll }: {
                 alt={box.generic ? `${d.title} (design preview)` : `${t.brand} ${t.model} skin: ${d.title}`}
                 width={960}
                 height={960}
+                // The page's LCP; the build preloads the first one from <head>.
+                fetchPriority="high"
                 className="aspect-square w-full object-contain"
                 draggable={false}
               />

@@ -14,6 +14,9 @@ function pageType(): string {
   if (p.startsWith('/checkout')) return 'checkout';
   if (p.startsWith('/orders')) return 'order';
   if (p.startsWith('/collections') || p.startsWith('/category') || p.startsWith('/brand')) return 'listing';
+  // Root-level landing pages (/apple-iphone-13-skins …): the model pages are
+  // most of Search Console's Core Web Vitals URLs, so they get their own bucket.
+  if (/^\/[a-z0-9-]+-skins?$/.test(p)) return 'landing';
   return 'other';
 }
 

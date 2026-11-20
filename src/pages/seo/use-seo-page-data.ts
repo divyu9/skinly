@@ -56,7 +56,9 @@ export function useSeoPageData(page: Page | null | undefined): SeoPageData | und
     if (!slug) return;
     let cancelled = false;
     setFromFile(undefined);
-    fetch(`/seo-data/${encodeURIComponent(slug)}.json`, { headers: { accept: "application/json" } })
+    // No custom headers: the build preloads this file from <head>
+    // (scripts/prerender.mjs dataPreload), and a plain GET is what reuses it.
+    fetch(`/seo-data/${encodeURIComponent(slug)}.json`)
       .then((r) => (r.ok && (r.headers.get("content-type") || "").includes("json") ? r.json() : null))
       .then((d) => { if (!cancelled) setFromFile(d && d.slug === slug ? d : null); })
       .catch(() => { if (!cancelled) setFromFile(null); });

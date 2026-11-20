@@ -529,6 +529,23 @@ function productImageUrl(url, width) {
   return `https://goskinly.com/cdn-cgi/image/width=${width},quality=75,format=auto,fit=scale-down,onerror=redirect/${CDN_HOST}${key}`;
 }
 
+/*
+ * The buy box's first photo on a model page (model-buy-box.tsx), asked for
+ * from <head>. It is the page's LCP, and without this it was only found after
+ * the bundle ran and fetched /seo-data: Lighthouse put 82% of a mobile LCP in
+ * "load delay". The URLs and sizes are the component's own (image-cdn.ts
+ * responsiveImg, widths 480/720/960), so the preload is the download it uses.
+ */
+const BUY_BOX_SIZES = "(min-width: 768px) 560px, calc(100vw - 24px)";
+function buyBoxPhoto(url) {
+  const key = !url ? null : url.startsWith(R2_PUBLIC) ? url.slice(R2_PUBLIC.length)
+    : url.startsWith(CDN_HOST) && !url.startsWith(`${CDN_HOST}cdn-cgi/`) ? url.slice(CDN_HOST.length)
+    : null;
+  if (!key) return null;
+  const at = (w) => `${CDN_HOST}cdn-cgi/image/width=${w},quality=75,format=auto,fit=scale-down,onerror=redirect/${key}`;
+  return { srcset: [480, 720, 960].map((w) => `${at(w)} ${w}w`).join(", "), sizes: BUY_BOX_SIZES };
+}
+
 function productPhoto(url) {
   const small = url && productImageUrl(url, 640);
   if (!small) return null;
@@ -620,10 +637,12 @@ function render(template, p) {
   let html = template.replace(/<title>[\s\S]*?<\/title>\s*/, "");
   // The product photo is asked for first thing in <head>, ahead of the
   // stylesheet and the bundle it would otherwise queue behind.
-  const ph = p.photoShell?.photo;
-  const photoPreload = ph
+  const ph = p.photoShell?.photo || p.lcpPhoto;
+  const photoPreload = (ph
     ? `<link rel="preload" as="image" imagesrcset="${esc(ph.srcset)}" imagesizes="${esc(ph.sizes)}" fetchpriority="high" />\n    `
-    : "";
+    : "") + (p.dataPreload
+    ? `<link rel="preload" as="fetch" crossorigin="anonymous" href="${esc(p.dataPreload)}" />\n    `
+    : "");
   html = html.replace("<!--seo-head-->", photoPreload + headFor(p));
   html = html.replace("<!--seo-body-->", noscriptFor(p) + seedFor(p) + homeSeedFor(p) + announcementSeedFor(p));
   if (p.rootHtml) {
@@ -1408,6 +1427,9 @@ function seoPage(s, info, knownPaths, themes = []) {
       ].filter((t) => t.slug !== s.slug).slice(0, 12);
   return {
     route: `/${s.slug}`,
+    lcpPhoto: info?.buyBox ? buyBoxPhoto(info.buyBox.designs?.[0]?.mockupUrl) : null,
+    // The page's own data, asked for with the HTML instead of after the bundle.
+    dataPreload: info ? `/seo-data/${encodeURIComponent(s.slug)}.json` : null,
     seed: {
       slug: s.slug,
       // The stored page as the app would read it, minus bookkeeping it never
