@@ -15,6 +15,8 @@
  * richer placeholder (ProductThumb, ProductImages) still do.
  */
 
+import { sizedOriginal } from "./image-cdn";
+
 const BROKEN_ATTR = "data-img-broken";
 
 export function installImageFallback() {
@@ -26,6 +28,17 @@ export function installImageFallback() {
       const el = event.target;
       if (!(el instanceof HTMLImageElement)) return;
       if (el.hasAttribute(BROKEN_ATTR)) return;
+      // A mockup's small copy not made yet (image-cdn.ts): show the original.
+      // Stopped here, in the capture phase, so a component's own onError
+      // never sees it and never paints its placeholder.
+      const original = sizedOriginal(el.currentSrc || el.src || "");
+      if (original && !el.dataset.sizedFallback) {
+        event.stopPropagation();
+        el.dataset.sizedFallback = "1";
+        el.removeAttribute("srcset");
+        el.src = original;
+        return;
+      }
       // A src that has not resolved yet is not a failure.
       if (!el.currentSrc && !el.getAttribute("src")) return;
 

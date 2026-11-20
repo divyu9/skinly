@@ -276,3 +276,28 @@ export const deleteR2Object = onCall(async (data: any, context: any) => {
   await s3.send(new DeleteObjectCommand({ Bucket: config.bucketName, Key: key }));
   return { success: true };
 });
+
+/**
+ * A mockup's ready-made small copies: sized/480/<key> and sized/960/<key>.
+ *
+ * The storefront shows mockups from these instead of Cloudflare's per-request
+ * resizing, whose free 5,000 a month ran out against ~140,000 mockups
+ * (src/lib/image-cdn.ts). Written whenever a mockup is (mockupSizes.ts), and
+ * once for the existing ones by scripts/mockups/make_sized.cjs.
+ */
+export const SIZED_WIDTHS = [480, 960];
+export const sizedKey = (width: number, key: string) => `sized/${width}/${key}`;
+
+export async function makeSizedCopies(key: string): Promise<void> {
+  const { s3, config } = pipelineS3();
+  const obj = await s3.send(new GetObjectCommand({ Bucket: config.bucketName, Key: key }));
+  const original = Buffer.from(await (obj.Body as any).transformToByteArray());
+  const sharp = (await import("sharp")).default;
+  for (const width of SIZED_WIDTHS) {
+    const body = await sharp(original).resize({ width, withoutEnlargement: true }).webp({ quality: 75 }).toBuffer();
+    await s3.send(new PutObjectCommand({
+      Bucket: config.bucketName, Key: sizedKey(width, key), Body: body, ContentType: "image/webp",
+      CacheControl: cacheControlFor(key),
+    }));
+  }
+}

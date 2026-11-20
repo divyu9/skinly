@@ -521,12 +521,19 @@ const R2_PUBLIC = "https://pub-db30b224c5eb4a378f7b3fd8fd5f2272.r2.dev/";
 const CDN_HOST = "https://cdn.goskinly.com/";
 const PRODUCT_MAIN_SIZES = "(min-width: 1024px) 432px, (min-width: 768px) 42vw, calc(100vw - 50px)";
 
+const r2KeyOf = (url) => !url ? null
+  : url.startsWith(R2_PUBLIC) ? url.slice(R2_PUBLIC.length)
+  : url.startsWith(CDN_HOST) && !url.startsWith(`${CDN_HOST}cdn-cgi/`) ? url.slice(CDN_HOST.length)
+  : null;
+// Mockups have ready-made 480 and 960 copies (src/lib/image-cdn.ts sizedUrl):
+// the same mapping, so a preload is the very file the app asks for.
+const sizedMockup = (key, w) => key.startsWith("mockups/") ? `${CDN_HOST}sized/${w <= 640 ? 480 : 960}/${key}` : null;
+
 function productImageUrl(url, width) {
-  const key = url.startsWith(R2_PUBLIC) ? url.slice(R2_PUBLIC.length)
-    : url.startsWith(CDN_HOST) && !url.startsWith(`${CDN_HOST}cdn-cgi/`) ? url.slice(CDN_HOST.length)
-    : null;
+  const key = r2KeyOf(url);
   if (!key) return null;
-  return `https://goskinly.com/cdn-cgi/image/width=${width},quality=75,format=auto,fit=scale-down,onerror=redirect/${CDN_HOST}${key}`;
+  return sizedMockup(key, width)
+    || `https://goskinly.com/cdn-cgi/image/width=${width},quality=75,format=auto,fit=scale-down,onerror=redirect/${CDN_HOST}${key}`;
 }
 
 /*
@@ -538,10 +545,11 @@ function productImageUrl(url, width) {
  */
 const BUY_BOX_SIZES = "(min-width: 768px) 560px, calc(100vw - 24px)";
 function buyBoxPhoto(url) {
-  const key = !url ? null : url.startsWith(R2_PUBLIC) ? url.slice(R2_PUBLIC.length)
-    : url.startsWith(CDN_HOST) && !url.startsWith(`${CDN_HOST}cdn-cgi/`) ? url.slice(CDN_HOST.length)
-    : null;
+  const key = r2KeyOf(url);
   if (!key) return null;
+  if (key.startsWith("mockups/")) {
+    return { srcset: [480, 960].map((w) => `${sizedMockup(key, w)} ${w}w`).join(", "), sizes: BUY_BOX_SIZES };
+  }
   const at = (w) => `${CDN_HOST}cdn-cgi/image/width=${w},quality=75,format=auto,fit=scale-down,onerror=redirect/${key}`;
   return { srcset: [480, 720, 960].map((w) => `${at(w)} ${w}w`).join(", "), sizes: BUY_BOX_SIZES };
 }
@@ -549,7 +557,8 @@ function buyBoxPhoto(url) {
 function productPhoto(url) {
   const small = url && productImageUrl(url, 640);
   if (!small) return null;
-  return { src: small, srcset: `${small} 640w, ${productImageUrl(url, 960)} 960w`, sizes: PRODUCT_MAIN_SIZES };
+  const smallW = small.startsWith(`${CDN_HOST}sized/`) ? 480 : 640;
+  return { src: small, srcset: `${small} ${smallW}w, ${productImageUrl(url, 960)} 960w`, sizes: PRODUCT_MAIN_SIZES };
 }
 
 function productShell(s) {
