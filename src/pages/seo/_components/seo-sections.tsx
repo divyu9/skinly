@@ -182,7 +182,11 @@ export function SeoProductsSection({ data, heading, h1, intro }: {
     <>
     {h1Block}
     {onDevice && data.buyBox && data.buyBox.designs.length > 0 && (
-      <Suspense fallback={<div className="min-h-[520px]" aria-hidden />}>
+      <Suspense fallback={
+        // A screen of room: the buy box is ~1,600px on a phone, and 520px let the grid below
+        // paint on screen and then drop (0.08 CLS on every model page, Lighthouse 22 Nov 2026).
+        <div className="min-h-screen" aria-hidden />
+      }>
         <ModelBuyBox data={data} hasH1={!!h1} onSeeAll={data.more?.length ? toGrid : undefined} />
       </Suspense>
     )}

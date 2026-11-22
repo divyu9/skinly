@@ -554,10 +554,46 @@ function buyBoxPhoto(url) {
   if (sizedMockup(key, 480)) {
     // responsiveImg(url, [480, 720, 960]) in model-buy-box.tsx, through the same mapping.
     const ws = [...new Set([480, 720, 960].map((w) => sizedWidthOf(key, w)))].sort((a, b) => a - b);
-    return { srcset: ws.map((w) => `${CDN_HOST}sized/${w}/${key} ${w}w`).join(", "), sizes: BUY_BOX_SIZES };
+    return { src: `${CDN_HOST}sized/${sizedWidthOf(key, 720)}/${key}`, srcset: ws.map((w) => `${CDN_HOST}sized/${w}/${key} ${w}w`).join(", "), sizes: BUY_BOX_SIZES };
   }
   const at = (w) => `${CDN_HOST}cdn-cgi/image/width=${w},quality=75,format=auto,fit=scale-down,onerror=redirect/${key}`;
-  return { srcset: [480, 720, 960].map((w) => `${at(w)} ${w}w`).join(", "), sizes: BUY_BOX_SIZES };
+  return { src: at(720), srcset: [480, 720, 960].map((w) => `${at(w)} ${w}w`).join(", "), sizes: BUY_BOX_SIZES };
+}
+
+/**
+ * A model page's first screen before the app: its H1 and the buy box's photo.
+ *
+ * The buy box is drawn by React after the bundle, the page's data and the
+ * buy-box chunk have all arrived, one after another; the photo itself was in
+ * by 1 s and then waited 4.5 s to be shown (Lighthouse mobile LCP 6.9 s,
+ * 21 Nov 2026). This overlay is the same markup with the same classes, so it
+ * lands where the app's own copy will, and heroFirst holds the bundle back
+ * until the photo has been painted. It goes as soon as the app's photo is on
+ * screen. The H1 sits on the page colour so the app's H1 under it never shows
+ * twice; the rest of the buy box is invisible room.
+ */
+function modelShell({ h1, intro, photo }) {
+  return (
+    `<div id="__photoShell" aria-hidden="true" style="position:absolute;top:0;left:0;right:0;z-index:30;pointer-events:none">` +
+      // The header's room: its spacer and the latest-models strip, 56px taller from md (site-header.tsx).
+      `<div class="h-24"></div><div class="border-y border-transparent"><div class="hidden md:block h-14"></div></div>` +
+      `<div class="bg-background"><div class="container mx-auto max-w-6xl px-3 pt-5 sm:px-4 md:pt-8">` +
+        `<div class="text-2xl font-extrabold leading-tight sm:text-3xl md:text-4xl">${esc(h1)}</div>` +
+        (intro ? `<p class="mt-1.5 line-clamp-2 text-sm text-muted-foreground md:text-base">${esc(intro)}</p>` : "") +
+      `</div></div>` +
+      `<div class="container mx-auto max-w-6xl px-3 sm:px-4 pb-8 pt-4 md:pb-12 md:pt-6">` +
+        `<div class="grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] md:gap-10"><div>` +
+          `<div class="sticker relative overflow-hidden rounded-3xl border-2 border-ink bg-card">` +
+            `<img src="${esc(photo.src)}" srcset="${esc(photo.srcset)}" sizes="${esc(photo.sizes)}" ` +
+              `fetchpriority="high" decoding="async" width="960" height="960" alt="" class="aspect-square w-full object-contain">` +
+          `</div>` +
+        `</div><div></div></div>` +
+      `</div>` +
+    `</div>` +
+    `<script>(function(){var t0=Date.now(),p=location.pathname;function done(){var s=document.getElementById("__photoShell");if(s)s.remove();clearInterval(iv)}` +
+    `var iv=setInterval(function(){if(location.pathname!==p||Date.now()-t0>15000)return done();` +
+    `var m=document.querySelector('#root section[aria-label^="Buy"] img');if(m&&m.complete&&m.naturalWidth)(document.hidden?done():requestAnimationFrame(function(){requestAnimationFrame(done)}))},100)})();</script>`
+  );
 }
 
 function productPhoto(url) {
@@ -663,6 +699,10 @@ function render(template, p) {
   if (p.rootHtml) {
     html = html.replace('<div id="root"></div>', `<div id="root">${p.rootHtml}</div>`);
     html = heroFirst(html);
+  }
+  if (p.modelShell) {
+    html = html.replace('<div id="root"></div>', `<div id="root"></div>${modelShell(p.modelShell)}`);
+    html = heroFirst(html, { selector: "#__photoShell img", keepCss: true });
   }
   if (p.photoShell) {
     html = html.replace('<div id="root"></div>', `<div id="root"></div>${productShell(p.photoShell)}`);
@@ -1443,6 +1483,11 @@ function seoPage(s, info, knownPaths, themes = []) {
   return {
     route: `/${s.slug}`,
     lcpPhoto: info?.buyBox ? buyBoxPhoto(info.buyBox.designs?.[0]?.mockupUrl) : null,
+    // The app shows the buy box under its H1 only when the page has one (seo-sections.tsx).
+    ...(() => {
+      const photo = info?.buyBox && s.h1Heading && info.target?.kind === "model" && info.target.brand && info.target.model ? buyBoxPhoto(info.buyBox.designs?.[0]?.mockupUrl) : null;
+      return photo ? { modelShell: { h1: s.h1Heading, intro: s.metaDescription || info.description || "", photo } } : {};
+    })(),
     // The page's own data, asked for with the HTML instead of after the bundle.
     dataPreload: info ? `/seo-data/${encodeURIComponent(s.slug)}.json` : null,
     seed: {
