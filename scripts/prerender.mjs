@@ -572,6 +572,40 @@ function buyBoxPhoto(url) {
  * screen. The H1 sits on the page colour so the app's H1 under it never shows
  * twice; the rest of the buy box is invisible room.
  */
+/**
+ * /real-photos' first row before the app (src/pages/real-photos/page.tsx): the
+ * same markup, everything but the photos invisible, so they land where the
+ * app's own will; gone once the app's first photo is on screen. The grid was
+ * the page's largest paint and React drew it only after the whole bundle
+ * (Lighthouse mobile LCP 6-8 s, 22 Nov 2026).
+ */
+function realPhotosShell({ count, photos }) {
+  const sizes = "(min-width: 1024px) 25vw, (min-width: 768px) 33vw, 50vw";
+  const card = (ph) =>
+    `<div class="overflow-hidden rounded-2xl border-2 border-transparent text-left">` +
+      `<div class="relative aspect-[4/5] overflow-hidden bg-muted" style="visibility:visible">` +
+        `<img src="${esc(ph.src)}" srcset="${esc(ph.srcset)}" sizes="${sizes}" fetchpriority="high" decoding="async" alt="" class="h-full w-full object-cover">` +
+      `</div>` +
+      `<div class="p-2.5"><p class="truncate text-[13px] font-bold">&nbsp;</p><p class="truncate text-[11px]">&nbsp;</p></div>` +
+    `</div>`;
+  return (
+    `<div id="__photoShell" aria-hidden="true" style="position:absolute;top:0;left:0;right:0;z-index:30;pointer-events:none">` +
+      `<div class="container mx-auto px-4 pb-16 pt-28"><div style="visibility:hidden">` +
+        `<div class="mx-auto max-w-3xl text-center">` +
+          `<span class="inline-flex items-center gap-1.5 rounded-full border-2 border-ink px-3 py-1 text-xs font-extrabold"><span class="inline-block size-3.5"></span> Straight from our packing table</span>` +
+          `<div class="mt-4 text-3xl font-extrabold tracking-tight md:text-5xl">Real photos, real orders</div>` +
+          `<p class="mt-3 md:text-lg">${count} skins printed and cut for a customer's exact device, photographed before it shipped. No renders, no filters.</p>` +
+        `</div>` +
+        `<div class="-mx-4 mt-8 flex gap-2 overflow-hidden px-4 pb-1"><span class="shrink-0 rounded-full border-2 px-3.5 py-1.5 text-sm font-bold">All</span></div>` +
+        `<div class="mt-6 grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-4 lg:grid-cols-4">${photos.map(card).join("")}</div>` +
+      `</div></div>` +
+    `</div>` +
+    `<script>(function(){var t0=Date.now(),p=location.pathname;function done(){var s=document.getElementById("__photoShell");if(s)s.remove();clearInterval(iv)}` +
+    `var iv=setInterval(function(){if(location.pathname!==p||Date.now()-t0>15000)return done();` +
+    `var m=document.querySelector("#root main img");if(m&&m.complete&&m.naturalWidth)(document.hidden?done():requestAnimationFrame(function(){requestAnimationFrame(done)}))},100)})();</script>`
+  );
+}
+
 function modelShell({ h1, intro, photo }) {
   return (
     `<div id="__photoShell" aria-hidden="true" style="position:absolute;top:0;left:0;right:0;z-index:30;pointer-events:none">` +
@@ -699,6 +733,10 @@ function render(template, p) {
   if (p.rootHtml) {
     html = html.replace('<div id="root"></div>', `<div id="root">${p.rootHtml}</div>`);
     html = heroFirst(html);
+  }
+  if (p.realShell) {
+    html = html.replace('<div id="root"></div>', `<div id="root"></div>${realPhotosShell(p.realShell)}`);
+    html = heroFirst(html, { selector: "#__photoShell img", keepCss: true });
   }
   if (p.modelShell) {
     html = html.replace('<div id="root"></div>', `<div id="root"></div>${modelShell(p.modelShell)}`);
@@ -2854,6 +2892,38 @@ async function main() {
       `</ul><p><a href="${SITE}/products">Shop all skins</a> · <a href="${SITE}/real-photos">Real photos</a></p>`;
   }
 
+  /*
+   * /real-photos' list, built here (src/pages/real-photos/page.tsx). The page
+   * read 600 rows from Firestore after the bundle and the SDK had loaded, and
+   * only then asked for a single photo: Lighthouse mobile LCP 8.4 s
+   * (22 Nov 2026). The file is preloaded with the HTML, the first photo too;
+   * the page still asks Firestore afterwards for any taken since this build.
+   * No order numbers: the page doesn't show them.
+   */
+  const realPhotoRows = await readCollection(project, "realPhotos").catch(() => []);
+  const realPhotoList = realPhotoRows.filter((r) => !r.hidden && r.imageUrl)
+    .sort((a, b) => Number(b.createdAt || 0) - Number(a.createdAt || 0)).slice(0, 600)
+    .map((r) => ({ _id: r._id, imageUrl: r.imageUrl, designCode: r.designCode || "", gadget: r.gadget || "", productId: r.productId || "",
+      productSlug: r.productSlug || "", productTitle: r.productTitle || "", brand: r.brand || "", model: r.model || "", createdAt: Number(r.createdAt || 0) }));
+  await fs.writeFile(path.join(DIST, "data", "real-photos.json"), JSON.stringify({ photos: realPhotoList }));
+  const realPhotosPage = statics.find((p) => p.route === "/real-photos");
+  if (realPhotosPage && realPhotoList.length) {
+    realPhotosPage.dataPreload = "/data/real-photos.json";
+    // The grid's own URLs (responsiveImg widths 240/360/480), so the shell shows the files the app will.
+    const gridPhoto = (url) => {
+      const key = r2KeyOf(url);
+      if (!key || !sizedMockup(key, 240)) return null;
+      const ws = [...new Set([240, 360, 480].map((w) => sizedWidthOf(key, w)))].sort((a, b) => a - b);
+      return { src: `${CDN_HOST}sized/${sizedWidthOf(key, 360)}/${key}`, srcset: ws.map((w) => `${CDN_HOST}sized/${w}/${key} ${w}w`).join(", "),
+        sizes: "(min-width: 1024px) 25vw, (min-width: 768px) 33vw, 50vw" };
+    };
+    const firstRow = realPhotoList.slice(0, 4).map((r) => gridPhoto(r.imageUrl));
+    if (firstRow.every(Boolean)) {
+      realPhotosPage.lcpPhoto = firstRow[0];
+      realPhotosPage.realShell = { count: realPhotoList.length, photos: firstRow };
+    }
+  }
+
   for (const p of statics) await writePage(p.route, render(template, p));
 
   const seoInfo = await seoPageData(project, seoDocs, data, variantsByProduct);
@@ -3008,7 +3078,7 @@ async function main() {
    * they are always true and cost the page nothing: models we cut for,
    * designs, packing-table photos, and approved reviews.
    */
-  const realPhotos = await readCollection(project, "realPhotos").catch(() => []);
+  const realPhotos = realPhotoRows;
   const approved = (data.reviews || []).filter((r) => r.status === "approved" && Number(r.rating) >= 1);
   rows.stats = {
     models: catalogueStats.models,

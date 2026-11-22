@@ -1,9 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
-import { collection, getDocs, limit, orderBy, query } from "firebase/firestore";
 import { CameraIcon, ChevronLeftIcon, ChevronRightIcon, XIcon } from "lucide-react";
-import { db } from "@/lib/firebase-db";
 import { responsiveImg, sizedImage } from "@/lib/image-cdn";
 import { cutFor, type RealPhoto } from "@/lib/real-photos";
 import { readActiveDevice } from "@/lib/active-device";
@@ -27,12 +25,32 @@ function useAllRealPhotos() {
   const [photos, setPhotos] = useState<RealPhoto[] | undefined>(undefined);
   useEffect(() => {
     let live = true;
-    getDocs(query(collection(db, "realPhotos"), orderBy("createdAt", "desc"), limit(600)))
-      .then((s) => {
-        const rows = s.docs.map((d) => ({ _id: d.id, ...d.data() } as RealPhoto)).filter((p) => !p.hidden && p.imageUrl);
-        if (live) setPhotos(rows);
+    // Loaded only when asked: the SDK is 100 KB of script the first photo needn't wait for.
+    const fromFirestore = async () => {
+      const [{ collection, getDocs, limit, orderBy, query }, { db }] = await Promise.all([import("firebase/firestore"), import("@/lib/firebase-db")]);
+      const s = await getDocs(query(collection(db, "realPhotos"), orderBy("createdAt", "desc"), limit(600)));
+      return s.docs.map((d) => ({ _id: d.id, ...d.data() } as RealPhoto)).filter((p) => !p.hidden && p.imageUrl);
+    };
+    // The build's list first (scripts/prerender.mjs, preloaded with the HTML): no
+    // wait for the Firestore SDK before the first photo is asked for. Firestore
+    // then adds any photo taken since, once the page is idle.
+    fetch("/data/real-photos.json")
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
+      .then((j: { photos?: RealPhoto[] }) => {
+        const built = Array.isArray(j?.photos) ? j.photos : [];
+        if (!built.length) throw new Error("empty");
+        if (live) setPhotos(built);
+        const later = (fn: () => void) => ((window as any).requestIdleCallback
+          ? (window as any).requestIdleCallback(fn, { timeout: 5000 }) : setTimeout(fn, 3000));
+        later(() => {
+          fromFirestore().then((rows) => {
+            if (!live || !rows.length) return;
+            const same = rows.length === built.length && rows.every((r, i) => r._id === built[i]?._id);
+            if (!same) setPhotos(rows);
+          }).catch(() => undefined);
+        });
       })
-      .catch(() => live && setPhotos([]));
+      .catch(() => fromFirestore().then((rows) => live && setPhotos(rows)).catch(() => live && setPhotos([])));
     return () => { live = false; };
   }, []);
   return photos;
@@ -131,7 +149,9 @@ export default function RealPhotosPage() {
                   className="group overflow-hidden rounded-2xl border-2 border-ink/15 bg-card text-left transition-all hover:border-ink hover:shadow-[3px_3px_0_0_var(--ink)]">
                   <div className="relative aspect-[4/5] overflow-hidden bg-muted">
                     <img {...responsiveImg(p.imageUrl, [240, 360, 480], "(min-width: 1024px) 25vw, (min-width: 768px) 33vw, 50vw")}
-                      alt={`${p.productTitle}, ${cutFor(p).toLowerCase()}`} loading="lazy" decoding="async"
+                      alt={`${p.productTitle}, ${cutFor(p).toLowerCase()}`}
+                      // The first row is the page's largest paint: asked for at once.
+                      loading={i < 4 ? "eager" : "lazy"} fetchPriority={i < 2 ? "high" : "auto"} decoding="async"
                       className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105" />
                   </div>
                   <div className="p-2.5">
