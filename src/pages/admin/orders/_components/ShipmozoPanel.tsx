@@ -25,7 +25,13 @@ export function ShipmozoPanel({ order }: { order: any }) {
     setBusy("label");
     try {
       const r = await call<{ label: string; awb: string }>("shipmozoLabel", { orderId });
-      if (w) {
+      if (w && /amazon/i.test(String(order.courierName || ""))) {
+        // Amazon takes only its own label: the picture as it came, no page fitting.
+        w.document.title = `Label ${r.awb}`;
+        const img = w.document.createElement("img");
+        img.src = r.label;
+        w.document.body.appendChild(img);
+      } else if (w) {
         w.document.title = `Label ${r.awb}`;
         // One 4×6 page: no browser margins (they print the date and "about:blank"),
         // and the picture is fitted to the page height so its bottom line

@@ -237,11 +237,20 @@ export async function cancelShipmozo(order: any, orderRef: admin.firestore.Docum
   });
 }
 
+/**
+ * Amazon Shipping refuses a parcel whose label is not its own format, so an
+ * Amazon label (booked through Shipmozo or RapidShyp) is never branded,
+ * rescaled or laid out with others: it is printed as it came (owner, 22 Nov 2026).
+ */
+export const isAmazonCourier = (courierName: string) => /amazon/i.test(courierName || "");
+
 /** A Shipmozo label as a PNG data URL (bulk printing in rapidshyp.ts uses it too). */
 export async function shipmozoLabelData(awb: string, courierName = ""): Promise<string> {
   const r = await smz(`get-order-label/${encodeURIComponent(awb)}`);
   const label = Array.isArray(r.data?.data) ? String(r.data.data[0]?.label || "") : "";
   if (!r.ok || !label.startsWith("data:image")) throw new Error(`Shipmozo did not return a label (${why(r)})`);
+  // Amazon Shipping takes only its own label at pickup: it goes out exactly as it came.
+  if (isAmazonCourier(courierName)) return label;
   // Our logo across the top, the courier's under the order barcode (labelBrand.ts).
   const { brandShipmozoLabel } = await import("./labelBrand");
   return brandShipmozoLabel(label, courierName);

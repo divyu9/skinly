@@ -365,7 +365,7 @@ function AdminOrdersPageInner() {
 
       // Load all label PDFs from base64 data (fetched by backend)
       // A label is either a PDF (RapidShyp, Delhivery) or an image (Shipmozo).
-      const labelPdfs: Array<{ orderNumber: string; pdf?: PDFDocument; image?: Uint8Array }> = [];
+      const labelPdfs: Array<{ orderNumber: string; pdf?: PDFDocument; image?: Uint8Array; asIs?: boolean }> = [];
       const loadErrors: Array<{ orderNumber: string; error: string }> = [];
 
       for (const label of results.labels as any[]) {
@@ -377,7 +377,7 @@ function AdminOrdersPageInner() {
             const image = new Uint8Array(bin.length);
             for (let i = 0; i < bin.length; i++) image[i] = bin.charCodeAt(i);
             if (!image.byteLength) throw new Error("Empty label image");
-            labelPdfs.push({ orderNumber: label.orderNumber, image });
+            labelPdfs.push({ orderNumber: label.orderNumber, image, asIs: !!label.asIs });
             continue;
           }
           console.log(`Loading label for ${label.orderNumber}`);
@@ -399,7 +399,7 @@ function AdminOrdersPageInner() {
           const pdf = await PDFDocument.load(bytes, { ignoreEncryption: true });
           console.log(`Loaded PDF for ${label.orderNumber}, pages: ${pdf.getPageCount()}`);
           
-          labelPdfs.push({ orderNumber: label.orderNumber, pdf });
+          labelPdfs.push({ orderNumber: label.orderNumber, pdf, asIs: !!label.asIs });
         } catch (error) {
           const errorMsg = error instanceof Error ? error.message : 'Unknown error';
           console.error(`Failed to load label for ${label.orderNumber}:`, errorMsg);
@@ -428,6 +428,38 @@ function AdminOrdersPageInner() {
       }
 
       console.log(`Successfully loaded ${labelPdfs.length} labels, creating ST4 layout`);
+
+      // Amazon Shipping accepts only its own label at pickup: those come out in a file of
+      // their own, every page exactly as the courier sent it (no logo, no scaling, no grid).
+      const asIsLabels = labelPdfs.filter((e) => e.asIs);
+      if (asIsLabels.length) {
+        labelPdfs.splice(0, labelPdfs.length, ...labelPdfs.filter((e) => !e.asIs));
+        const amazonPdf = await PDFDocument.create();
+        for (const entry of asIsLabels) {
+          try {
+            if (entry.image) {
+              const isJpg = entry.image[0] === 0xff && entry.image[1] === 0xd8;
+              const img = isJpg ? await amazonPdf.embedJpg(entry.image) : await amazonPdf.embedPng(entry.image);
+              // The picture alone on a page of its own proportions, 4 inches wide.
+              const W = 288, H = (288 * img.height) / img.width;
+              amazonPdf.addPage([W, H]).drawImage(img, { x: 0, y: 0, width: W, height: H });
+            } else {
+              const pages = await amazonPdf.copyPages(entry.pdf!, entry.pdf!.getPageIndices());
+              pages.forEach((pg) => amazonPdf.addPage(pg));
+            }
+          } catch (error) {
+            loadErrors.push({ orderNumber: entry.orderNumber, error: error instanceof Error ? error.message : "Failed to copy Amazon label" });
+          }
+        }
+        const bytes = await amazonPdf.save();
+        const aUrl = URL.createObjectURL(new Blob([new Uint8Array(bytes)], { type: "application/pdf" }));
+        const a = document.createElement("a");
+        a.href = aUrl;
+        a.download = `amazon-labels-${new Date().toISOString().slice(0, 10)}.pdf`;
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+        URL.revokeObjectURL(aUrl);
+        toast.success(`Downloaded ${asIsLabels.length} Amazon label(s) as they came, in a separate file`);
+      }
 
       const mergedPdf = await PDFDocument.create();
 
@@ -503,7 +535,8 @@ function AdminOrdersPageInner() {
       }
       }
 
-      // Download merged PDF
+      // Download merged PDF (none when every label was Amazon's)
+      if (labelPdfs.length) {
       const mergedPdfBytes = await mergedPdf.save();
       const blob = new Blob([new Uint8Array(mergedPdfBytes)], { type: "application/pdf" });
       const url = URL.createObjectURL(blob);
@@ -518,6 +551,7 @@ function AdminOrdersPageInner() {
       toast.success(labelFormat === "4x6"
         ? `Downloaded ${labelPdfs.length} labels (4×6, one a page)`
         : `Downloaded ${labelPdfs.length} labels (${Math.ceil(labelPdfs.length / 4)} A4 pages, four a page)`);
+      }
 
       if (loadErrors.length > 0 || results.errors.length > 0) {
         setBulkResults({

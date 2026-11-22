@@ -753,12 +753,15 @@ export const bulkFetchLabels = onCall(async (data: any, context: any) => {
     const order: any = snap.exists ? snap.data() : null;
     const label = String(order?.orderNumber || order?.failedOrderNumber || "Pending");
     if (!order) { errors.push({ orderId: snap.id, orderNumber: label, error: "Order not found" }); continue; }
+    // Amazon's label is printed as it came, never laid out with the rest (isAmazonCourier).
+    const { isAmazonCourier } = await import("./shipmozo");
+    const asIs = isAmazonCourier(String(order.courierName || ""));
     // Shipmozo sends its label as a PNG, not a PDF link; the page lays it out like the rest.
     if (order.shippingProvider === "shipmozo" && order.awbNumber) {
       try {
         const { shipmozoLabelData } = await import("./shipmozo");
         const dataUrl = await shipmozoLabelData(String(order.awbNumber), String(order.courierName || ""));
-        labels.push({ orderId: snap.id, orderNumber: label, pngBase64: dataUrl.replace(/^data:image\/\w+;base64,/, "") });
+        labels.push({ orderId: snap.id, orderNumber: label, pngBase64: dataUrl.replace(/^data:image\/\w+;base64,/, ""), asIs });
       } catch (e: any) {
         errors.push({ orderId: snap.id, orderNumber: label, error: e?.message || "Shipmozo label failed" });
       }
@@ -774,7 +777,7 @@ export const bulkFetchLabels = onCall(async (data: any, context: any) => {
       if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);
       const buf = Buffer.from(await res.arrayBuffer());
       if (!buf.byteLength) throw new Error("Empty PDF file");
-      labels.push({ orderId: snap.id, orderNumber: label, pdfBase64: buf.toString("base64") });
+      labels.push({ orderId: snap.id, orderNumber: label, pdfBase64: buf.toString("base64"), asIs });
     } catch (e: any) {
       errors.push({ orderId: snap.id, orderNumber: label, error: e?.message || "Fetch failed" });
     }
