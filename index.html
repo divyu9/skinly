@@ -183,6 +183,10 @@
           };
           if (!window._fbq) window._fbq = n;
           n.push = n; n.loaded = true; n.version = "2.0"; n.queue = [];
+          // No automatic events: they scan the whole page (buttons, microdata) in
+          // one 300-400 ms task on a phone, a tap's worth of INP, and the events
+          // we send ourselves (and through CAPI) are the ones the ads optimise on.
+          n("set", "autoConfig", false, pixelId);
           n("init", pixelId);
           n("track", "PageView");
           for (var i = 0; i < early.length; i++) n.apply(null, early[i]);
