@@ -115,7 +115,7 @@ function AuthenticatedCartContent() {
   // Create a map for quick stock lookup
   // Typed, because the untyped Map inferred its values as {} and every
   // stockInfo?.isOutOfStock read below was an error hiding in the noise.
-  const stockStatusMap = new Map<string, { isOutOfStock?: boolean }>(
+  const stockStatusMap = new Map<string, { isOutOfStock?: boolean; availableQuantity?: number }>(
     stockStatus?.map((status: any) => [`${status.productId}-${status.variant}`, status]) || []
   );
 
@@ -269,6 +269,8 @@ function AuthenticatedCartContent() {
           {cartItems.map((item) => {
             const stockInfo = stockStatusMap.get(`${item.productId}-${item.variant}`);
             const isOutOfStock = !(item as any).clearanceItemId && (stockInfo?.isOutOfStock || false);
+            // Some left, just fewer than the cart holds (one design on two phones): reduce, don't remove.
+            const onlyLeft = isOutOfStock && (stockInfo?.availableQuantity || 0) > 0 ? stockInfo!.availableQuantity! : 0;
             
             return (
               <Card key={item._id} className={`rounded-2xl border-2 border-ink/15 py-0 ${isOutOfStock ? 'opacity-50' : ''}`}>
@@ -304,7 +306,7 @@ function AuthenticatedCartContent() {
                       </Link>
                       {isOutOfStock && (
                         <Badge variant="destructive" className="text-xs shrink-0">
-                          Out of Stock
+                          {onlyLeft ? `Only ${onlyLeft} left` : "Out of Stock"}
                         </Badge>
                       )}
                     </div>
@@ -324,7 +326,7 @@ function AuthenticatedCartContent() {
                     {isOutOfStock && (
                       <div className="flex items-center gap-1 mb-2 text-sm text-destructive">
                         <AlertCircleIcon className="size-4" />
-                        <span>Remove this item to proceed with checkout</span>
+                        <span>{onlyLeft ? `Only ${onlyLeft} left in this design: remove or reduce to ${onlyLeft} to check out` : "Remove this item to proceed with checkout"}</span>
                       </div>
                     )}
                     {/* Stepper, line total and remove on one row. Stacked, a
@@ -337,7 +339,7 @@ function AuthenticatedCartContent() {
                           variant="ghost"
                           className="size-9 p-0"
                           aria-label="Decrease quantity"
-                          disabled={isOutOfStock}
+                          disabled={isOutOfStock && !onlyLeft}
                           onClick={() => handleUpdateQuantity(item._id, Math.max(1, item.quantity - 1))}
                         >
                           <MinusIcon className="size-4" />
@@ -532,7 +534,7 @@ function GuestCartContent() {
   // Create a map for quick stock lookup
   // Typed, because the untyped Map inferred its values as {} and every
   // stockInfo?.isOutOfStock read below was an error hiding in the noise.
-  const stockStatusMap = new Map<string, { isOutOfStock?: boolean }>(
+  const stockStatusMap = new Map<string, { isOutOfStock?: boolean; availableQuantity?: number }>(
     stockStatus?.map((status: any) => [`${status.productId}-${status.variant}`, status]) || []
   );
 
@@ -628,6 +630,8 @@ function GuestCartContent() {
             const key = `${item.productId}-${item.variant}-${idx}`;
             const stockInfo = stockStatusMap.get(`${item.productId}-${item.variant}`);
             const isOutOfStock = !(item as any).clearanceItemId && (stockInfo?.isOutOfStock || false);
+            // Some left, just fewer than the cart holds (one design on two phones): reduce, don't remove.
+            const onlyLeft = isOutOfStock && (stockInfo?.availableQuantity || 0) > 0 ? stockInfo!.availableQuantity! : 0;
             
             return (
               <Card key={key} className={`rounded-2xl border-2 border-ink/15 py-0 ${isOutOfStock ? 'opacity-50' : ''}`}>
@@ -663,7 +667,7 @@ function GuestCartContent() {
                         </Link>
                         {isOutOfStock && (
                           <Badge variant="destructive" className="text-xs shrink-0">
-                            Out of Stock
+                            {onlyLeft ? `Only ${onlyLeft} left` : "Out of Stock"}
                           </Badge>
                         )}
                       </div>
@@ -681,7 +685,7 @@ function GuestCartContent() {
                       {isOutOfStock && (
                         <div className="flex items-center gap-1 mb-2 text-sm text-destructive">
                           <AlertCircleIcon className="size-4" />
-                          <span>Remove this item to proceed with checkout</span>
+                          <span>{onlyLeft ? `Only ${onlyLeft} left in this design: remove or reduce to ${onlyLeft} to check out` : "Remove this item to proceed with checkout"}</span>
                         </div>
                       )}
                       {/* Same row as the signed-in cart: stepper, line total,
@@ -694,7 +698,7 @@ function GuestCartContent() {
                             variant="ghost"
                             className="size-9 p-0"
                             aria-label="Decrease quantity"
-                            disabled={isOutOfStock}
+                            disabled={isOutOfStock && !onlyLeft}
                             onClick={() => handleUpdateQuantity(item.productId, item.variant, Math.max(1, item.quantity - 1))}
                           >
                             <MinusIcon className="size-4" />

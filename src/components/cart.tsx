@@ -119,7 +119,7 @@ function CartContent({ onCheckoutClick }: { onCheckoutClick: () => void }) {
   );
 
   // Create a map for quick stock lookup
-  const stockStatusMap = new Map<string, { isOutOfStock?: boolean }>(
+  const stockStatusMap = new Map<string, { isOutOfStock?: boolean; availableQuantity?: number }>(
     stockStatus?.map(status => [`${status.productId}-${status.variant}`, status]) || []
   );
 
@@ -203,6 +203,8 @@ function CartContent({ onCheckoutClick }: { onCheckoutClick: () => void }) {
           const key = itemId || `${item.productId}-${item.variant}-${idx}`;
           const stockInfo = stockStatusMap.get(`${item.productId}-${item.variant}`);
           const isOutOfStock = !(item as any).clearanceItemId && (stockInfo?.isOutOfStock || false);
+            // Some left, just fewer than the cart holds (one design on two phones): reduce, don't remove.
+            const onlyLeft = isOutOfStock && (stockInfo?.availableQuantity || 0) > 0 ? stockInfo!.availableQuantity! : 0;
           
           return (
             <div key={key}>
@@ -228,7 +230,7 @@ function CartContent({ onCheckoutClick }: { onCheckoutClick: () => void }) {
                       </h4>
                       {isOutOfStock && (
                         <Badge variant="destructive" className="text-xs shrink-0">
-                          Out of Stock
+                          {onlyLeft ? `Only ${onlyLeft} left` : "Out of Stock"}
                         </Badge>
                       )}
                     </div>
@@ -259,7 +261,7 @@ function CartContent({ onCheckoutClick }: { onCheckoutClick: () => void }) {
                     {isOutOfStock && (
                       <div className="flex items-center gap-1 mt-1 text-xs text-destructive">
                         <AlertCircleIcon className="size-3" />
-                        <span>Remove this item to proceed</span>
+                        <span>{onlyLeft ? `Only ${onlyLeft} left in this design: remove or reduce to ${onlyLeft}` : "Remove this item to proceed"}</span>
                       </div>
                     )}
                   </div>
@@ -277,7 +279,7 @@ function CartContent({ onCheckoutClick }: { onCheckoutClick: () => void }) {
                           size="sm"
                           variant="ghost"
                           className="h-7 w-7 p-0"
-                          disabled={isOutOfStock}
+                          disabled={isOutOfStock && !onlyLeft}
                           onClick={() => handleUpdateQuantity(
                             item.productId,
                             item.variant,

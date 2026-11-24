@@ -113,26 +113,20 @@ export function resolveMaterialCode(
   return whole && stock.has(whole) ? stock.get(whole)! : null;
 }
 
-export async function reserveMaterialForOrder(
+/**
+ * What an order's lines take from stock, design by design: two lines of one
+ * design (one skin for a Pixel 9, one for a Find X10) are two sheets of the
+ * same pile. Shared by the draw-down and by placeOrder's check before it.
+ */
+export async function materialDemand(
   db: admin.firestore.Firestore,
-  orderRef: admin.firestore.DocumentReference,
   items: Array<{ productId?: string; variant?: string; title?: string; quantity?: number }>
-): Promise<void> {
-  // Once per order: the trigger and any re-run must not take it twice. The
-  // claim is a transaction because a payment confirmation writes the order
-  // several times in quick succession, and each write wakes the trigger.
-  const claimed = await db.runTransaction(async (tx) => {
-    const o = (await tx.get(orderRef)).data() as any;
-    if (!o || o.materialConsumed || o.materialClaimedAt) return false;
-    tx.update(orderRef, { materialClaimedAt: Date.now() });
-    return true;
-  });
-  if (!claimed) return;
-
+): Promise<{ wanted: Map<string, Consumption & { designName: string }>; unresolved: string[] }> {
+  const wanted = new Map<string, Consumption & { designName: string }>();
   const productIds = Array.from(
     new Set(items.map((i) => i?.productId).filter((p): p is string => !!p))
   );
-  if (!productIds.length) return;
+  if (!productIds.length) return { wanted, unresolved: [] as string[] };
 
   const chunks: string[][] = [];
   for (let i = 0; i < productIds.length; i += 30) chunks.push(productIds.slice(i, i + 30));
@@ -164,7 +158,6 @@ export async function reserveMaterialForOrder(
     if (g.gadgetTypeId) gadgets.set(g.gadgetTypeId, g);
   });
 
-  const wanted = new Map<string, Consumption>();
   const unresolved: string[] = [];
 
   for (const item of items) {
@@ -212,8 +205,48 @@ export async function reserveMaterialForOrder(
     const key = `${collection}/${design.id}`;
     const prev = wanted.get(key);
     if (prev) prev.amount += amount;
-    else wanted.set(key, { collection, docId: design.id, code: design.code, amount, unit });
+    else wanted.set(key, { collection, docId: design.id, code: design.code, designName: design.designName, amount, unit });
   }
+  return { wanted, unresolved };
+}
+
+/**
+ * Designs this cart asks for more sheets of than the shelf holds. Each phone
+ * model is its own variant with its own "1 in stock", so a cart could carry
+ * one design twice on two phones while the pile had one sheet (#4134, M-202,
+ * 24 Nov 2026). Cutouts only: sheets are counted; a roll's yield in metres is
+ * an estimate.
+ */
+export async function cutoutShortfall(
+  db: admin.firestore.Firestore,
+  items: Array<{ productId?: string; variant?: string; quantity?: number }>
+): Promise<Array<{ code: string; designName: string; need: number; have: number }>> {
+  const { wanted } = await materialDemand(db, items);
+  const cut = [...wanted.values()].filter((w) => w.collection === "cutoutInventory");
+  if (!cut.length) return [];
+  const snaps = await db.getAll(...cut.map((w) => db.collection("cutoutInventory").doc(w.docId)));
+  return cut
+    .map((w, i) => ({ code: w.code, designName: w.designName, need: w.amount, have: Number((snaps[i].data() as any)?.sheetsAvailable) || 0 }))
+    .filter((x) => x.need > x.have);
+}
+
+export async function reserveMaterialForOrder(
+  db: admin.firestore.Firestore,
+  orderRef: admin.firestore.DocumentReference,
+  items: Array<{ productId?: string; variant?: string; title?: string; quantity?: number }>
+): Promise<void> {
+  // Once per order: the trigger and any re-run must not take it twice. The
+  // claim is a transaction because a payment confirmation writes the order
+  // several times in quick succession, and each write wakes the trigger.
+  const claimed = await db.runTransaction(async (tx) => {
+    const o = (await tx.get(orderRef)).data() as any;
+    if (!o || o.materialConsumed || o.materialClaimedAt) return false;
+    tx.update(orderRef, { materialClaimedAt: Date.now() });
+    return true;
+  });
+  if (!claimed) return;
+
+  const { wanted, unresolved } = await materialDemand(db, items);
 
   if (!wanted.size) {
     if (unresolved.length) console.warn("reserveMaterial: nothing drawn down", { unresolved });

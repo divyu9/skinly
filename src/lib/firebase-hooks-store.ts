@@ -1358,7 +1358,16 @@ export async function runQuery(c: QueryCtx) {
             setData([]);
           } else {
             (async () => {
+              // One design on two phones is two lines of one variant, each "1 in
+              // stock" on its own (#4134, M-202): compare the variant's stock with
+              // every line of it in the cart. placeOrder checks per design too.
+              const inCart = new Map<string, number>();
+              for (const it of cartItems) {
+                const k = `${it.productId}::${it.variant}`;
+                inCart.set(k, (inCart.get(k) || 0) + (Number(it.quantity) || 1));
+              }
               const status = await Promise.all(cartItems.map(async (item) => {
+                const wanted = inCart.get(`${item.productId}::${item.variant}`) || Number(item.quantity) || 1;
                 try {
                   const vsnap = await getDocs(query(
                     collection(db, 'variants'),
@@ -1373,9 +1382,9 @@ export async function runQuery(c: QueryCtx) {
                   return {
                     productId: item.productId,
                     variant: item.variant,
-                    isOutOfStock: available <= 0 || available < item.quantity,
+                    isOutOfStock: available <= 0 || available < wanted,
                     availableQuantity: available,
-                    requestedQuantity: item.quantity,
+                    requestedQuantity: wanted,
                   };
                 } catch (e) {
                   console.error(`stock check failed for ${item.productId}:`, e);

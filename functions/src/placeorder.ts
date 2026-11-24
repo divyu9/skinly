@@ -8,6 +8,7 @@ import { HttpsError } from "firebase-functions/v1/https";
 import * as admin from "firebase-admin";
 import * as crypto from "crypto";
 import { getCaller } from "./auth";
+import { cutoutShortfall } from "./materials";
 import { assertCodOtp, markCodOtpUsed } from "./codOtp";
 import { recordOptIn } from "./contacts";
 import { evaluateReferral, normCode, recordReferral, referrerRewardFor } from "./referrals";
@@ -304,6 +305,21 @@ export const placeOrder = functions
       }
       return sum + dbPrice * qty;
     }, 0);
+
+    // ── 3. Enough sheets for the whole cart ───────────────────────────────────
+    // Each phone model is a variant with its own "1 in stock", so one design
+    // on two phones passed every per-line check while the pile held one sheet
+    // (#4134: M-202 for a Pixel 9 and a Find X10, 24 Nov 2026). Counted per
+    // design here, before anything is written. A failed lookup never blocks.
+    const short = await cutoutShortfall(db, orderItems.filter((it: any) => !it?.clearanceItemId))
+      .catch((e) => { console.error("[placeOrder] stock check:", e?.message || e); return []; });
+    if (short.length) {
+      const s0 = short[0];
+      const name = s0.designName || s0.code;
+      throw new HttpsError("failed-precondition", s0.have > 0
+        ? `Only ${s0.have} left of "${name}" — your cart has ${s0.need}. Please remove ${s0.need - s0.have} from the cart.`
+        : `"${name}" just sold out. Please remove it from the cart.`);
+    }
 
     // ── 3a. Shipping, the same rule the checkout page shows ──────────────────
     // Checkout adds flatShippingFee below freeShippingThreshold and shows it in
